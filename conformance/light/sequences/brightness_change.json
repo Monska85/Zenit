@@ -1,0 +1,10 @@
+{
+  "description": "Brightness moves linearly in L over 500 ms.",
+  "settings": {},
+  "events": [{ "at": 2000, "set": { "brightness": 100 } }],
+  "expect": [
+    { "at": 2000, "duties": [0, 0, 0, 4607] },
+    { "at": 2250, "duties": [0, 0, 0, 9286] },
+    { "at": 2500, "duties": [0, 0, 0, 16383] }
+  ]
+}

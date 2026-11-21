@@ -1,0 +1,18 @@
+{
+  "description": "Lightness to duty, docs/board/light-v1.md#brightness-curve",
+  "cases": [
+    { "lightness": 0, "duty": 0 },
+    { "lightness": 1, "duty": 18 },
+    { "lightness": 5, "duty": 91 },
+    { "lightness": 8, "duty": 145 },
+    { "lightness": 8.5, "duty": 154 },
+    { "lightness": 10, "duty": 184 },
+    { "lightness": 20, "duty": 490 },
+    { "lightness": 30, "duty": 1022 },
+    { "lightness": 50, "duty": 3018 },
+    { "lightness": 60, "duty": 4607 },
+    { "lightness": 80, "duty": 9286 },
+    { "lightness": 90, "duty": 12501 },
+    { "lightness": 100, "duty": 16383 }
+  ]
+}

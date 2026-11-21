@@ -1,0 +1,5 @@
+{
+  "description": "Fall asleep without a timer behaves as static.",
+  "settings": { "effect": "fall_asleep", "color": "blue" },
+  "expect": [{ "at": 120000, "duties": [0, 0, 4607, 0] }]
+}

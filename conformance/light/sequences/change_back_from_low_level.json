@@ -1,0 +1,14 @@
+{
+  "description": "Breathing at its floor (factor 200, brightness 100), a change to static at 4 s and back at 4.1 s: the fade-down reached 168, and the turn-back returns to breathing's own factor (201.23 at 4.1 s) at the full fade-down rate, in 21 ms.",
+  "settings": { "effect": "breathing", "brightness": 100 },
+  "events": [
+    { "at": 4000, "set": { "effect": "static" } },
+    { "at": 4100, "set": { "effect": "breathing" } }
+  ],
+  "expect": [
+    { "at": 4100, "duties": [0, 0, 0, 370] },
+    { "at": 4110, "duties": [0, 0, 0, 427] },
+    { "at": 4121, "duties": [0, 0, 0, 497] },
+    { "at": 4300, "duties": [0, 0, 0, 536] }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "description": "Twinkle, strength 20, seed 1, brightness 60: targets 824, 999, 941, 949, 856, 972 from the xorshift sequence.",
+  "settings": { "effect": "twinkle" },
+  "seed": 1,
+  "expect": [
+    { "at": 1000, "duties": [0, 0, 0, 3208] },
+    { "at": 1100, "duties": [0, 0, 0, 3731] },
+    { "at": 1300, "duties": [0, 0, 0, 3642] }
+  ]
+}

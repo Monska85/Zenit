@@ -1,0 +1,10 @@
+{
+  "description": "A 1 minute timer: the fade-out starts at 60 s and lasts 30 s, then the light is off.",
+  "settings": { "timer_minutes": 1 },
+  "expect": [
+    { "at": 30000, "duties": [0, 0, 0, 4607], "timer_remaining_s": 30 },
+    { "at": 60000, "duties": [0, 0, 0, 4607], "timer_remaining_s": 0, "on": true },
+    { "at": 75000, "duties": [0, 0, 0, 1022], "on": true },
+    { "at": 90000, "duties": [0, 0, 0, 0], "on": false }
+  ]
+}

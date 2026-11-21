@@ -1,0 +1,9 @@
+{
+  "description": "Breathing, period 8 s, floor 20, brightness 100: full at 0, floor at half the period.",
+  "settings": { "effect": "breathing", "brightness": 100 },
+  "expect": [
+    { "at": 2000, "duties": [0, 0, 0, 4607] },
+    { "at": 4000, "duties": [0, 0, 0, 490] },
+    { "at": 8000, "duties": [0, 0, 0, 16383] }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "description": "Color change of red and green, hold 5 s, floor 20, brightness 100: each color lasts 7 s.",
+  "settings": { "effect": "color_change", "colors": ["red", "green"], "hold_seconds": 5, "brightness": 100 },
+  "expect": [
+    { "at": 1000, "duties": [16383, 0, 0, 0] },
+    { "at": 6500, "duties": [4607, 0, 0, 0] },
+    { "at": 7000, "duties": [0, 490, 0, 0] },
+    { "at": 7500, "duties": [0, 4607, 0, 0] },
+    { "at": 14000, "duties": [490, 0, 0, 0] }
+  ]
+}

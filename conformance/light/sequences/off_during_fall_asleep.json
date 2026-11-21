@@ -1,0 +1,9 @@
+{
+  "description": "Off during fall asleep keeps the countdown's factor while it fades out: at 30.5 s the factor is 593.33 and the power 0.5.",
+  "settings": { "effect": "fall_asleep", "timer_minutes": 1 },
+  "events": [{ "at": 30000, "light": false }],
+  "expect": [
+    { "at": 30500, "duties": [0, 0, 0, 405], "on": false },
+    { "at": 31000, "duties": [0, 0, 0, 0], "on": false }
+  ]
+}

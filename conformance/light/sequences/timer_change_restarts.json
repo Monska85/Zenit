@@ -1,0 +1,9 @@
+{
+  "description": "Changing the timer while the light is on starts the countdown again from the full duration.",
+  "settings": { "timer_minutes": 1 },
+  "events": [{ "at": 50000, "set": { "timer_minutes": 2 } }],
+  "expect": [
+    { "at": 60000, "duties": [0, 0, 0, 4607], "timer_remaining_s": 110 },
+    { "at": 170000, "duties": [0, 0, 0, 4607], "timer_remaining_s": 0 }
+  ]
+}

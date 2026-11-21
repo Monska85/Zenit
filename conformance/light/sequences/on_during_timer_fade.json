@@ -1,0 +1,10 @@
+{
+  "description": "On during the timer's fade-out brings the light back at the rate of light on (from 0.5, 500 ms) with a new countdown.",
+  "settings": { "timer_minutes": 1 },
+  "events": [{ "at": 75000, "light": true }],
+  "expect": [
+    { "at": 75250, "duties": [0, 0, 0, 2382], "on": true },
+    { "at": 75500, "duties": [0, 0, 0, 4607], "on": true },
+    { "at": 76000, "duties": [0, 0, 0, 4607], "timer_remaining_s": 59 }
+  ]
+}

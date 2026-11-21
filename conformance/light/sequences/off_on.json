@@ -1,0 +1,14 @@
+{
+  "description": "Off fades out in 1 s and is reported at once; on fades in again in 1 s.",
+  "settings": {},
+  "events": [
+    { "at": 2000, "light": false },
+    { "at": 5000, "light": true }
+  ],
+  "expect": [
+    { "at": 2500, "duties": [0, 0, 0, 1022], "on": false },
+    { "at": 3000, "duties": [0, 0, 0, 0], "on": false },
+    { "at": 5500, "duties": [0, 0, 0, 1022], "on": true },
+    { "at": 6000, "duties": [0, 0, 0, 4607], "on": true }
+  ]
+}

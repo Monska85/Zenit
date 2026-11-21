@@ -1,0 +1,11 @@
+{
+  "description": "Power limit, docs/board/light-v1.md#power-limit. Duties in channel order red, green, blue, white.",
+  "cases": [
+    { "duties": [0, 0, 0, 16383], "limit_mw": 1000, "expect": [0, 0, 0, 16383], "power_scale": 100 },
+    { "duties": [16383, 0, 0, 0], "limit_mw": 1000, "expect": [16383, 0, 0, 0], "power_scale": 100 },
+    { "duties": [0, 0, 0, 16383], "limit_mw": 300, "expect": [0, 0, 0, 5649], "power_scale": 34 },
+    { "duties": [16383, 0, 0, 0], "limit_mw": 500, "expect": [13428, 0, 0, 0], "power_scale": 81 },
+    { "duties": [16383, 16383, 16383, 16383], "limit_mw": 1000, "expect": [5087, 5087, 5087, 5087], "power_scale": 31 },
+    { "duties": [0, 0, 0, 0], "limit_mw": 1000, "expect": [0, 0, 0, 0], "power_scale": 100 }
+  ]
+}

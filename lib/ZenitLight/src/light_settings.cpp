@@ -1,0 +1,123 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#include "light_settings.h"
+
+#include <cstring>
+
+namespace zenit
+{
+
+namespace
+{
+const char *const EFFECT_NAMES[EFFECT_COUNT] = {"static",  "color_change", "breathing",
+                                                "twinkle", "fall_asleep",  "christmas"};
+const char *const COLOR_SET_NAMES[COLOR_SET_COUNT] = {"christmas", "ice"};
+} // namespace
+
+bool ColorList::operator==(const ColorList &other) const
+{
+  if (count != other.count)
+    return false;
+  for (size_t i = 0; i < count && i < MAX_COLORS; i++)
+    if (color[i] != other.color[i])
+      return false;
+  return true;
+}
+
+bool LightSettings::operator==(const LightSettings &other) const
+{
+  return brightness == other.brightness && effect == other.effect && color == other.color && colors == other.colors &&
+         color_set == other.color_set && hold_seconds == other.hold_seconds && period_seconds == other.period_seconds &&
+         floor == other.floor && twinkle_strength == other.twinkle_strength && timer_minutes == other.timer_minutes;
+}
+
+bool valid_brightness(uint32_t value) { return value >= MIN_BRIGHTNESS && value <= MAX_BRIGHTNESS; }
+
+bool valid_colors(const ColorList &colors)
+{
+  if (colors.count < MIN_COLORS || colors.count > MAX_COLORS)
+    return false;
+  for (size_t i = 0; i < colors.count; i++)
+  {
+    if (static_cast<size_t>(colors.color[i]) >= COLOR_COUNT)
+      return false;
+    for (size_t j = 0; j < i; j++)
+      if (colors.color[i] == colors.color[j])
+        return false;
+  }
+  return true;
+}
+
+bool valid_hold_seconds(uint32_t value) { return value >= MIN_HOLD_SECONDS && value <= MAX_HOLD_SECONDS; }
+bool valid_period_seconds(uint32_t value) { return value >= MIN_PERIOD_SECONDS && value <= MAX_PERIOD_SECONDS; }
+bool valid_floor(uint32_t value) { return value >= MIN_FLOOR && value <= MAX_FLOOR; }
+bool valid_twinkle_strength(uint32_t value) { return value >= MIN_TWINKLE_STRENGTH && value <= MAX_TWINKLE_STRENGTH; }
+bool valid_timer_minutes(uint32_t value) { return value <= MAX_TIMER_MINUTES; }
+
+bool valid(const LightSettings &s)
+{
+  return valid_brightness(s.brightness) && static_cast<size_t>(s.effect) < EFFECT_COUNT &&
+         static_cast<size_t>(s.color) < COLOR_COUNT && valid_colors(s.colors) &&
+         static_cast<size_t>(s.color_set) < COLOR_SET_COUNT && valid_hold_seconds(s.hold_seconds) &&
+         valid_period_seconds(s.period_seconds) && valid_floor(s.floor) && valid_twinkle_strength(s.twinkle_strength) &&
+         valid_timer_minutes(s.timer_minutes);
+}
+
+const char *effect_name(Effect effect)
+{
+  size_t index = static_cast<size_t>(effect);
+  return index < EFFECT_COUNT ? EFFECT_NAMES[index] : "static";
+}
+
+bool effect_from_name(const char *name, Effect &effect)
+{
+  if (!name)
+    return false;
+  for (size_t i = 0; i < EFFECT_COUNT; i++)
+    if (std::strcmp(name, EFFECT_NAMES[i]) == 0)
+    {
+      effect = static_cast<Effect>(i);
+      return true;
+    }
+  return false;
+}
+
+const char *color_set_name(ColorSet set)
+{
+  size_t index = static_cast<size_t>(set);
+  return index < COLOR_SET_COUNT ? COLOR_SET_NAMES[index] : "christmas";
+}
+
+bool color_set_from_name(const char *name, ColorSet &set)
+{
+  if (!name)
+    return false;
+  for (size_t i = 0; i < COLOR_SET_COUNT; i++)
+    if (std::strcmp(name, COLOR_SET_NAMES[i]) == 0)
+    {
+      set = static_cast<ColorSet>(i);
+      return true;
+    }
+  return false;
+}
+
+ColorList color_set_colors(ColorSet set)
+{
+  ColorList list;
+  if (set == ColorSet::Ice)
+  {
+    list.color[0] = Color::Blue;
+    list.color[1] = Color::White;
+    list.count = 2;
+  }
+  else
+  {
+    list.color[0] = Color::Red;
+    list.color[1] = Color::Green;
+    list.color[2] = Color::White;
+    list.count = 3;
+  }
+  return list;
+}
+
+} // namespace zenit

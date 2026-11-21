@@ -1,0 +1,13 @@
+{
+  "description": "A second change during the fade-out keeps fading and shows the latest settings.",
+  "settings": {},
+  "events": [
+    { "at": 2000, "set": { "color": "red" } },
+    { "at": 2250, "set": { "color": "green" } }
+  ],
+  "expect": [
+    { "at": 2250, "duties": [0, 0, 0, 1476] },
+    { "at": 2500, "duties": [0, 230, 0, 0] },
+    { "at": 3000, "duties": [0, 4607, 0, 0] }
+  ]
+}

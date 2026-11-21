@@ -1,0 +1,9 @@
+{
+  "description": "A parameter the running effect does not read changes nothing on the light.",
+  "settings": {},
+  "events": [{ "at": 2000, "set": { "hold_seconds": 60 } }],
+  "expect": [
+    { "at": 2250, "duties": [0, 0, 0, 4607] },
+    { "at": 2500, "duties": [0, 0, 0, 4607] }
+  ]
+}

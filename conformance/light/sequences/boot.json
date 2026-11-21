@@ -1,0 +1,10 @@
+{
+  "description": "Start with the defaults: white at 60, fading in over 1 s (Start, Transitions).",
+  "settings": {},
+  "expect": [
+    { "at": 0, "duties": [0, 0, 0, 0], "on": true },
+    { "at": 500, "duties": [0, 0, 0, 1022] },
+    { "at": 1000, "duties": [0, 0, 0, 4607] },
+    { "at": 60000, "duties": [0, 0, 0, 4607], "timer_remaining_s": 0 }
+  ]
+}

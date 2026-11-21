@@ -1,0 +1,7 @@
+{
+  "name": "ZenitLight",
+  "version": "0.1.0",
+  "description": "The light engine of docs/board/light-v1.md: brightness curve, power limit, effects, transitions and timer. Plain C++17, no Arduino dependency.",
+  "frameworks": "*",
+  "platforms": "*"
+}

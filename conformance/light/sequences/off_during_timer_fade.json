@@ -1,0 +1,10 @@
+{
+  "description": "Off during the timer's fade-out starts from the level reached (0.5 at 75 s) at the rate of a full fade: 500 ms to off.",
+  "settings": { "timer_minutes": 1 },
+  "events": [{ "at": 75000, "light": false }],
+  "expect": [
+    { "at": 75000, "duties": [0, 0, 0, 1022], "on": false },
+    { "at": 75250, "duties": [0, 0, 0, 313], "on": false },
+    { "at": 75500, "duties": [0, 0, 0, 0], "on": false }
+  ]
+}

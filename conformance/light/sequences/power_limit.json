@@ -1,0 +1,6 @@
+{
+  "description": "A lower power limit scales the duty: white at 100 with 300 mW.",
+  "settings": { "brightness": 100 },
+  "limit_mw": 300,
+  "expect": [{ "at": 1000, "duties": [0, 0, 0, 5649], "power_scale": 34 }]
+}

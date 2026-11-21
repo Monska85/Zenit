@@ -1,0 +1,10 @@
+{
+  "description": "Fall asleep with a 1 minute timer, floor 20, brightness 100: from full to the floor over the timer, then the 30 s fade.",
+  "settings": { "effect": "fall_asleep", "timer_minutes": 1, "brightness": 100 },
+  "expect": [
+    { "at": 30000, "duties": [0, 0, 0, 4607] },
+    { "at": 60000, "duties": [0, 0, 0, 490] },
+    { "at": 75000, "duties": [0, 0, 0, 184] },
+    { "at": 90000, "duties": [0, 0, 0, 0], "on": false }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "description": "A change back during the fade-down turns back from the level reached (600 at 2250) in the time taken so far (250 ms).",
+  "settings": {},
+  "events": [
+    { "at": 2000, "set": { "color": "red" } },
+    { "at": 2250, "set": { "color": "white" } }
+  ],
+  "expect": [
+    { "at": 2250, "duties": [0, 0, 0, 1476] },
+    { "at": 2375, "duties": [0, 0, 0, 2751] },
+    { "at": 2500, "duties": [0, 0, 0, 4607] }
+  ]
+}
