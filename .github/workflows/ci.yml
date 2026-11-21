@@ -1,0 +1,101 @@
+name: CI
+
+# Every change is checked once: in its pull request, and on main after the merge.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Whether a pull request changed anything but documentation. Every other event runs every job. A job skipped by its
+  # if: reports success, so the required checks pass; check also runs when this job fails.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+    outputs:
+      code: ${{ github.event_name != 'pull_request' || steps.filter.outputs.code == 'true' }}
+    steps:
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          # A file counts when it matches every pattern: anything outside docs/ that is not Markdown.
+          predicate-quantifier: every
+          filters: |
+            code:
+              - '**'
+              - '!docs/**'
+              - '!**/*.md'
+
+  # actionlint checks the workflows, and the run: blocks with the runner's shellcheck
+  actionlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The release archive of rhysd/actionlint, checked against its SHA-256. Dependabot does not update it: change
+      # both values together, the hash from actionlint_<version>_checksums.txt of the same release.
+      - name: Lint the workflows
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          set -eu
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/$archive"
+          echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color
+
+  # Formatting, the tool tests, the native tests with the conformance cases, and the firmware and simulator builds
+  check:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The firmware version comes from git describe
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+
+      - name: Check
+        run: make check
+
+      - name: Check that the firmware leaves 64 KiB of its slot free
+        run: |
+          set -eu
+          size=$(stat -c %s .pio/build/esp32c3/firmware.bin)
+          slot=$((0x1F0000))
+          echo "firmware $size bytes, slot $slot bytes"
+          test $((slot - size)) -ge 65536
+
+      - name: Simulate every effect
+        run: |
+          set -eu
+          for effect in static color_change breathing twinkle fall_asleep christmas; do
+            .pio/build/native/program --duration 30 --set effect="$effect" --set timer_minutes=1 \
+              --out "sim-out/$effect" > /dev/null
+          done
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: simulator-traces
+          path: sim-out/
+          retention-days: 14

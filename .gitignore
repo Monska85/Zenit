@@ -1,0 +1,56 @@
+# Patterns with a leading / match at the repository root only; the others match in any folder.
+
+# --- Build output and generated files -------------------------------------------------------
+# PlatformIO build output, downloaded libraries and toolchains
+/.pio/
+# Board files generated for the file system image (uploadfs)
+/data/
+# Simulator output
+/sim-out/
+# Release site built locally
+/site/
+
+# --- Tool caches ----------------------------------------------------------------------------
+# Python bytecode and virtual environments of the tools and the build scripts
+__pycache__/
+*.py[cod]
+/.venv/
+# Python test, lint and type checker caches
+/.pytest_cache/
+/.ruff_cache/
+/.mypy_cache/
+# clangd: compile database from `pio run -t compiledb` and its index cache
+/compile_commands.json
+/.cache/
+
+# --- Web app (web/) -------------------------------------------------------------------------
+# Dependencies and the build output
+/web/node_modules/
+/web/dist/
+# Playwright output of the end-to-end, layout and screenshot runs
+/web/test-results*/
+/web/playwright-report*/
+# Coverage output
+/web/coverage/
+
+# --- Secrets and local environment ----------------------------------------------------------
+# Environment files with real values; the templates stay tracked
+.env
+.env.*
+!.env.example
+!.env.dist
+# Private keys, signing material and serial logs that can hold board identifiers or WiFi names
+*.key
+*.pem
+!/certs/*.pem
+*.log
+
+# --- Editors and operating systems ----------------------------------------------------------
+# PlatformIO IDE regenerates .vscode, except the extension list
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
