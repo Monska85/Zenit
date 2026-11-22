@@ -1,0 +1,90 @@
+{
+  "description": "An object that names a key twice, at any level, is bad_frame, as written or after escapes are decoded; nothing runs.",
+  "steps": [
+    {
+      "send": "@ZN c6b49e6a {\"seq\":1,\"cmd\":\"info\",\"cmd\":\"settings_reset\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "cmd twice"
+    },
+    {
+      "send": "@ZN 01797b31 {\"seq\":1,\"seq\":2,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "seq twice"
+    },
+    {
+      "send": "@ZN d6fc3cfd {\"seq\":1,\"cmd\":\"settings_set\",\"brightness\":10,\"brightness\":20}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a setting twice"
+    },
+    {
+      "send": "@ZN 3001c5bb {\"seq\":1,\"cmd\":\"settings_set\",\"brightness\":10,\"bright\\u006eess\":20}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "the same key written with an escape"
+    },
+    {
+      "send": "@ZN 2da7a7da {\"seq\":1,\"cmd\":\"info\",\"a\":{\"b\":1,\"b\":2}}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a key twice in a nested object"
+    },
+    {
+      "send": "@ZN 024e1d20 {\"seq\":1,\"cmd\":\"info\",\"a\":[{\"b\":1,\"b\":2}]}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a key twice in an object inside an array"
+    },
+    {
+      "send": "@ZN 32a195dc {\"seq\":9,\"cmd\":\"info\",\"a\":{\"b\":1},\"c\":{\"b\":1}}",
+      "expect": {
+        "seq": 9,
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "the same key in different objects is fine: only the unknown field is wrong"
+    },
+    {
+      "send": {
+        "seq": 10,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 10,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "note": "nothing ran"
+    }
+  ]
+}

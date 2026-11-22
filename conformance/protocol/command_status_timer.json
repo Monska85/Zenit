@@ -1,0 +1,224 @@
+{
+  "description": "A timer change restarts the countdown; at its end the light fades out in 30 s and stays off.",
+  "steps": [
+    {
+      "advance_ms": 1000
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "settings_set",
+        "timer_minutes": 1
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 1
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": {
+            "minutes": 1,
+            "remaining": 60
+          }
+        }
+      }
+    },
+    {
+      "advance_ms": 5000
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": {
+            "minutes": 1,
+            "remaining": 55
+          }
+        }
+      }
+    },
+    {
+      "advance_ms": 55000
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": {
+            "minutes": 1,
+            "remaining": 0
+          }
+        }
+      },
+      "note": "t = 61 s: the fade-out starts now"
+    },
+    {
+      "advance_ms": 15000
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 5,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 30.0,
+          "power_scale": 100,
+          "timer": {
+            "minutes": 1,
+            "remaining": 0
+          }
+        }
+      },
+      "note": "t = 76 s: half way down"
+    },
+    {
+      "advance_ms": 15000
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 6,
+        "ok": true,
+        "light": {
+          "on": false,
+          "effect": "static",
+          "color": null,
+          "lightness": 0.0,
+          "power_scale": 100,
+          "timer": {
+            "minutes": 1,
+            "remaining": 0
+          }
+        }
+      },
+      "note": "t = 91 s: off"
+    },
+    {
+      "send": {
+        "seq": 7,
+        "cmd": "light",
+        "on": true
+      },
+      "expect": {
+        "seq": 7,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": null,
+          "lightness": 0.0,
+          "power_scale": 100,
+          "timer": {
+            "minutes": 1,
+            "remaining": 60
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 8,
+        "cmd": "settings_set",
+        "timer_minutes": 0
+      },
+      "expect": {
+        "seq": 8,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 9,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 9,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": null,
+          "lightness": 0.0,
+          "power_scale": 100,
+          "timer": null
+        }
+      }
+    }
+  ]
+}

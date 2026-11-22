@@ -1,0 +1,57 @@
+{
+  "description": "status reports the color lit once a color change has faded in.",
+  "steps": [
+    {
+      "advance_ms": 1000
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "settings_set",
+        "color": "red"
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "red",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "advance_ms": 2000
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "red",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        }
+      }
+    }
+  ]
+}

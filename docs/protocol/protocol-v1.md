@@ -1,6 +1,8 @@
 # Command protocol, version 1
 
-Status: **proposed**. Why it works this way is recorded in [ADR 0001](../adr/0001-architecture.md). The light it controls is specified in [Light](../board/light-v1.md).
+Status: **accepted**. Why it works this way is recorded in [ADR 0001](../adr/0001-architecture.md), and how it is implemented in [ADR 0002](../adr/0002-protocol-and-releases.md). The light it controls is specified in [Light](../board/light-v1.md).
+
+The first firmware that speaks it (milestone 2) implements `info`, `status`, `settings_get`, `settings_set`, `light` and `settings_reset` over USB serial and over the simulator's WebSocket. What belongs to WiFi, authentication and updates is specified here too and marked "from the WiFi and updates milestone" below, the milestone that implements it; a firmware from before that milestone answers those commands `unknown_command`, and clients ignore the reply parts it leaves out.
 
 This document specifies how a client (the web app, the command line tool, a test) talks to a Zenit board: reading what the board is, changing its settings, turning the light on and off, setting up WiFi and installing firmware updates. Zenit stores no files, so there is no file transfer.
 
@@ -22,8 +24,9 @@ A board connected to WiFi serves the protocol on `ws://<board>/ws`, port 80, and
 
 - Every WebSocket text message carries exactly one protocol line, without the final newline.
 - The [line limit](#limits) counts the whole message after reassembly. A longer message closes the connection with status 1009, a binary message with 1003, a text message containing a newline with 1008, and one that is not valid UTF-8 with 1007.
-- One client at a time: a second connection is refused until the first one closes.
+- One client at a time: a second connection is refused until the first one closes (HTTP 503).
 - **Origin check.** The board accepts a connection whose `Origin` is missing (command line clients), the project's site (the site address the firmware was built with), `localhost`, a `.local` name or a private network address. Any other origin is closed with status 1008 after the handshake. The simulator accepts a missing origin, `http://localhost` and `http://127.0.0.1` with any port, the project's site, and the origins added with `--ws-origin`.
+- **The simulator's WebSocket is the WiFi transport.** The commands reserved for USB answer `usb_only` there, as on a board on WiFi. `just serve` starts it (see [Simulator](../../README.md#simulator)).
 - With `network_login` on, a WiFi client [authenticates](#authentication) first.
 
 The board remembers the last reply of each transport separately, and forgets the one of the WiFi transport when a WiFi connection opens or closes.
@@ -38,8 +41,8 @@ Every protocol message, in both directions, is one line:
 
 - `@ZN` followed by one space, at the very start of the line.
 - `<crc>` is the CRC-32 of the `<json>` bytes as sent (the zlib, PNG and Ethernet CRC: polynomial `0x04C11DB7` reflected, initial value and final XOR `0xFFFFFFFF`), as 8 lowercase hexadecimal digits, followed by one space. In Python it is `zlib.crc32(data)`.
-- `<json>` is one JSON object in valid UTF-8, with no newline inside, following strict JSON: no comments, no single quotes, no unquoted keys, no control characters inside strings, no unpaired escaped surrogate, no U+0000, nothing after the object, nesting at most 4 levels.
-- The line ends with `\n`. A `\r` just before the `\n` is ignored.
+- `<json>` is one JSON object in valid UTF-8, with no newline inside, following strict JSON: no comments, no single quotes, no unquoted keys, no control characters inside strings, no unpaired escaped surrogate, no U+0000, nothing after the object, nesting at most 4 levels, no newline or carriage return anywhere (between tokens only a space or a tab is whitespace), and no key named twice in one object, at any level (keys are compared after their escapes are decoded).
+- The line ends with `\n`. One `\r` just before the `\n` is ignored; any other `\r` is part of the JSON, which has none, so `...}\r\r\n` is `bad_frame`.
 
 For example, the `info` request with sequence number 1:
 
@@ -92,11 +95,11 @@ A client offers only the colors, effects and color sets the board lists, so late
 
 ### `status`
 
-The light, WiFi, time and update state. No fields.
+The light, and from the WiFi and updates milestone the WiFi, time and update state. No fields. Until that milestone the reply holds `light` only.
 
 ```text
 > {"seq":2,"cmd":"status"}
-< {"seq":2,"ok":true,"light":{"on":true,"effect":"static","color":"white","lightness":60.0,"power_scale":100,"timer":{"minutes":30,"remaining":1754}},"wifi":{"state":"connected","ip":"192.168.1.42","rssi":-58,"power":"8.5","power_reduced":false,"hostname":"zenit-a1b2","ssid":"Example Home WiFi"},"time":{"known":false},"update":{"state":"idle","progress":0,"last_check":1200,"last_result":"ok","last_detail":null,"firmware":null,"last_install":null}}
+< {"seq":2,"ok":true,"light":{"on":true,"effect":"static","color":"white","lightness":60.0,"power_scale":100,"timer":{"minutes":30,"remaining":1754}}}
 ```
 
 | Field                     | Meaning                                                                                                                           |
@@ -104,14 +107,14 @@ The light, WiFi, time and update state. No fields.
 | `light.on`                | `false` after off from the app or the end of the timer, until the light is turned on or the board restarts; `true` otherwise.     |
 | `light.effect`            | The `effect` setting.                                                                                                             |
 | `light.color`             | The color lit now, or `null` when the light is off.                                                                               |
-| `light.lightness`         | The lightness `L` sent to the curve now, from 0 to 100, with one decimal.                                                         |
+| `light.lightness`         | The lightness `L` sent to the curve now, from 0 to 100, always written with one decimal (`60.0`).                                 |
 | `light.power_scale`       | The percentage the [power limit](../board/light-v1.md#power-limit) leaves of the duties now, from 1 to 100.                       |
 | `light.timer`             | `null` with no timer, otherwise `minutes` (the setting) and `remaining`, the whole seconds until the fade-out starts, 0 after it. |
-| `wifi`, `time`, `update`  | Specified with the WiFi and updates milestone. The hostname is `zenit-XXXX`.                                                      |
+| `wifi`, `time`, `update`  | From the WiFi and updates milestone, which specifies them. The hostname is `zenit-XXXX`.                                          |
 
 ### `settings_get`, `settings_set`
 
-The board's settings, stored in NVS. `settings_get` has no fields; its reply holds `settings`, an object with every setting.
+The board's settings, stored in NVS. `settings_get` has no fields; its reply holds `settings`, an object with every setting. Until the WiFi and updates milestone that is the light settings.
 
 Light settings, specified in [Light](../board/light-v1.md):
 
@@ -128,7 +131,7 @@ Light settings, specified in [Light](../board/light-v1.md):
 | `twinkle_strength` | integer | `20`                                | 5 to 50.                                                        |
 | `timer_minutes`    | integer | `0`                                 | 0 (no timer), or 1 to 360.                                      |
 
-Board settings, specified with the WiFi and updates milestone:
+Board settings, from the WiFi and updates milestone, which adds them to `settings_get`, `settings_set` and `settings_reset`. Until then `settings_set` has no field for them, so one is `bad_request`:
 
 | Setting           | Type    | Default             | Values                                                                        |
 | ----------------- | ------- | ------------------- | ----------------------------------------------------------------------------- |
@@ -168,23 +171,23 @@ The reply holds `light`, as in `status`.
 
 ### `settings_reset`
 
-Puts every setting back to its default, forgets the WiFi network and makes a new token. No fields. USB only. The reply holds `settings` after the reset. The light fades to the default configuration.
+Puts every setting back to its default, forgets the WiFi network and makes a new token. No fields. USB only: over WiFi the reply is `usb_only`. The reply holds `settings` after the reset. The light fades to the default configuration. Until the WiFi and updates milestone it puts the light settings back and has no network or token to forget. If the settings cannot be saved the reply is `storage_error` and nothing changes.
 
 ### `wifi_forget`
 
-Erases the stored WiFi network and disconnects. No fields. USB only. `busy` when the network task cannot take the request now.
+From the WiFi and updates milestone. Erases the stored WiFi network and disconnects. No fields. USB only. `busy` when the network task cannot take the request now.
 
 ### `token_regenerate`
 
-Makes a new token and closes the WiFi client's connection. No fields. USB only. The reply holds `token`.
+From the WiFi and updates milestone. Makes a new token and closes the WiFi client's connection. No fields. USB only. The reply holds `token`.
 
 ### `auth_challenge`, `auth`
 
-[Authentication](#authentication) for a WiFi client. `auth_challenge` has no fields; its reply holds `nonce`, 32 lowercase hexadecimal digits. `auth` has one field, `hmac`, 64 lowercase hexadecimal digits.
+From the WiFi and updates milestone. [Authentication](#authentication) for a WiFi client. `auth_challenge` has no fields; its reply holds `nonce`, 32 lowercase hexadecimal digits. `auth` has one field, `hmac`, 64 lowercase hexadecimal digits.
 
 ### `update_check`, `update_install`
 
-Firmware updates from the project's manifest: `update_check` starts a check in the background; `update_install` has `target` (`firmware`, the only value) and an optional `force` (installs a version on the skip list). Their rules, the update states and the update errors are specified with the WiFi and updates milestone.
+From the WiFi and updates milestone. Firmware updates from the project's manifest: `update_check` starts a check in the background; `update_install` has `target` (`firmware`, the only value) and an optional `force` (installs a version on the skip list). Their rules, the update states and the update errors are specified with the WiFi and updates milestone.
 
 ## Errors
 
@@ -201,7 +204,7 @@ Firmware updates from the project's manifest: `update_check` starts a check in t
 | `no_network`         | The board is not connected to WiFi.                                                           |
 | `nothing_to_install` | The last check found nothing to install.                                                      |
 
-Every error leaves the settings as they were.
+`unauthorized`, `no_network`, `updates_off` and `nothing_to_install` are produced from the WiFi and updates milestone. `busy` too: before it, a reply that does not fit the reply buffer would be answered `busy`, which no command does. Every error leaves the settings as they were.
 
 ## Limits
 
@@ -244,4 +247,15 @@ Before authenticating, a WiFi client can send `info`, `auth_challenge` and `auth
 
 ## Conformance
 
-The cases in `conformance/protocol/` describe exchanges of requests and expected replies, run against the simulator. Each change to the protocol comes with new cases, worked out by hand from this document.
+The cases in `conformance/protocol/` describe exchanges of requests and expected replies, run against the protocol core with a virtual clock. Each change to the protocol comes with new cases, worked out by hand from this document. Their format is in [`conformance/README.md`](../../conformance/README.md).
+
+## Measurements
+
+On an ESP32-C3 SuperMini with the milestone 2 firmware (2026-11-22), after every command, a damaged line and a line over the limit had been sent several times, with the longest settings reply:
+
+- The firmware is 355,760 bytes, 17.5 % of its 2,031,616-byte slot.
+- The loop task's lowest free stack is 5,044 bytes of 8,192 (3,148 used).
+- The heap has 277,848 bytes free, with a largest block of 139,252 bytes; the settings memory has 123 entries in use and 507 free.
+- The replies are short: `info` about 390 bytes, a `settings` reply at most 270, `status` about 175. The reply buffer holds 1,536.
+
+The stack figure comes from `uxTaskGetStackHighWaterMark`, which the firmware logs (`zenit: loop stack: N bytes free at the lowest`) each time the lowest value falls after a request.

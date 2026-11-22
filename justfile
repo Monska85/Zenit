@@ -48,13 +48,31 @@ sim *args: sim-build
 sim-live *args: sim-build
     {{sim}} --live --no-files {{args}}
 
+# Serve the simulator on a local WebSocket for the web app (e.g. just serve --port 9000)
+serve *args: sim-build
+    {{python}} tools/ws_bridge.py --sim {{sim}} {{args}}
+
+# Run the command line client against a board or the simulator (e.g. just cli --port /dev/ttyACM0 info)
+cli *args:
+    {{python}} tools/zenit.py {{args}}
+
 # Run the tests on the simulator
 test:
     nice -n {{nice}} pio test -e native_test
 
-# Run the Python tool tests
+# Run the Python tool tests (the simulator tests need `just sim-build` first)
 tools-test:
     nice -n {{nice}} {{python}} -m unittest discover -s tools
+
+# Write the third-party notices of the firmware build (`just build` first)
+notices:
+    {{python}} tools/firmware_notices.py --version check --out .pio/build/{{board}}/THIRD_PARTY_NOTICES.txt
+
+# Build the files of a release in release/ (e.g. just release-assets 1.2.3): factory image, firmware, notices, checksums
+release-assets version:
+    ZENIT_VERSION={{version}} nice -n {{nice}} pio run -j {{jobs}} -e {{board}}
+    {{python}} tools/firmware_notices.py --version {{version}} --out .pio/build/{{board}}/THIRD_PARTY_NOTICES.txt
+    {{python}} tools/release_assets.py --version {{version}} --out release --notices .pio/build/{{board}}/THIRD_PARTY_NOTICES.txt
 
 # Format the C++ sources with clang-format
 format:
@@ -64,13 +82,14 @@ format:
 format-check:
     find src include test lib \( -name '*.cpp' -o -name '*.h' \) -exec nice -n {{nice}} clang-format --dry-run --Werror {} +
 
-# Check formatting, run every test suite and build the firmware and the simulator
+# Check formatting, run every test suite, build the firmware and the simulator, build the notices
 check: format-check
-    nice -n {{nice}} {{python}} -m unittest discover -s tools
     nice -n {{nice}} pio test -e native_test
     nice -n {{nice}} pio run -j {{jobs}} -e native -e {{board}}
+    nice -n {{nice}} {{python}} -m unittest discover -s tools
+    {{python}} tools/firmware_notices.py --version check --out .pio/build/{{board}}/THIRD_PARTY_NOTICES.txt
 
 # Remove build outputs and simulator output
 clean:
     pio run -t clean -e native -e native_test -e {{board}}
-    rm -rf {{out}}
+    rm -rf {{out}} release

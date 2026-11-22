@@ -1,0 +1,118 @@
+{
+  "description": "A field the command does not define is bad_request.",
+  "steps": [
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "info",
+        "extra": 1
+      },
+      "expect": {
+        "seq": 1,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "status",
+        "extra": 1
+      },
+      "expect": {
+        "seq": 2,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "settings_get",
+        "extra": 1
+      },
+      "expect": {
+        "seq": 3,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_reset",
+        "extra": 1
+      },
+      "expect": {
+        "seq": 4,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "light",
+        "on": true,
+        "extra": 1
+      },
+      "expect": {
+        "seq": 5,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "info",
+        "on": true
+      },
+      "expect": {
+        "seq": 6,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 7,
+        "cmd": "settings_get",
+        "settings": {}
+      },
+      "expect": {
+        "seq": 7,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 8,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 8,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "note": "the same command without the field"
+    }
+  ]
+}

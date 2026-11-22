@@ -6,23 +6,30 @@
 #if defined(ZENIT_SIM) && !defined(PIO_UNIT_TESTING)
 
 #include <light_text.h>
+#include <line_reader.h>
 #include <zenit_light.h>
 
 #include <algorithm>
 #include <chrono>
+#include <cerrno>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <random>
 #include <string>
 #include <thread>
 #include <vector>
 
+#include <poll.h>
+#include <unistd.h>
+
 #include "app.h"
 #include "output.h"
 #include "platform.h"
+#include "protocol.h"
 #include "settings.h"
 
 namespace
@@ -50,21 +57,34 @@ struct Options
   std::string out = "sim-out";
   bool files = true;
   bool live = false;
+  // The command protocol on standard input and output instead of a run: see usage().
+  bool protocol = false;
+  protocol::Transport transport = protocol::Transport::Usb;
+  bool duration_given = false;
 };
 
 void usage()
 {
-  std::puts("usage: program [options]\n"
-            "  --duration SECONDS     virtual time to run, whole seconds (default 60)\n"
-            "  --seed N               seed of the twinkle effect (default 1)\n"
-            "  --set KEY=VALUE        a stored setting at the start (repeat), e.g. --set effect=breathing\n"
-            "  --event MS:on|off      turn the light on or off at MS milliseconds (repeat)\n"
-            "  --event MS:KEY=VALUE   change a setting at MS milliseconds, as the app does (repeat)\n"
-            "  --out DIR              write trace.csv and viewer.html there (default sim-out)\n"
-            "  --no-files             write no files\n"
-            "  --live                 run in real time and draw the light in the terminal\n"
-            "Settings: brightness, effect, color, colors (comma separated), color_set, hold_seconds, period_seconds,\n"
-            "floor, twinkle_strength, timer_minutes.");
+  std::puts(
+      "usage: program [options]\n"
+      "  --duration SECONDS     virtual time to run, whole seconds (default 60)\n"
+      "  --seed N               seed of the twinkle effect (default 1)\n"
+      "  --set KEY=VALUE        a stored setting at the start (repeat), e.g. --set effect=breathing\n"
+      "  --event MS:on|off      turn the light on or off at MS milliseconds (repeat)\n"
+      "  --event MS:KEY=VALUE   change a setting at MS milliseconds, as the app does (repeat)\n"
+      "  --out DIR              write trace.csv and viewer.html there (default sim-out)\n"
+      "  --no-files             write no files\n"
+      "  --live                 run in real time and draw the light in the terminal\n"
+      "  --protocol             speak the command protocol: lines on standard input, replies on standard output.\n"
+      "                         Virtual time moves only with the line `!advance MS`; with --live it follows the\n"
+      "                         clock. Runs until standard input closes. No files, no --duration or --event.\n"
+      "  --transport usb|wifi   with --protocol, the transport the lines stand for (default usb). The lines\n"
+      "                         `!wifi-open` and `!wifi-close` tell a wifi transport that a client came or went (the "
+      "close is\n"
+      "                         acknowledged with the line `!wifi-closed`); a wifi transport keeps every `\\r`,\n"
+      "                         as a WebSocket message has no line ending\n"
+      "Settings: brightness, effect, color, colors (comma separated), color_set, hold_seconds, period_seconds,\n"
+      "floor, twinkle_strength, timer_minutes.");
 }
 
 // A whole number from 0 to `max`, digits only.
@@ -100,6 +120,7 @@ bool split(const std::string &text, char sep, std::string &left, std::string &ri
 
 bool parse(int argc, char **argv, Options &options)
 {
+  bool transport_given = false;
   for (int i = 1; i < argc; i++)
   {
     std::string arg = argv[i];
@@ -126,6 +147,7 @@ bool parse(int argc, char **argv, Options &options)
         return false;
       }
       options.duration_s = seconds;
+      options.duration_given = true;
     }
     else if (arg == "--seed" && next(value))
     {
@@ -182,12 +204,34 @@ bool parse(int argc, char **argv, Options &options)
       options.files = false;
     else if (arg == "--live")
       options.live = true;
+    else if (arg == "--protocol")
+      options.protocol = true;
+    else if (arg == "--transport" && next(value))
+    {
+      if (value != "usb" && value != "wifi")
+      {
+        std::fprintf(stderr, "--transport %s: expected usb or wifi\n", value.c_str());
+        return false;
+      }
+      options.transport = value == "wifi" ? protocol::Transport::Wifi : protocol::Transport::Usb;
+      transport_given = true;
+    }
     else
     {
       std::fprintf(stderr, "unknown or incomplete option: %s\n", arg.c_str());
       usage();
       return false;
     }
+  }
+  if (transport_given && !options.protocol)
+  {
+    std::fprintf(stderr, "--transport needs --protocol\n");
+    return false;
+  }
+  if (options.protocol && (options.duration_given || !options.events.empty()))
+  {
+    std::fprintf(stderr, "--protocol runs until standard input closes: it takes no --duration and no --event\n");
+    return false;
   }
   for (const Event &event : options.events)
     if (event.at > options.duration_s * 1000)
@@ -273,12 +317,12 @@ const MAX = 16383, colors = ['#ff4d4d', '#4dff6a', '#4d7dff', '#f0f0f0'];
 const lamp = document.getElementById('lamp'), info = document.getElementById('info');
 const seek = document.getElementById('seek'), chart = document.getElementById('chart'), ctx = chart.getContext('2d');
 seek.max = TRACE.length - 1;
-// The traces are drawn once into an off-screen canvas, one column per pixel; playback only copies it and draws the
-// cursor.
+// The traces are drawn once into an off-screen canvas, one column per canvas column; playback only copies it and draws
+// the cursor.
 const traces = document.createElement('canvas');
 traces.width = chart.width; traces.height = chart.height;
 (function drawTraces() {
-  // Every point carries the lowest and highest duty of the ticks it stands for (fields 5 to 12), and each pixel
+  // Every point carries the lowest and highest duty of the ticks it stands for (fields 5 to 12), and each canvas
   // column draws the range of its points, so a short change is never lost. Points are spread over the full width.
   const t = traces.getContext('2d'), w = chart.width, n = TRACE.length;
   const y = v => chart.height - v / MAX * (chart.height - 4) - 2;
@@ -389,6 +433,159 @@ bool write_viewer(const std::string &dir, const std::vector<ViewerPoint> &points
   return static_cast<bool>(html);
 }
 
+// ---- The command protocol on standard input and output ----
+
+void write_to_stdout(const char *line, size_t length)
+{
+  std::fwrite(line, 1, length, stdout);
+  std::fflush(stdout);
+}
+
+// Lines in, replies out. The virtual clock is the one platform::now_ms() reports.
+class ProtocolSession
+{
+public:
+  ProtocolSession(protocol::Transport transport, bool live)
+      : transport_(transport), live_(live), reader_(transport == protocol::Transport::Usb)
+  {
+  }
+
+  void feed(uint8_t byte, uint64_t now)
+  {
+    switch (reader_.feed(byte))
+    {
+    case zenit::proto::LineReader::Event::None:
+      break;
+    case zenit::proto::LineReader::Event::Line:
+      handle(std::string(reader_.line(), reader_.length()), now);
+      break;
+    case zenit::proto::LineReader::Event::TooLong:
+      protocol::line_too_long(transport_, write_to_stdout);
+      break;
+    }
+  }
+
+  // The virtual time asked for by `!advance`, or 0.
+  uint64_t take_advance()
+  {
+    const uint64_t ms = advance_;
+    advance_ = 0;
+    return ms;
+  }
+
+private:
+  // A line that starts with `!` is the simulator's own control line, never a request. A control line that cannot be
+  // carried out is reported on standard error, so a test or a bridge that sends a wrong one finds out.
+  void control(const std::string &line)
+  {
+    if (line.rfind("!advance ", 0) == 0)
+    {
+      uint64_t ms = 0;
+      if (live_)
+        std::fprintf(stderr, "zenit-sim: '%s' refused: the clock is real in --live mode\n", line.c_str());
+      else if (!parse_whole(line.substr(9), MAX_DURATION_S * 1000, ms))
+        std::fprintf(stderr, "zenit-sim: '%s' refused: expected whole milliseconds up to %llu\n", line.c_str(),
+                     (unsigned long long)(MAX_DURATION_S * 1000));
+      else
+        advance_ += ms;
+    }
+    else if (line == "!wifi-open" || line == "!wifi-close")
+    {
+      if (transport_ != protocol::Transport::Wifi)
+        std::fprintf(stderr, "zenit-sim: '%s' ignored: only the wifi transport has connections\n", line.c_str());
+      else if (line == "!wifi-open")
+        protocol::wifi_opened();
+      else
+      {
+        protocol::wifi_closed();
+        // Everything written before this line was a reply to the connection that closed: the bridge waits for this
+        // acknowledgement before it lets the next client in, so none of those replies reaches the next one.
+        write_to_stdout("!wifi-closed\n", sizeof("!wifi-closed\n") - 1);
+      }
+    }
+    else
+      std::fprintf(stderr, "zenit-sim: unknown control line '%s'\n", line.c_str());
+  }
+
+  void handle(const std::string &line, uint64_t now)
+  {
+    if (!line.empty() && line[0] == '!')
+      control(line);
+    else
+      protocol::handle_line(transport_, line.data(), line.size(), now, write_to_stdout);
+  }
+
+  protocol::Transport transport_;
+  bool live_;
+  zenit::proto::LineReader reader_;
+  uint64_t advance_ = 0;
+};
+
+// Runs the 10 ms grid up to `until`, one tick per step.
+void tick_to(uint64_t &now, uint64_t until)
+{
+  while (now + zenit::TICK_MS <= until)
+  {
+    now += zenit::TICK_MS;
+    platform::sim_set_now_ms(now);
+    app::tick(now);
+  }
+}
+
+// Virtual time: moves only on `!advance`, and runs until standard input closes.
+void run_protocol_virtual(ProtocolSession &session)
+{
+  uint64_t now = 0;
+  int byte;
+  while ((byte = std::getchar()) != EOF)
+  {
+    session.feed(static_cast<uint8_t>(byte), now);
+    if (const uint64_t advance = session.take_advance())
+      tick_to(now, now + advance);
+  }
+}
+
+// Real time: ticks on the 10 ms grid and reads standard input between them, until it closes.
+void run_protocol_live(ProtocolSession &session)
+{
+  const auto start = std::chrono::steady_clock::now();
+  auto elapsed_ms = [&]() -> uint64_t
+  {
+    return static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+  };
+  uint64_t now = 0;
+  uint64_t next_tick = zenit::TICK_MS;
+  for (;;)
+  {
+    const uint64_t at = elapsed_ms();
+    const int wait = at >= next_tick ? 0 : static_cast<int>(next_tick - at);
+    pollfd input{STDIN_FILENO, POLLIN, 0};
+    if (poll(&input, 1, wait) > 0)
+    {
+      uint8_t chunk[512];
+      const ssize_t count = read(STDIN_FILENO, chunk, sizeof(chunk));
+      if (count == 0)
+        return;
+      if (count < 0 && errno != EINTR)
+        return;
+      platform::sim_set_now_ms(elapsed_ms());
+      // Requests are timed by the real clock here, as on the board: a request that changes the light starts its fade
+      // now.
+      for (ssize_t i = 0; i < count; i++)
+        session.feed(chunk[i], elapsed_ms());
+    }
+    const uint64_t current = elapsed_ms();
+    if (current >= next_tick)
+    {
+      now = current - current % zenit::TICK_MS;
+      platform::sim_set_now_ms(now);
+      app::tick(now);
+      next_tick = now + zenit::TICK_MS;
+    }
+  }
+}
+
 } // namespace
 
 int main(int argc, char **argv)
@@ -403,6 +600,21 @@ int main(int argc, char **argv)
   platform::sim_set_now_ms(0);
   app::begin(0, options.seed);
   platform::log("firmware %s on %s", platform::firmware_version(), platform::board_name());
+
+  if (options.protocol)
+  {
+    // A live run is a board that has just started: its boot id changes with every run. A virtual run is repeatable.
+    if (options.live)
+      platform::sim_set_random(std::random_device{}());
+    protocol::begin(platform::random32());
+    app::tick(0);
+    ProtocolSession session(options.transport, options.live);
+    if (options.live)
+      run_protocol_live(session);
+    else
+      run_protocol_virtual(session);
+    return 0;
+  }
 
   const uint64_t end = options.duration_s * 1000;
   const uint64_t ticks = end / zenit::TICK_MS + 1;

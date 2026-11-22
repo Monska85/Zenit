@@ -1,0 +1,219 @@
+{
+  "description": "A request without a valid seq or cmd is bad_request without seq.",
+  "steps": [
+    {
+      "send": {
+        "cmd": "info"
+      },
+      "expect": {
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "no seq"
+    },
+    {
+      "send": {
+        "seq": 1
+      },
+      "expect": {
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "no cmd"
+    },
+    {
+      "send": {},
+      "expect": {
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "an empty request"
+    },
+    {
+      "send": {
+        "seq": -1,
+        "cmd": "info"
+      },
+      "expect": {
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "a negative seq"
+    },
+    {
+      "send": "@ZN 084e30ee {\"seq\":4294967296,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "seq above 4,294,967,295"
+    },
+    {
+      "send": "@ZN 940ddcbd {\"seq\":1.0,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "seq with a decimal point"
+    },
+    {
+      "send": "@ZN e0a801fa {\"seq\":1e0,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "seq with an exponent"
+    },
+    {
+      "send": {
+        "seq": "1",
+        "cmd": "info"
+      },
+      "expect": {
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "seq as text"
+    },
+    {
+      "send": {
+        "seq": null,
+        "cmd": "info"
+      },
+      "expect": {
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "seq null"
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": 5
+      },
+      "expect": {
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "cmd as a number"
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": null
+      },
+      "expect": {
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "cmd null"
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": [
+          "info"
+        ]
+      },
+      "expect": {
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "cmd as an array"
+    },
+    {
+      "send": {
+        "seq": 0,
+        "cmd": "info"
+      },
+      "expect": {
+        "seq": 0,
+        "ok": true,
+        "protocol": 1,
+        "firmware": {
+          "$any": "string"
+        },
+        "board": "simulator",
+        "boot_id": 4242,
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      },
+      "note": "the lowest seq"
+    },
+    {
+      "send": {
+        "seq": 4294967295,
+        "cmd": "info"
+      },
+      "expect": {
+        "seq": 4294967295,
+        "ok": true,
+        "protocol": 1,
+        "firmware": {
+          "$any": "string"
+        },
+        "board": "simulator",
+        "boot_id": 4242,
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      },
+      "note": "the highest seq"
+    }
+  ]
+}

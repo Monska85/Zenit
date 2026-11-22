@@ -1,0 +1,92 @@
+{
+  "description": "The info request of the specification, as a raw line, and its reply.",
+  "steps": [
+    {
+      "send": "@ZN 3c250228 {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "protocol": 1,
+        "firmware": {
+          "$any": "string"
+        },
+        "board": "simulator",
+        "boot_id": 4242,
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      }
+    },
+    {
+      "send": "@ZN 3c250228 {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "protocol": 1,
+        "firmware": {
+          "$any": "string"
+        },
+        "board": "simulator",
+        "boot_id": 4242,
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      },
+      "note": "the same request again gets the remembered reply"
+    }
+  ]
+}

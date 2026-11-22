@@ -1,0 +1,152 @@
+{
+  "description": "Each transport remembers its own last reply; a request over one never replaces the other's.",
+  "steps": [
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_set",
+        "brightness": 40
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "settings": {
+          "brightness": 40,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "transport": "usb"
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_set",
+        "brightness": 50
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "settings": {
+          "brightness": 50,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "transport": "wifi",
+      "note": "same seq, other request, other transport"
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_set",
+        "brightness": 40
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "settings": {
+          "brightness": 40,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "transport": "usb",
+      "note": "remembered over USB"
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_set",
+        "brightness": 50
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "settings": {
+          "brightness": 50,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "transport": "wifi",
+      "note": "remembered over WiFi"
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 5,
+        "ok": true,
+        "settings": {
+          "brightness": 50,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "transport": "usb"
+    }
+  ]
+}

@@ -1,0 +1,117 @@
+{
+  "description": "Only the last reply of a transport is remembered: an older request runs again.",
+  "steps": [
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_set",
+        "brightness": 40
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "settings": {
+          "brightness": 40,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "settings_set",
+        "brightness": 70
+      },
+      "expect": {
+        "seq": 5,
+        "ok": true,
+        "settings": {
+          "brightness": 70,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_set",
+        "brightness": 40
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "settings": {
+          "brightness": 40,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "note": "runs again"
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 6,
+        "ok": true,
+        "settings": {
+          "brightness": 40,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    }
+  ]
+}

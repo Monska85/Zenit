@@ -21,6 +21,9 @@ uint64_t now_ms() { return now; }
 
 uint32_t random32() { return next_random++; }
 
+MemoryInfo memory_info() { return {0, 0}; }
+NvsInfo nvs_info() { return {0, 0}; }
+
 void log(const char *format, ...)
 {
   if (!log_enabled)

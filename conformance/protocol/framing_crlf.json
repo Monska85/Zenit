@@ -1,0 +1,48 @@
+{
+  "description": "A carriage return just before the newline is ignored.",
+  "steps": [
+    {
+      "send": "@ZN 3c250228 {\"seq\":1,\"cmd\":\"info\"}\r",
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "protocol": 1,
+        "firmware": {
+          "$any": "string"
+        },
+        "board": "simulator",
+        "boot_id": 4242,
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      }
+    }
+  ]
+}

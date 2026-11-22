@@ -1,0 +1,134 @@
+{
+  "description": "The same seq with another request is a new request, whatever its checksum.",
+  "steps": [
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_set",
+        "brightness": 40
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "settings": {
+          "brightness": 40,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_set",
+        "brightness": 50
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "settings": {
+          "brightness": 50,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "settings": {
+          "brightness": 50,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "info"
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "protocol": 1,
+        "firmware": {
+          "$any": "string"
+        },
+        "board": "simulator",
+        "boot_id": 4242,
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      }
+    }
+  ]
+}

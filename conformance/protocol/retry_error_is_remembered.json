@@ -1,0 +1,29 @@
+{
+  "description": "An error reply is remembered like any other.",
+  "steps": [
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_set",
+        "brightness": 0
+      },
+      "expect": {
+        "seq": 4,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_set",
+        "brightness": 0
+      },
+      "expect": {
+        "seq": 4,
+        "ok": false,
+        "error": "bad_request"
+      }
+    }
+  ]
+}

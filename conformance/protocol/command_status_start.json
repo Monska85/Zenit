@@ -1,0 +1,86 @@
+{
+  "description": "status at start: the light fades in over 1,000 ms to the default brightness.",
+  "steps": [
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": null,
+          "lightness": 0.0,
+          "power_scale": 100,
+          "timer": null
+        }
+      }
+    },
+    {
+      "advance_ms": 500
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 30.0,
+          "power_scale": 100,
+          "timer": null
+        }
+      }
+    },
+    {
+      "advance_ms": 500
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        }
+      }
+    },
+    {
+      "advance_ms": 100000
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,304 @@
+{
+  "description": "JSON the specification forbids is bad_frame, without seq, even with a correct checksum.",
+  "steps": [
+    {
+      "send": "@ZN 9b512356 {\"seq\":1,\"cmd\":\"info\"} // c",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a comment"
+    },
+    {
+      "send": "@ZN 1ed5d8c5 {\"seq\":1,/* c */\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a block comment"
+    },
+    {
+      "send": "@ZN 3d5f443f {'seq':1,'cmd':'info'}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "single quotes"
+    },
+    {
+      "send": "@ZN ac0bb65d {seq:1,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "an unquoted key"
+    },
+    {
+      "send": "@ZN 6a9f03e1 {\"seq\":1,\"cmd\":\"info\",}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a trailing comma"
+    },
+    {
+      "send": "@ZN 90cd29b5 {,\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a leading comma"
+    },
+    {
+      "send": "@ZN 16d09305 {\"seq\":1 \"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a missing comma"
+    },
+    {
+      "send": "@ZN 2eb1869a {\"seq\" 1,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a missing colon"
+    },
+    {
+      "send": "@ZN ea349fea {\"seq\":1,\"cmd\":\"in\tfo\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a raw tab inside a string"
+    },
+    {
+      "send": "@ZN da44d42b {\"seq\":1,\"cmd\":\"in\u0001fo\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a raw control character inside a string"
+    },
+    {
+      "send": "@ZN b6861ed9 {\"seq\":1,\"cmd\":\"in\\u0000fo\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "an escaped U+0000"
+    },
+    {
+      "send": "@ZN 5405ad82 {\"seq\":1,\"cmd\":\"in\\ud800fo\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "an unpaired high surrogate"
+    },
+    {
+      "send": "@ZN 75d710cf {\"seq\":1,\"cmd\":\"in\\udc00fo\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "an unpaired low surrogate"
+    },
+    {
+      "send": "@ZN bc717a16 {\"seq\":1,\"cmd\":\"in\\ud800\\u0041fo\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a high surrogate and a letter"
+    },
+    {
+      "send": "@ZN 07797dd0 {\"seq\":1,\"cmd\":\"in\\xfo\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "an invalid escape"
+    },
+    {
+      "send": "@ZN dc587c38 {\"seq\":1,\"cmd\":\"in\\u12fo\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a short unicode escape"
+    },
+    {
+      "send": "@ZN 9e35147b {\"seq\":01,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a leading zero"
+    },
+    {
+      "send": "@ZN 22c90158 {\"seq\":+1,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a plus sign"
+    },
+    {
+      "send": "@ZN 20b7d938 {\"seq\":1.,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a trailing dot"
+    },
+    {
+      "send": "@ZN d2ecb92d {\"seq\":.5,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a leading dot"
+    },
+    {
+      "send": "@ZN 7d807202 {\"seq\":NaN,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "NaN"
+    },
+    {
+      "send": "@ZN 00ca3049 {\"seq\":1,\"cmd\":\"info\",\"a\":True}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a capitalized literal"
+    },
+    {
+      "send": "@ZN f094b146 [{\"seq\":1,\"cmd\":\"info\"}]",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "an array at the top"
+    },
+    {
+      "send": "@ZN 83dcefb7 1",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a number at the top"
+    },
+    {
+      "send": "@ZN cf22118c \"info\"",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a string at the top"
+    },
+    {
+      "send": "@ZN 25cbfc4f null",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "null at the top"
+    },
+    {
+      "send": "@ZN 10f54ce0 {\"seq\":1,\"cmd\":\"info\"}{}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a second object"
+    },
+    {
+      "send": "@ZN 39d03cf0 {\"seq\":1,\"cmd\":\"info\"} x",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "text after the object"
+    },
+    {
+      "send": "@ZN 298c897f {\"seq\":1,\"cmd\":\"info\"",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "an unclosed object"
+    },
+    {
+      "send": "@ZN 5a2a977d {\"seq\":1,\"cmd\":\"info",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "an unclosed string"
+    },
+    {
+      "send": "@ZN fbe82654 {\"seq\":1,\"cmd\":\"info\",\"a\":{\"b\":{\"c\":{\"d\":{}}}}}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "five levels of nesting"
+    },
+    {
+      "send": "@ZN f0906265 {\"seq\":1,\"cmd\":\"info\",\"a\":[[[[1]]]]}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "five levels of arrays"
+    },
+    {
+      "send": "@ZN 3c250228 {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "protocol": 1,
+        "firmware": {
+          "$any": "string"
+        },
+        "board": "simulator",
+        "boot_id": 4242,
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      }
+    }
+  ]
+}

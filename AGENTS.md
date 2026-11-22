@@ -8,7 +8,7 @@ Zenit is ESP32 firmware that drives LEDs through MOSFET outputs, with WiFi contr
 
 **Process:** full rigor from the first release (specifications, ADRs, simulator, native and web tests, end-to-end tests, screenshots, release-please, full CI). Deadline for the first units: 2026-12-25.
 
-**Status:** milestone 1 (light engine, simulator, tests). Read these before any work:
+**Status:** milestone 2 (command protocol over USB, simulator transport and WebSocket bridge, command line client, releases). Read these before any work:
 
 1. The local planning notes, when present (excluded from Git): the current state, the order of the phases and the next step. Update them at the end of every session.
 2. `docs/requirements/firmware-v1.md`: what the firmware must do, the decisions taken and the proposals still open.
@@ -43,6 +43,7 @@ These apply as soon as the matching code exists. The reasons are in `docs/adr/`.
 - **Fixed flash layout from the first release:** NVS, OTA data, two equal firmware slots and a core dump partition, no file system, written out in `partitions.csv` (ADR 0001). A layout change after the first release needs a USB reflash that erases the board's settings.
 - **A/B OTA with rollback always on.** A new firmware boots on trial and confirms itself after a health check. A version that rolled back goes on a skip list, and downgrades are never installed over the network.
 - **One command protocol for every transport** (USB serial and WebSocket): one line per message with a CRC-32, a `seq` with idempotent retries, strict JSON, stable error codes, and an `info` handshake that reports the version and the limits. Commands that change the WiFi network, the token or reset everything are USB only.
+- **The protocol is `lib/ZenitProto/` plus `src/protocol.cpp`.** The checks of every request field, the strict JSON scan, the framing and the reply cache are pure C++ in the library; `protocol.cpp` only dispatches to `app::` and `settings::`. A new command or field gets its check there, its specification text and its conformance cases in the same change. Opening the serial port from a tool must not clear DTR or RTS before the other, or the ESP32-C3 restarts.
 - **Limits are `constexpr`.** When a size, count or timing limit changes, check every place that enforces, advertises or tests it (firmware, simulator, web app, schemas, tools, specifications, conformance cases) and keep them equal where they describe the same contract.
 - **Compatible formats.** Readers of protocol replies and published files ignore unknown optional fields but validate every known one. A request field the command does not define is an error.
 
@@ -62,7 +63,9 @@ These apply as soon as the matching code exists. The reasons are in `docs/adr/`.
 
 Run builds, tests and checks only through the `justfile` or `Makefile` recipes (`just --list`, `make help`), with their default limits (`JOBS` and `NICE`) unless the user asks for others. Never use hand-made `pio` commands with other parallelism. Run one build or test at a time, never two in parallel.
 
-- `just check` is the gate before a change is done: formatting, the tool tests, the native tests with the conformance cases, and the firmware and simulator builds.
+- `just check` is the gate before a change is done: formatting, the native tests with the conformance cases, the firmware and simulator builds, the tool tests (some run against the simulator program, so they follow its build) and the third-party notices of the firmware.
+- `just serve` serves the simulator on a local WebSocket and `just cli` runs `tools/zenit.py` against a board or the simulator; the board test plan of a phase uses the client.
+- A new third-party library of the firmware needs its entry in `LICENSES/firmware.json` and its license text, or the notices step of `just check` fails.
 - When the light engine changes, compare the simulator's traces (`just sim`, every effect) before and after; a change meant to alter the output says which outputs change and why.
 - When a change adds, moves or renames a top-level folder that CI reads, check the path filter of the `changes` job in `.github/workflows/ci.yml`.
 - Every C, C++, Python and later TypeScript source file starts with `SPDX-License-Identifier: GPL-3.0-or-later` in a comment; build, configuration, markup, style and shell files carry none.

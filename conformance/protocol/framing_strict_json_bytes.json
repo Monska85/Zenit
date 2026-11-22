@@ -1,0 +1,113 @@
+{
+  "description": "Invalid UTF-8, a raw U+0000 and a byte order mark are bad_frame.",
+  "steps": [
+    {
+      "send_hex": "405a4e203264343033613137207b22736571223a312c22636d64223a22696eff666f227d",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a byte that is never UTF-8"
+    },
+    {
+      "send_hex": "405a4e203439393136663930207b22736571223a312c22636d64223a22696ec3666f227d",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a truncated sequence"
+    },
+    {
+      "send_hex": "405a4e203135393962303734207b22736571223a312c22636d64223a22696ec080666f227d",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "an overlong NUL"
+    },
+    {
+      "send_hex": "405a4e203964663062313065207b22736571223a312c22636d64223a22696eeda080666f227d",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "an encoded surrogate"
+    },
+    {
+      "send_hex": "405a4e203466663939323135207b22736571223a312c22636d64223a22696ef4908080666f227d",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "above U+10FFFF"
+    },
+    {
+      "send_hex": "405a4e206537323466643962207b22736571223a312c22636d64223a22696e00666f227d",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a raw NUL"
+    },
+    {
+      "send_hex": "405a4e20303161356234343920efbbbf7b22736571223a312c22636d64223a22696e666f227d",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a byte order mark"
+    },
+    {
+      "send_hex": "405a4e203766653161393333207b22736571223a312c22636d64223a22696e666f222c22c3a9223a317d",
+      "expect": {
+        "seq": 1,
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "valid UTF-8 passes the check and is an unknown field"
+    },
+    {
+      "send": "@ZN 3c250228 {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "protocol": 1,
+        "firmware": {
+          "$any": "string"
+        },
+        "board": "simulator",
+        "boot_id": 4242,
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,433 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Command line client of the Zenit command protocol (docs/protocol/protocol-v1.md).
+
+    zenit.py --port /dev/ttyACM0 info
+    zenit.py --ws ws://127.0.0.1:8765 status
+    zenit.py --port /dev/ttyACM0 settings-set brightness=40 effect=breathing
+    zenit.py --port /dev/ttyACM0 light off
+    zenit.py --port /dev/ttyACM0 raw '{"cmd":"settings_get"}'
+
+The reply is printed as JSON. The exit status is 0 for a successful reply, 1 for an error reply and 2 when the board
+cannot be reached or answers nothing. The client sends `info` first and waits for its reply, as the protocol asks, and
+repeats a request that gets no valid reply (2 s, 5 tries in all).
+
+Needs Python 3.11 or later (what websockets 17 asks for), pyserial for --port and the websockets package, version 17,
+for --ws.
+"""
+
+import argparse
+import json
+import math
+import random
+import re
+import sys
+import time
+import zlib
+
+MARKER = b"@ZN "
+REPLY_TIMEOUT = 2.0
+ATTEMPTS = 5
+BAUD = 115200
+# The longest reply line the client accepts (docs/protocol/protocol-v1.md#limits); the board sends far less
+MAX_REPLY_LINE = 4096
+SUPPORTED_PROTOCOL = 1
+
+
+class ClientError(Exception):
+    """The board could not be reached, or it answered nothing usable."""
+
+
+def frame(request):
+    """The line for a request object: `@ZN <crc> <json>`, without the newline."""
+    body = json.dumps(request, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return MARKER + b"%08x " % zlib.crc32(body) + body
+
+
+def _reject_constant(name):
+    raise ValueError(f"{name} is not JSON")
+
+
+def _object_without_duplicates(pairs):
+    keys = [key for key, _ in pairs]
+    if len(set(keys)) != len(keys):
+        raise ValueError("a key is named twice")
+    return dict(pairs)
+
+
+def _clean(value):
+    """Raises ValueError for what Python's parser lets through and the protocol forbids: an unpaired surrogate (a
+    paired one has become one character), U+0000, and a number that is not finite (1e999)."""
+    if isinstance(value, str):
+        if any("\ud800" <= char <= "\udfff" or char == "\x00" for char in value):
+            raise ValueError("a string has an unpaired surrogate or U+0000")
+    elif isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError("a number is not finite")
+    elif isinstance(value, list):
+        for item in value:
+            _clean(item)
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            _clean(key)
+            _clean(item)
+
+
+def strict_json(body):
+    """The object in `body` (bytes), parsed by the rules of docs/protocol/protocol-v1.md#lines: valid UTF-8, one
+    object and nothing after it, no newline or carriage return, no control character in a string, no NaN or Infinity,
+    no unpaired surrogate escape, no U+0000, no key named twice. Raises ValueError otherwise. Replies are not bounded
+    in nesting by the protocol; a nesting too deep for Python is refused as well."""
+    if b"\n" in body or b"\r" in body:
+        raise ValueError("a newline or carriage return inside the JSON")
+    try:
+        value = json.loads(
+            body.decode("utf-8"),
+            parse_constant=_reject_constant,
+            object_pairs_hook=_object_without_duplicates,
+        )
+        if not isinstance(value, dict):
+            raise ValueError("not an object")
+        _clean(value)
+    except RecursionError:
+        raise ValueError("nested too deeply")
+    return value
+
+
+def parse_line(raw):
+    """The JSON object of a protocol line, or None for anything else: a log line, a line with a bad checksum, JSON
+    that breaks the protocol's rules (strict_json). The client throws these away."""
+    if raw.endswith(b"\n"):
+        raw = raw[:-1]
+    if raw.endswith(b"\r"):
+        raw = raw[:-1]
+    if not raw.startswith(MARKER) or len(raw) < len(MARKER) + 9 or raw[len(MARKER) + 8 : len(MARKER) + 9] != b" ":
+        return None
+    digits = raw[len(MARKER) : len(MARKER) + 8]
+    if not re.fullmatch(rb"[0-9a-f]{8}", digits):
+        return None
+    body = raw[len(MARKER) + 9 :]
+    if zlib.crc32(body) != int(digits, 16):
+        return None
+    try:
+        return strict_json(body)
+    except ValueError:  # includes UnicodeDecodeError and JSONDecodeError
+        return None
+
+
+class SerialLink:
+    """The board's USB serial port."""
+
+    def __init__(self, port, baud=BAUD):
+        try:
+            import serial
+        except ImportError:
+            raise ClientError("--port needs the pyserial package (pip install pyserial)")
+        self.serial = serial.Serial()
+        self.serial.port = port
+        self.serial.baudrate = baud
+        self.serial.timeout = 0.05
+        # Keep both control lines at pyserial's default (raised together, as the kernel does on open). Clearing one of
+        # them first would run the reset sequence of the ESP32-C3's USB serial port and restart the board.
+        try:
+            self.serial.open()
+        except (OSError, serial.SerialException) as error:
+            raise ClientError(f"cannot open {port}: {error}")
+        self.buffer = b""
+
+    def write_line(self, line):
+        self.serial.write(line + b"\n")
+        self.serial.flush()
+
+    def read_line(self, timeout):
+        """The next line, without its newline, or None when none arrives within `timeout` seconds."""
+        deadline = time.monotonic() + timeout
+        while True:
+            at = self.buffer.find(b"\n")
+            if at >= 0:
+                line, self.buffer = self.buffer[:at], self.buffer[at + 1 :]
+                return line
+            if len(self.buffer) > 2 * MAX_REPLY_LINE:
+                self.buffer = b""  # no newline in sight: the bytes are not ours
+            if time.monotonic() >= deadline:
+                return None
+            self.buffer += self.serial.read(self.serial.in_waiting or 1)
+
+    def close(self):
+        self.serial.close()
+
+
+class WebSocketLink:
+    """The WebSocket of the simulator or of a board on WiFi: one message is one line."""
+
+    def __init__(self, url, origin=None):
+        try:
+            from websockets.sync.client import connect
+        except ImportError:
+            raise ClientError("--ws needs the websockets package, version 17 (pip install websockets)")
+        try:
+            self.socket = connect(url, origin=origin, compression=None, max_size=MAX_REPLY_LINE, open_timeout=5)
+        except Exception as error:  # the library raises many types for a refused or failed handshake
+            raise ClientError(f"cannot connect to {url}: {error}")
+
+    def write_line(self, line):
+        self.socket.send(line.decode("utf-8"))
+
+    def read_line(self, timeout):
+        try:
+            message = self.socket.recv(timeout=timeout)
+        except TimeoutError:
+            return None
+        except Exception as error:
+            raise ClientError(f"the connection closed: {error}")
+        return message if isinstance(message, bytes) else message.encode("utf-8")
+
+    def close(self):
+        self.socket.close()
+
+
+# ---- What a reply must look like (docs/protocol/protocol-v1.md). A reply that does not match is unusable: the client
+# throws it away and asks again. Unknown fields are ignored; every known one must have its type.
+
+
+def is_int(value):
+    return type(value) is int  # not a bool, not a float such as 1.0
+
+
+def is_number(value):
+    return type(value) in (int, float)
+
+
+def is_text(value):
+    return isinstance(value, str)
+
+
+def is_bool(value):
+    return isinstance(value, bool)
+
+
+def is_null(value):
+    return value is None
+
+
+def conforms(value, schema):
+    """Whether `value` fits `schema`: a predicate, a dict (an object with at least these fields), a one-item list (an
+    array of that), or a tuple (any of these)."""
+    if callable(schema):
+        return schema(value)
+    if isinstance(schema, dict):
+        return isinstance(value, dict) and all(key in value and conforms(value[key], item) for key, item in schema.items())
+    if isinstance(schema, list):
+        return isinstance(value, list) and all(conforms(item, schema[0]) for item in value)
+    return any(conforms(value, option) for option in schema)
+
+
+SETTINGS = {
+    "brightness": is_int,
+    "effect": is_text,
+    "color": is_text,
+    "colors": [is_text],
+    "color_set": is_text,
+    "hold_seconds": is_int,
+    "period_seconds": is_int,
+    "floor": is_int,
+    "twinkle_strength": is_int,
+    "timer_minutes": is_int,
+}
+LIGHT = {
+    "on": is_bool,
+    "effect": is_text,
+    "color": (is_text, is_null),
+    "lightness": is_number,
+    "power_scale": is_int,
+    "timer": (is_null, {"minutes": is_int, "remaining": is_int}),
+}
+# The known fields of a successful reply, by command
+REPLIES = {
+    "info": {
+        "protocol": is_int,
+        "firmware": is_text,
+        "board": is_text,
+        "boot_id": is_int,
+        "colors": [is_text],
+        "effects": [is_text],
+        "color_sets": [is_text],
+        "power_limit_mw": is_int,
+        "memory": {"free": is_int, "largest": is_int},
+        "nvs": {"used": is_int, "free": is_int},
+        "limits": {"line": is_int},
+    },
+    "status": {"light": LIGHT},
+    "light": {"light": LIGHT},
+    "settings_get": {"settings": SETTINGS},
+    "settings_set": {"settings": SETTINGS},
+    "settings_reset": {"settings": SETTINGS},
+}
+
+
+def valid_seq(value):
+    return is_int(value) and 0 <= value < 2**32
+
+
+def valid_body(command, reply):
+    """Whether `ok`, the error fields and the command's known fields of a reply have their types."""
+    ok = reply.get("ok")
+    if ok is False:
+        return is_text(reply.get("error")) and is_text(reply.get("message"))
+    return ok is True and conforms(reply, REPLIES.get(command, {}))
+
+
+def is_bad_frame_reply(reply):
+    """The reply to a line the board could not read: no `seq`, an error."""
+    return "seq" not in reply and valid_body("", reply) and reply.get("ok") is False and reply.get("error") == "bad_frame"
+
+
+class Client:
+    """One request in flight at a time, repeated until a valid reply with the same `seq` arrives."""
+
+    def __init__(self, link, timeout=REPLY_TIMEOUT, attempts=ATTEMPTS, seq=None):
+        self.link = link
+        self.timeout = timeout
+        self.attempts = attempts
+        # A random start: a board remembers its last reply, and a new run must not look like a retry of the last one
+        self.seq = random.randrange(0, 2**31) if seq is None else seq
+        self.info = None
+
+    def request(self, command, **fields):
+        """`send` with the fields as keyword arguments, for a command whose field names are known to be safe."""
+        return self.send(command, fields)
+
+    def send(self, command, fields, seq=None):
+        """Sends a request and returns the reply object. `fields` is a dict, so any field name is fine. A `seq` given
+        is used and matched in the reply as it is; otherwise the next one is. Raises ClientError when no reply
+        arrives."""
+        if "seq" in fields or "cmd" in fields:
+            raise ClientError("seq and cmd are not fields: pass seq as the argument")
+        if seq is None:
+            seq = self.seq
+            self.seq = (self.seq + 1) % 2**32
+        line = frame({"seq": seq, "cmd": command, **fields})
+        malformed = False
+        for _ in range(self.attempts):
+            self.link.write_line(line)
+            deadline = time.monotonic() + self.timeout
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                raw = self.link.read_line(remaining)
+                if raw is None:
+                    break
+                reply = parse_line(raw)
+                if reply is None or ("event" in reply and "seq" not in reply):
+                    continue  # a line to throw away, or an event this client does not know
+                # The same seq, of the same JSON type: 1.0 and true are not 1
+                if type(reply.get("seq")) is type(seq) and reply["seq"] == seq:
+                    if valid_body(command, reply) and (not is_int(seq) or valid_seq(reply["seq"])):
+                        return reply
+                    malformed = True  # unusable: ask again
+                    continue
+                if is_bad_frame_reply(reply):
+                    break  # the board did not understand the line: send it again at once
+        raise ClientError(f"no reply to {command} after {self.attempts} tries" + (" that was well formed" if malformed else ""))
+
+    def handshake(self):
+        """`info` first, as the protocol asks, and a check of the protocol version."""
+        reply = self.request("info")
+        if not reply.get("ok"):
+            raise ClientError(f"info failed: {reply.get('error')}")
+        if reply.get("protocol") != SUPPORTED_PROTOCOL:
+            raise ClientError(f"the board speaks protocol {reply.get('protocol')}, this client protocol {SUPPORTED_PROTOCOL}")
+        self.info = reply
+        return reply
+
+
+def parse_value(key, text):
+    """The JSON value of a `key=value` setting: whole numbers, true, false and null as such, `colors` as a comma
+    separated list, anything else as text."""
+    if key == "colors":
+        return [name for name in text.split(",") if name]
+    if text in ("true", "false", "null"):
+        return json.loads(text)
+    if re.fullmatch(r"-?[0-9]+", text):
+        return int(text)
+    return text
+
+
+def parse_settings(pairs):
+    settings = {}
+    for pair in pairs:
+        key, sep, text = pair.partition("=")
+        if not sep or not key:
+            raise ValueError(f"expected KEY=VALUE, got '{pair}'")
+        if key in ("seq", "cmd"):
+            raise ValueError(f"'{key}' is not a setting")
+        settings[key] = parse_value(key, text)
+    return settings
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(description="Command line client of the Zenit command protocol.")
+    where = parser.add_mutually_exclusive_group(required=True)
+    where.add_argument("--port", help="USB serial port of the board, e.g. /dev/ttyACM0")
+    where.add_argument("--ws", metavar="URL", help="WebSocket of the simulator or the board, e.g. ws://127.0.0.1:8765")
+    parser.add_argument("--origin", help="Origin header to send with --ws (none by default, as command line clients do)")
+    parser.add_argument("--timeout", type=float, default=REPLY_TIMEOUT, help="seconds to wait for a reply (default 2)")
+    parser.add_argument("--attempts", type=int, default=ATTEMPTS, help="tries in all for a request (default 5)")
+    commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("info", help="what the board is and supports")
+    commands.add_parser("status", help="the state of the light")
+    commands.add_parser("settings-get", help="every setting")
+    commands.add_parser("settings-reset", help="every setting back to its default (USB only)")
+    settings = commands.add_parser("settings-set", help="change settings, e.g. brightness=40 colors=red,blue")
+    settings.add_argument("settings", nargs="+", metavar="KEY=VALUE")
+    light = commands.add_parser("light", help="turn the light on or off, without saving")
+    light.add_argument("state", choices=["on", "off"])
+    raw = commands.add_parser("raw", help="send a request object as it is; `seq` is added unless given")
+    raw.add_argument("json", help='e.g. \'{"cmd":"settings_get"}\'')
+    return parser
+
+
+def request_of(args):
+    """(command, fields) of the parsed command line."""
+    if args.command == "settings-set":
+        return "settings_set", parse_settings(args.settings)
+    if args.command == "light":
+        return "light", {"on": args.state == "on"}
+    if args.command == "raw":
+        fields = json.loads(args.json)
+        if not isinstance(fields, dict) or not isinstance(fields.get("cmd"), str):
+            raise ValueError('raw expects a JSON object with a text "cmd"')
+        command = fields.pop("cmd")
+        return command, fields
+    return args.command.replace("-", "_"), {}
+
+
+def main(argv=None, out=None):
+    out = out or sys.stdout
+    args = build_parser().parse_args(argv)
+    try:
+        command, fields = request_of(args)
+    except ValueError as error:
+        print(f"zenit: {error}", file=sys.stderr)
+        return 2
+    link = None
+    try:
+        link = SerialLink(args.port) if args.port else WebSocketLink(args.ws, args.origin)
+        client = Client(link, args.timeout, args.attempts)
+        client.handshake()
+        seq = fields.pop("seq", None) if args.command == "raw" else None
+        # raw sends what it is given, even `info`
+        reply = client.info if args.command == "info" else client.send(command, fields, seq)
+    except ClientError as error:
+        print(f"zenit: {error}", file=sys.stderr)
+        return 2
+    finally:
+        if link is not None:
+            link.close()
+    print(json.dumps(reply, indent=2, ensure_ascii=False), file=out)
+    return 0 if reply.get("ok") else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

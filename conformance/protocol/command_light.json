@@ -1,0 +1,178 @@
+{
+  "description": "light turns the light off and on without saving; the reply is the light as the request left it.",
+  "steps": [
+    {
+      "advance_ms": 1000
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "light",
+        "on": false
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "light": {
+          "on": false,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        }
+      }
+    },
+    {
+      "advance_ms": 500
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": true,
+        "light": {
+          "on": false,
+          "effect": "static",
+          "color": "white",
+          "lightness": 30.0,
+          "power_scale": 100,
+          "timer": null
+        }
+      }
+    },
+    {
+      "advance_ms": 500
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": true,
+        "light": {
+          "on": false,
+          "effect": "static",
+          "color": null,
+          "lightness": 0.0,
+          "power_scale": 100,
+          "timer": null
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "light",
+        "on": true
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": null,
+          "lightness": 0.0,
+          "power_scale": 100,
+          "timer": null
+        }
+      }
+    },
+    {
+      "advance_ms": 500
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 5,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 30.0,
+          "power_scale": 100,
+          "timer": null
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "light",
+        "on": true
+      },
+      "expect": {
+        "seq": 6,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 30.0,
+          "power_scale": 100,
+          "timer": null
+        }
+      },
+      "note": "already on: nothing changes"
+    },
+    {
+      "advance_ms": 500
+    },
+    {
+      "send": {
+        "seq": 7,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 7,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 8,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 8,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "note": "light does not save"
+    }
+  ]
+}

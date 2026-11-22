@@ -1,0 +1,161 @@
+{
+  "description": "settings_reset puts every light setting back to its default; USB only.",
+  "steps": [
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "settings_set",
+        "brightness": 40,
+        "effect": "twinkle",
+        "timer_minutes": 5
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "settings": {
+          "brightness": 40,
+          "effect": "twinkle",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 5
+        }
+      },
+      "transport": "usb"
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "settings_reset"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": false,
+        "error": "usb_only"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": true,
+        "settings": {
+          "brightness": 40,
+          "effect": "twinkle",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 5
+        }
+      },
+      "transport": "usb"
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_reset"
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "transport": "usb"
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 5,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "transport": "usb"
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "settings_reset"
+      },
+      "expect": {
+        "seq": 6,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "transport": "usb",
+      "note": "nothing to reset is a success"
+    }
+  ]
+}

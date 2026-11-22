@@ -1,13 +1,25 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Runs the cases of conformance/light against the light engine.
+// Runs the cases of conformance/light against the light engine, and those of conformance/protocol against the
+// protocol core with a virtual clock.
 
 #include <unity.h>
 
+#include <frame.h>
+#include <line_reader.h>
+#include <proto_limits.h>
+#include <strict_json.h>
+
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <string>
 #include <vector>
 
+#include "app.h"
+#include "platform.h"
+#include "protocol.h"
+#include "settings.h"
 #include "zenit_test.h"
 
 namespace fs = std::filesystem;
@@ -157,6 +169,245 @@ void test_sequences()
   TEST_ASSERT_GREATER_THAN(0, count);
 }
 
+// ---- Protocol cases ----
+
+namespace
+{
+const std::string PROTOCOL = zenit_test::PROJECT_DIR + "/conformance/protocol";
+constexpr uint32_t BOOT_ID = 4242;
+
+std::vector<std::string> replies;
+
+void collect(const char *line, size_t length) { replies.emplace_back(line, length); }
+
+// Whether `actual` is what `expected` describes. An object `{"$any": "<type>"}` matches any value of that type; every
+// other object matches exactly (same keys, no more, no fewer); numbers compare by value.
+bool matches(JsonVariantConst expected, JsonVariantConst actual, std::string &why, const std::string &path)
+{
+  if (expected.is<JsonObjectConst>() && expected["$any"].is<const char *>())
+  {
+    const std::string type = expected["$any"].as<const char *>();
+    const bool ok = (type == "string" && actual.is<const char *>()) || (type == "integer" && actual.is<int64_t>()) ||
+                    (type == "boolean" && actual.is<bool>());
+    if (!ok)
+      why = path + ": not a " + type;
+    return ok;
+  }
+  if (expected.is<JsonObjectConst>())
+  {
+    if (!actual.is<JsonObjectConst>())
+    {
+      why = path + ": not an object";
+      return false;
+    }
+    JsonObjectConst e = expected.as<JsonObjectConst>(), a = actual.as<JsonObjectConst>();
+    for (JsonPairConst pair : e)
+    {
+      if (a[pair.key()].isUnbound())
+      {
+        why = path + "." + pair.key().c_str() + ": missing";
+        return false;
+      }
+      if (!matches(pair.value(), a[pair.key()], why, path + "." + pair.key().c_str()))
+        return false;
+    }
+    for (JsonPairConst pair : a)
+      if (e[pair.key()].isUnbound() && !(path == "$" && pair.key() == "message"))
+      {
+        why = path + "." + pair.key().c_str() + ": not expected";
+        return false;
+      }
+    return true;
+  }
+  if (expected.is<JsonArrayConst>())
+  {
+    if (!actual.is<JsonArrayConst>() || expected.size() != actual.size())
+    {
+      why = path + ": not the same array";
+      return false;
+    }
+    for (size_t i = 0; i < expected.size(); i++)
+      if (!matches(expected[i], actual[i], why, path + "[" + std::to_string(i) + "]"))
+        return false;
+    return true;
+  }
+  if (expected.isNull())
+  {
+    if (!actual.isNull())
+      why = path + ": not null";
+    return actual.isNull();
+  }
+  if (expected.is<bool>())
+  {
+    const bool ok = actual.is<bool>() && actual.as<bool>() == expected.as<bool>();
+    if (!ok)
+      why = path + ": not " + (expected.as<bool>() ? "true" : "false");
+    return ok;
+  }
+  if (expected.is<const char *>())
+  {
+    const bool ok = actual.is<const char *>() && std::string(actual.as<const char *>()) == expected.as<const char *>();
+    if (!ok)
+      why = path + ": not \"" + expected.as<const char *>() + "\"";
+    return ok;
+  }
+  const bool ok = actual.is<double>() && !actual.is<const char *>() && !actual.is<bool>() &&
+                  std::fabs(actual.as<double>() - expected.as<double>()) < 1e-9;
+  if (!ok)
+    why = path + ": not " + std::to_string(expected.as<double>());
+  return ok;
+}
+
+void start_protocol_case()
+{
+  replies.clear();
+  settings::sim_fail_writes(false);
+  settings::sim_clear();
+  settings::sim_reset_current();
+  platform::sim_set_now_ms(0);
+  app::begin(0, 1);
+  app::tick(0);
+  protocol::begin(BOOT_ID);
+}
+
+// The bytes of a line and its newline through the line reader, as the serial port delivers them. A line with a newline
+// in it is several lines, as on the port.
+void deliver_over_usb(const std::string &line, uint64_t now)
+{
+  zenit::proto::LineReader reader;
+  for (char c : line + "\n")
+  {
+    const auto event = reader.feed(static_cast<uint8_t>(c));
+    if (event == zenit::proto::LineReader::Event::Line)
+      protocol::handle_line(protocol::Transport::Usb, reader.line(), reader.length(), now, collect);
+    else if (event == zenit::proto::LineReader::Event::TooLong)
+      protocol::line_too_long(protocol::Transport::Usb, collect);
+  }
+}
+
+void run_protocol_case(const fs::path &path)
+{
+  JsonDocument doc = load(path.string());
+  const std::string name = path.stem().string();
+  const std::string case_transport = doc["transport"] | "usb";
+  start_protocol_case();
+  uint64_t now = 0;
+  int index = 0;
+  for (JsonObjectConst step : doc["steps"].as<JsonArrayConst>())
+  {
+    const std::string label = name + " step " + std::to_string(index++);
+    if (step["advance_ms"].is<uint64_t>())
+    {
+      const uint64_t until = now + step["advance_ms"].as<uint64_t>();
+      for (now += zenit::TICK_MS; now <= until; now += zenit::TICK_MS)
+      {
+        platform::sim_set_now_ms(now);
+        app::tick(now);
+      }
+      now = until;
+      platform::sim_set_now_ms(now);
+      continue;
+    }
+    if (step["event"].is<const char *>())
+    {
+      const std::string event = step["event"].as<const char *>();
+      if (event == "wifi_open")
+        protocol::wifi_opened();
+      else if (event == "wifi_close")
+        protocol::wifi_closed();
+      else if (event == "storage_fail")
+        settings::sim_fail_writes(true);
+      else if (event == "storage_ok")
+        settings::sim_fail_writes(false);
+      else
+        TEST_FAIL_MESSAGE((label + ": unknown event " + event).c_str());
+      continue;
+    }
+
+    // The line to send: a raw string as it is, a request object framed here, or a padded line.
+    std::string line;
+    JsonVariantConst send = step["send"];
+    if (send.is<const char *>())
+      line = send.as<const char *>();
+    else if (send.is<JsonObjectConst>())
+    {
+      std::string json;
+      serializeJson(send, json);
+      char buffer[zenit::proto::MAX_REPLY_LINE + 1];
+      const size_t size = zenit::proto::format_frame(buffer, sizeof(buffer), json.data(), json.size());
+      TEST_ASSERT_TRUE_MESSAGE(size > 0, label.c_str());
+      line.assign(buffer, size - 1);
+    }
+    else if (step["send_hex"].is<const char *>())
+    {
+      // Bytes a JSON string cannot carry: invalid UTF-8, a raw NUL. Two hexadecimal digits each.
+      const std::string hex = step["send_hex"].as<const char *>();
+      for (size_t i = 0; i + 1 < hex.size(); i += 2)
+        line += static_cast<char>(std::stoi(hex.substr(i, 2), nullptr, 16));
+    }
+    else if (step["send_padded"].is<JsonObjectConst>())
+    {
+      JsonObjectConst padded = step["send_padded"];
+      line = std::string(padded["prefix"].as<const char *>()) +
+             std::string(padded["count"].as<size_t>(), padded["fill"].as<const char *>()[0]);
+    }
+    else
+      TEST_FAIL_MESSAGE((label + ": a step needs send, send_hex, send_padded, advance_ms or event").c_str());
+
+    const std::string transport = step["transport"] | case_transport.c_str();
+    replies.clear();
+    if (transport == "wifi")
+      // A WebSocket message is one line, as it is.
+      protocol::handle_line(protocol::Transport::Wifi, line.data(), line.size(), now, collect);
+    else
+      deliver_over_usb(line, now);
+
+    if (step["expect"].isNull())
+    {
+      TEST_ASSERT_EQUAL_size_t_MESSAGE(0, replies.size(), (label + ": a reply came").c_str());
+      continue;
+    }
+    TEST_ASSERT_EQUAL_size_t_MESSAGE(1, replies.size(), (label + ": expected one reply").c_str());
+    const std::string &reply = replies[0];
+    TEST_ASSERT_TRUE_MESSAGE(reply.size() > 1 && reply.back() == '\n', (label + ": no newline").c_str());
+    // Every reply is a well-formed frame with a matching checksum and strict JSON, with no other newline.
+    const std::string body = reply.substr(0, reply.size() - 1);
+    TEST_ASSERT_TRUE_MESSAGE(body.find('\n') == std::string::npos, (label + ": newline inside").c_str());
+    zenit::proto::Frame frame;
+    TEST_ASSERT_TRUE_MESSAGE(zenit::proto::parse_frame(body.data(), body.size(), frame) ==
+                                 zenit::proto::FrameStatus::Ok,
+                             (label + ": reply is not a frame with a good checksum").c_str());
+    const char *reason = nullptr;
+    size_t offset = 0;
+    TEST_ASSERT_TRUE_MESSAGE(
+        zenit::proto::check_strict_object(frame.json, frame.json_length, zenit::proto::MAX_NESTING, reason, offset),
+        (label + ": reply is not strict JSON").c_str());
+    JsonDocument actual;
+    TEST_ASSERT_FALSE_MESSAGE(deserializeJson(actual, frame.json, frame.json_length), (label + ": reply").c_str());
+    // An error reply carries a message for people, which the cases do not pin down.
+    if (actual["ok"].is<bool>() && !actual["ok"].as<bool>())
+    {
+      TEST_ASSERT_TRUE_MESSAGE(actual["message"].is<const char *>() && actual["message"].as<std::string>().size() > 0,
+                               (label + ": error without a message").c_str());
+    }
+    std::string why;
+    TEST_ASSERT_TRUE_MESSAGE(matches(step["expect"], actual, why, "$"), (label + ": " + why + " in " + body).c_str());
+  }
+}
+} // namespace
+
+void test_protocol_cases()
+{
+  std::vector<fs::path> files;
+  for (const auto &entry : fs::directory_iterator(PROTOCOL))
+    if (entry.path().extension() == ".json")
+      files.push_back(entry.path());
+  std::sort(files.begin(), files.end());
+  TEST_ASSERT_GREATER_THAN(0, files.size());
+  for (const fs::path &file : files)
+    run_protocol_case(file);
+}
+
 int main()
 {
   UNITY_BEGIN();
@@ -164,5 +415,6 @@ int main()
   RUN_TEST(test_power);
   RUN_TEST(test_record);
   RUN_TEST(test_sequences);
+  RUN_TEST(test_protocol_cases);
   return UNITY_END();
 }

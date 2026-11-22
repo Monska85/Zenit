@@ -1,3 +1,7 @@
 # The Python tools CI installs, at exact versions. Dependabot opens a pull request for each new version.
 platformio==6.2.0
 clang-format==23.1.5
+
+# Clients of the command protocol (tools/zenit.py, tools/ws_bridge.py)
+pyserial==3.5
+websockets==17.4

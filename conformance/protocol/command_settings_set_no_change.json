@@ -1,0 +1,90 @@
+{
+  "description": "A settings_set that changes nothing is a success with the same settings.",
+  "steps": [
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "settings_set",
+        "brightness": 60
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "settings_set",
+        "brightness": 60,
+        "effect": "static",
+        "color": "white"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "description": "A settings_reset that cannot save changes nothing.",
+  "steps": [
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "settings_set",
+        "brightness": 40
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "settings": {
+          "brightness": 40,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "event": "storage_fail"
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "settings_reset"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": false,
+        "error": "storage_error"
+      }
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": true,
+        "settings": {
+          "brightness": 40,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    }
+  ]
+}

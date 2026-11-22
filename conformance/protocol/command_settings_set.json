@@ -1,0 +1,332 @@
+{
+  "description": "settings_set changes one or several settings and replies with all of them.",
+  "steps": [
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "settings_set",
+        "brightness": 100
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "settings": {
+          "brightness": 100,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "settings_set",
+        "brightness": 1
+      },
+      "expect": {
+        "seq": 2,
+        "ok": true,
+        "settings": {
+          "brightness": 1,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "settings_set",
+        "effect": "breathing"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": true,
+        "settings": {
+          "brightness": 1,
+          "effect": "breathing",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_set",
+        "color": "blue"
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "settings": {
+          "brightness": 1,
+          "effect": "breathing",
+          "color": "blue",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "settings_set",
+        "colors": [
+          "blue",
+          "white"
+        ]
+      },
+      "expect": {
+        "seq": 5,
+        "ok": true,
+        "settings": {
+          "brightness": 1,
+          "effect": "breathing",
+          "color": "blue",
+          "colors": [
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "settings_set",
+        "color_set": "ice"
+      },
+      "expect": {
+        "seq": 6,
+        "ok": true,
+        "settings": {
+          "brightness": 1,
+          "effect": "breathing",
+          "color": "blue",
+          "colors": [
+            "blue",
+            "white"
+          ],
+          "color_set": "ice",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 7,
+        "cmd": "settings_set",
+        "hold_seconds": 600,
+        "period_seconds": 4,
+        "floor": 80,
+        "twinkle_strength": 5,
+        "timer_minutes": 360
+      },
+      "expect": {
+        "seq": 7,
+        "ok": true,
+        "settings": {
+          "brightness": 1,
+          "effect": "breathing",
+          "color": "blue",
+          "colors": [
+            "blue",
+            "white"
+          ],
+          "color_set": "ice",
+          "hold_seconds": 600,
+          "period_seconds": 4,
+          "floor": 80,
+          "twinkle_strength": 5,
+          "timer_minutes": 360
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 8,
+        "cmd": "settings_set",
+        "hold_seconds": 5,
+        "period_seconds": 20,
+        "floor": 5,
+        "twinkle_strength": 50,
+        "timer_minutes": 0,
+        "brightness": 60,
+        "effect": "static",
+        "color": "white",
+        "colors": [
+          "red",
+          "green",
+          "blue",
+          "white"
+        ],
+        "color_set": "christmas"
+      },
+      "expect": {
+        "seq": 8,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 5,
+          "period_seconds": 20,
+          "floor": 5,
+          "twinkle_strength": 50,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 9,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 9,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 5,
+          "period_seconds": 20,
+          "floor": 5,
+          "twinkle_strength": 50,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 10,
+        "cmd": "settings_set",
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ]
+      },
+      "expect": {
+        "seq": 10,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "white",
+            "red",
+            "green",
+            "blue"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 5,
+          "period_seconds": 20,
+          "floor": 5,
+          "twinkle_strength": 50,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 11,
+        "cmd": "settings_set",
+        "timer_minutes": 1
+      },
+      "expect": {
+        "seq": 11,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "white",
+            "red",
+            "green",
+            "blue"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 5,
+          "period_seconds": 20,
+          "floor": 5,
+          "twinkle_strength": 50,
+          "timer_minutes": 1
+        }
+      }
+    }
+  ]
+}

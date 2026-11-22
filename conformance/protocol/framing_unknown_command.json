@@ -1,0 +1,95 @@
+{
+  "description": "An unknown command is unknown_command with its seq; a command name is exact.",
+  "steps": [
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "fly"
+      },
+      "expect": {
+        "seq": 1,
+        "ok": false,
+        "error": "unknown_command"
+      }
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "INFO"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": false,
+        "error": "unknown_command"
+      }
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "info "
+      },
+      "expect": {
+        "seq": 3,
+        "ok": false,
+        "error": "unknown_command"
+      }
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": ""
+      },
+      "expect": {
+        "seq": 4,
+        "ok": false,
+        "error": "unknown_command"
+      }
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "info"
+      },
+      "expect": {
+        "seq": 5,
+        "ok": true,
+        "protocol": 1,
+        "firmware": {
+          "$any": "string"
+        },
+        "board": "simulator",
+        "boot_id": 4242,
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      }
+    }
+  ]
+}

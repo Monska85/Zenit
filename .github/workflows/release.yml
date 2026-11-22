@@ -1,0 +1,126 @@
+name: Release
+
+# release-please keeps a release pull request open on main. Merging it tags the release (vX.Y.Z) and creates its GitHub
+# Release with the notes from the changelog; the jobs below then build that tag and attach the factory image, the
+# firmware, the third-party notices and their checksums. A manual run with dry_run builds the same files from the
+# branch it runs on, publishes nothing and keeps them as a workflow artifact for 14 days.
+#
+# The repository setting "Allow GitHub Actions to create and approve pull requests" must be on, or release-please
+# cannot open the release pull request. A pull request opened with the default token does not start the other
+# workflows: to run CI on it, add a RELEASE_PLEASE_TOKEN secret (a fine-grained token with Contents, Pull requests and
+# Issues read and write), which this workflow uses when it exists.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build the release files and publish nothing
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  # The release is cut from a main that passes every check
+  check:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+
+      - name: Check
+        run: make check
+
+  release-please:
+    needs: check
+    # One run at a time, so two runs never tag the same release or update the release pull request together
+    concurrency:
+      group: release-please
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  build:
+    needs: release-please
+    # release-please is skipped on a dry run, which must still build
+    if: >-
+      ${{ !cancelled() && needs.release-please.result != 'failure' &&
+      (needs.release-please.outputs.release_created == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs.dry_run == true)) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # A dry run has no release: its files carry a version that cannot be mistaken for one
+      VERSION: ${{ needs.release-please.outputs.release_created == 'true' && needs.release-please.outputs.version || format('0.0.0-dry-run.{0}', github.run_number) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release-please.outputs.release_created == 'true' && needs.release-please.outputs.tag_name || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+
+      # Builds the firmware with the release version, then writes the notices from its link map and the files to attach
+      - name: Build the release files
+        run: make release-assets VERSION="$VERSION"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-files
+          path: release/
+          retention-days: 14
+
+  publish:
+    needs: [release-please, build]
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      # Build provenance: the attestation is signed with the workflow's identity and stored with the repository
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-files
+          path: ${{ runner.temp }}/release
+
+      # Ties each file to this repository, this workflow and the commit it was built from; `gh attestation verify FILE
+      # --repo OWNER/REPO` checks it. The files are the ones the build job made, unchanged.
+      # A private repository needs a paid plan for attestations, so they start once the repository is public.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        if: github.event.repository.visibility == 'public'
+        with:
+          subject-path: ${{ runner.temp }}/release/*
+
+      - name: Attach the files to the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: gh release upload "$TAG" "$RUNNER_TEMP"/release/* --clobber

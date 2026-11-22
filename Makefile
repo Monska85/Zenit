@@ -10,6 +10,7 @@ PYTHON ?= python3
 JOBS ?= 4
 NICE ?= 10
 ARGS ?=
+VERSION ?=
 SIM := .pio/build/native/program
 
 ifeq ($(shell printf '%s' '$(JOBS)' | grep -Ex '[1-9][0-9]*'),)
@@ -22,7 +23,7 @@ endif
 UPLOAD_PORT := $(if $(PORT),--upload-port $(PORT),)
 MONITOR_PORT := $(if $(PORT),--port $(PORT),)
 
-.PHONY: help build upload monitor flash sim-build sim sim-live test tools-test format format-check check clean
+.PHONY: help build upload monitor flash sim-build sim sim-live serve cli test tools-test notices release-assets format format-check check clean
 
 help: ## List the targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/' | expand -t 16
@@ -48,11 +49,26 @@ sim: sim-build ## Run the simulator and write trace.csv and viewer.html (ARGS="-
 sim-live: sim-build ## Run the simulator in real time and draw the light in the terminal
 	$(SIM) --live --no-files $(ARGS)
 
+serve: sim-build ## Serve the simulator on a local WebSocket for the web app (ARGS="--port 9000")
+	$(PYTHON) tools/ws_bridge.py --sim $(SIM) $(ARGS)
+
+cli: ## Run the command line client against a board or the simulator (ARGS="--port /dev/ttyACM0 info")
+	$(PYTHON) tools/zenit.py $(ARGS)
+
 test: ## Run the tests on the simulator
 	nice -n $(NICE) pio test -e native_test
 
-tools-test: ## Run the Python tool tests
+tools-test: ## Run the Python tool tests (the simulator tests need `make sim-build` first)
 	nice -n $(NICE) $(PYTHON) -m unittest discover -s tools
+
+notices: ## Write the third-party notices of the firmware build (`make build` first)
+	$(PYTHON) tools/firmware_notices.py --version check --out .pio/build/$(BOARD)/THIRD_PARTY_NOTICES.txt
+
+release-assets: ## Build the files of a release in release/ (VERSION=1.2.3): factory image, firmware, notices, checksums
+	@test -n "$(VERSION)" || { echo "VERSION is required, e.g. make release-assets VERSION=1.2.3"; exit 1; }
+	ZENIT_VERSION=$(VERSION) nice -n $(NICE) pio run -j $(JOBS) -e $(BOARD)
+	$(PYTHON) tools/firmware_notices.py --version $(VERSION) --out .pio/build/$(BOARD)/THIRD_PARTY_NOTICES.txt
+	$(PYTHON) tools/release_assets.py --version $(VERSION) --out release --notices .pio/build/$(BOARD)/THIRD_PARTY_NOTICES.txt
 
 format: ## Format the C++ sources with clang-format
 	find src include test lib \( -name '*.cpp' -o -name '*.h' \) -exec nice -n $(NICE) clang-format -i {} +
@@ -60,11 +76,12 @@ format: ## Format the C++ sources with clang-format
 format-check: ## Fail if a C++ source is not formatted
 	find src include test lib \( -name '*.cpp' -o -name '*.h' \) -exec nice -n $(NICE) clang-format --dry-run --Werror {} +
 
-check: format-check ## Check formatting, run every test suite and build the firmware and the simulator
-	nice -n $(NICE) $(PYTHON) -m unittest discover -s tools
+check: format-check ## Check formatting, run every test suite, build the firmware and the simulator, build the notices
 	nice -n $(NICE) pio test -e native_test
 	nice -n $(NICE) pio run -j $(JOBS) -e native -e $(BOARD)
+	nice -n $(NICE) $(PYTHON) -m unittest discover -s tools
+	$(PYTHON) tools/firmware_notices.py --version check --out .pio/build/$(BOARD)/THIRD_PARTY_NOTICES.txt
 
 clean: ## Remove build outputs and simulator output
 	pio run -t clean -e native -e native_test -e $(BOARD)
-	rm -rf $(OUT)
+	rm -rf $(OUT) release

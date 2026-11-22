@@ -1,0 +1,67 @@
+{
+  "description": "A newline inside the JSON is bad_frame over a WebSocket, where a message can hold one; on USB it ends the line.",
+  "steps": [
+    {
+      "send": "@ZN bd975bc7 {\"seq\":1,\n\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "transport": "wifi",
+      "note": "a message with a newline and a matching checksum"
+    },
+    {
+      "send": "@ZN bd975bc7 {\"seq\":1,\n\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "transport": "usb",
+      "note": "on USB the line ends at the newline: the first part has a wrong checksum and the second part is not a protocol line"
+    },
+    {
+      "send": "@ZN 3c250228 {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "protocol": 1,
+        "firmware": {
+          "$any": "string"
+        },
+        "board": "simulator",
+        "boot_id": 4242,
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      },
+      "transport": "wifi"
+    }
+  ]
+}

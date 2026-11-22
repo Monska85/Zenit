@@ -1,0 +1,37 @@
+{
+  "description": "Four levels of nesting are read; the request itself is the first level.",
+  "steps": [
+    {
+      "send": "@ZN 62e2d96f {\"seq\":1,\"cmd\":\"info\",\"a\":{\"b\":{\"c\":1}}}",
+      "expect": {
+        "seq": 1,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": "@ZN 5e1ccfae {\"seq\":2,\"cmd\":\"info\",\"a\":{\"b\":{\"c\":{}}}}",
+      "expect": {
+        "seq": 2,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": "@ZN 6f221b69 {\"seq\":3,\"cmd\":\"info\",\"a\":[[[1]]]}",
+      "expect": {
+        "seq": 3,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": "@ZN 842df7cc {\"seq\":4,\"cmd\":\"info\",\"a\":{\"b\":{\"c\":{\"d\":{}}}}}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "five levels"
+    }
+  ]
+}

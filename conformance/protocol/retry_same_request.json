@@ -1,0 +1,121 @@
+{
+  "description": "The same seq with the same request gets the remembered reply without running again.",
+  "steps": [
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_set",
+        "brightness": 40
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "settings": {
+          "brightness": 40,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "transport": "usb"
+    },
+    {
+      "send": {
+        "seq": 9,
+        "cmd": "settings_set",
+        "brightness": 70
+      },
+      "expect": {
+        "seq": 9,
+        "ok": true,
+        "settings": {
+          "brightness": 70,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_set",
+        "brightness": 40
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "settings": {
+          "brightness": 40,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "transport": "usb",
+      "note": "remembered: the settings stay at 70"
+    },
+    {
+      "send": {
+        "seq": 10,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 10,
+        "ok": true,
+        "settings": {
+          "brightness": 70,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "transport": "usb"
+    }
+  ]
+}

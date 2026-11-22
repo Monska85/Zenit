@@ -1,0 +1,133 @@
+{
+  "description": "A line answered with bad_frame does not touch the remembered reply.",
+  "steps": [
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_set",
+        "brightness": 40
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "settings": {
+          "brightness": 40,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 9,
+        "cmd": "settings_set",
+        "brightness": 70
+      },
+      "expect": {
+        "seq": 9,
+        "ok": true,
+        "settings": {
+          "brightness": 70,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": "@ZN 00000000 {\"seq\":4,\"cmd\":\"settings_set\",\"brightness\":40}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      }
+    },
+    {
+      "send": "@ZN 5fe99725 {\"seq\":4,\"cmd\":\"settings_set\",\"brightness\":40,}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      }
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_set",
+        "brightness": 40
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "settings": {
+          "brightness": 40,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "note": "still remembered"
+    },
+    {
+      "send": {
+        "seq": 10,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 10,
+        "ok": true,
+        "settings": {
+          "brightness": 70,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0
+        }
+      },
+      "note": "the settings stayed at 70"
+    }
+  ]
+}

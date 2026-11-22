@@ -1,0 +1,240 @@
+{
+  "description": "Only one carriage return before the newline is ignored; any other is part of the JSON, which has none.",
+  "steps": [
+    {
+      "send": "@ZN 3c250228 {\"seq\":1,\"cmd\":\"info\"}\r",
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "protocol": 1,
+        "firmware": {
+          "$any": "string"
+        },
+        "board": "simulator",
+        "boot_id": 4242,
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      },
+      "note": "CR LF: the one carriage return is ignored"
+    },
+    {
+      "send": "@ZN 3c250228 {\"seq\":1,\"cmd\":\"info\"}\r\r",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "CR CR LF with the checksum of the JSON: the second carriage return breaks the checksum"
+    },
+    {
+      "send": "@ZN 993a1ec8 {\"seq\":1,\"cmd\":\"info\"}\r\r",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "CR CR LF with the checksum of the JSON and one carriage return: strict JSON refuses it"
+    },
+    {
+      "send": "@ZN d85af107 {\"seq\":1,\r\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a carriage return between tokens"
+    },
+    {
+      "send": "@ZN 1fb4392a {\"seq\":1,\"cmd\":\"in\rfo\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a carriage return inside a string"
+    },
+    {
+      "send": "@ZN 993a1ec8 {\"seq\":1,\"cmd\":\"info\"}\r",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "note": "a carriage return at the end of the JSON, covered by the checksum"
+    },
+    {
+      "send": "@ZN c1f67e1c {\"seq\":1,\t\"cmd\":\"info\"}",
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "protocol": 1,
+        "firmware": {
+          "$any": "string"
+        },
+        "board": "simulator",
+        "boot_id": 4242,
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      },
+      "note": "a tab between tokens is whitespace"
+    },
+    {
+      "send": "@ZN 19d442d5 {\"seq\":1, \"cmd\":\"info\" }",
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "protocol": 1,
+        "firmware": {
+          "$any": "string"
+        },
+        "board": "simulator",
+        "boot_id": 4242,
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      },
+      "note": "so is a space"
+    },
+    {
+      "send": "@ZN 3c250228 {\"seq\":1,\"cmd\":\"info\"}\r",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "transport": "wifi",
+      "note": "a WebSocket message has no line ending: a carriage return at its end is part of the JSON, and the checksum does not cover it"
+    },
+    {
+      "send": "@ZN 993a1ec8 {\"seq\":1,\"cmd\":\"info\"}\r",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      },
+      "transport": "wifi",
+      "note": "even with a checksum that covers it, strict JSON refuses it"
+    },
+    {
+      "send": "@ZN 3c250228 {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "protocol": 1,
+        "firmware": {
+          "$any": "string"
+        },
+        "board": "simulator",
+        "boot_id": 4242,
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      },
+      "transport": "wifi",
+      "note": "the same message without it is fine"
+    }
+  ]
+}

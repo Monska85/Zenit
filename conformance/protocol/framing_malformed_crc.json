@@ -1,0 +1,133 @@
+{
+  "description": "A checksum that is missing, short, long, not hexadecimal, uppercase or not followed by a space is bad_frame.",
+  "steps": [
+    {
+      "send": "@ZN ",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      }
+    },
+    {
+      "send": "@ZN 3c250228",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      }
+    },
+    {
+      "send": "@ZN 3c250228 ",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      }
+    },
+    {
+      "send": "@ZN {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      }
+    },
+    {
+      "send": "@ZN 3c25022 {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      }
+    },
+    {
+      "send": "@ZN 3c2502288 {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      }
+    },
+    {
+      "send": "@ZN 3c25022g {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      }
+    },
+    {
+      "send": "@ZN 3C250228 {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      }
+    },
+    {
+      "send": "@ZN 0x250228 {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      }
+    },
+    {
+      "send": "@ZN 3c250228\t{\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      }
+    },
+    {
+      "send": "@ZN  3c250228 {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      }
+    },
+    {
+      "send": "@ZN 3c250228{\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "ok": false,
+        "error": "bad_frame"
+      }
+    },
+    {
+      "send": "@ZN 3c250228 {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "protocol": 1,
+        "firmware": {
+          "$any": "string"
+        },
+        "board": "simulator",
+        "boot_id": 4242,
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      },
+      "note": "a well formed line passes"
+    }
+  ]
+}

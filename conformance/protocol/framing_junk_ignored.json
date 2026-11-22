@@ -1,0 +1,85 @@
+{
+  "description": "Lines that do not start with the marker get no reply, whatever they hold.",
+  "steps": [
+    {
+      "send": "hello",
+      "expect": null
+    },
+    {
+      "send": "zenit: firmware 1.0.0 on esp32c3",
+      "expect": null
+    },
+    {
+      "send": "",
+      "expect": null
+    },
+    {
+      "send": "@ZN",
+      "expect": null
+    },
+    {
+      "send": "@zn 3c250228 {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": null
+    },
+    {
+      "send": " @ZN 3c250228 {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": null
+    },
+    {
+      "send": "@@ZN 3c250228 {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": null
+    },
+    {
+      "send": "{\"seq\":1,\"cmd\":\"info\"}",
+      "expect": null
+    },
+    {
+      "send": "IMPROV\u0001\u0001",
+      "expect": null
+    },
+    {
+      "send": "@ZN 3c250228 {\"seq\":1,\"cmd\":\"info\"}",
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "protocol": 1,
+        "firmware": {
+          "$any": "string"
+        },
+        "board": "simulator",
+        "boot_id": 4242,
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      },
+      "note": "the board still answers afterwards"
+    }
+  ]
+}

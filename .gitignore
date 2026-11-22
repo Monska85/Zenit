@@ -9,6 +9,8 @@
 /sim-out/
 # Release site built locally
 /site/
+# Files of a release built locally (just release-assets)
+/release/
 
 # --- Tool caches ----------------------------------------------------------------------------
 # Python bytecode and virtual environments of the tools and the build scripts

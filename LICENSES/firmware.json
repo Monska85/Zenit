@@ -1,0 +1,98 @@
+{
+  "comment": "The third-party software of the firmware, for tools/firmware_notices.py (LICENSES/README.md). Every archive the firmware links must be named by a section, by a library, or be a library of the project's lib/ folder. A section's version is read from the build: 'esp-idf' and 'component:<name>' from versions.txt of the framework's library package, 'arduino' from its package.json, 'toolchain' from the compiler package. 'pins' are the versions the files in LICENSES/firmware/ were taken from: a build with other versions fails until the files are taken again.",
+  "pins": {
+    "esp-idf": "v5.5.5",
+    "arduino": "3.3.12",
+    "components": {
+      "espressif__esp_diagnostics": "1.3.4"
+    }
+  },
+  "sections": [
+    {
+      "name": "Arduino-ESP32",
+      "version": "arduino",
+      "license": "LGPL-2.1-or-later",
+      "source": "https://github.com/espressif/arduino-esp32/tree/{version}",
+      "files": ["arduino-esp32.LICENSE.md"],
+      "archives": ["libFrameworkArduino.a", "libPreferences.a"]
+    },
+    {
+      "name": "ESP-IDF",
+      "version": "esp-idf",
+      "license": "Apache-2.0",
+      "source": "https://github.com/espressif/esp-idf/tree/{version}",
+      "files": ["esp-idf.LICENSE"],
+      "archives": [
+        "libapp_update.a", "libbootloader_support.a", "libbt.a", "libcxx.a", "libefuse.a", "libesp_app_format.a",
+        "libesp_coex.a", "libesp_common.a", "libesp_driver_gpio.a", "libesp_driver_ledc.a", "libesp_driver_rmt.a",
+        "libesp_driver_spi.a", "libesp_driver_tsens.a", "libesp_driver_uart.a", "libesp_driver_usb_serial_jtag.a",
+        "libesp_event.a", "libesp_hw_support.a", "libesp_mm.a", "libesp_partition.a", "libesp_phy.a", "libesp_pm.a",
+        "libesp_ringbuf.a", "libesp_security.a", "libesp_system.a", "libesp_timer.a", "libesp_vfs_console.a",
+        "libespcoredump.a", "libfreertos.a", "libhal.a", "libheap.a", "liblog.a", "libmbedcrypto.a", "libnewlib.a", "libnvs_flash.a",
+        "libnvs_sec_provider.a", "libpthread.a", "libriscv.a", "libsoc.a", "libspi_flash.a", "libvfs.a"
+      ]
+    },
+    {
+      "name": "Espressif binary libraries (PHY, Bluetooth, coexistence), in object form only",
+      "version": "esp-idf",
+      "license": "Apache-2.0",
+      "source": "https://github.com/espressif/esp-idf/tree/{version}",
+      "files": ["esp-idf.LICENSE"],
+      "archives": ["libbtbb.a", "libbtdm_app.a", "libcoexist.a", "libphy.a"]
+    },
+    {
+      "name": "FreeRTOS kernel (in ESP-IDF, components/freertos)",
+      "version": "esp-idf",
+      "license": "MIT",
+      "source": "https://github.com/espressif/esp-idf/tree/{version}/components/freertos/FreeRTOS-Kernel",
+      "files": ["FreeRTOS-Kernel.LICENSE.md"],
+      "archives": ["libfreertos.a"]
+    },
+    {
+      "name": "Mbed TLS (in ESP-IDF, components/mbedtls), used under Apache-2.0",
+      "version": "esp-idf",
+      "license": "Apache-2.0 OR GPL-2.0-or-later",
+      "source": "https://github.com/espressif/mbedtls",
+      "files": ["mbedtls.LICENSE"],
+      "archives": ["libmbedcrypto.a"]
+    },
+    {
+      "name": "TLSF memory allocator (in ESP-IDF, components/heap/tlsf)",
+      "version": "esp-idf",
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/espressif/tlsf",
+      "files": ["tlsf.LICENSE"],
+      "archives": ["libheap.a"]
+    },
+    {
+      "name": "esp_diagnostics (component espressif/esp_diagnostics)",
+      "version": "component:espressif__esp_diagnostics",
+      "license": "Apache-2.0",
+      "source": "https://components.espressif.com/components/espressif/esp_diagnostics/versions/{version}",
+      "files": ["esp-idf.LICENSE"],
+      "archives": ["libespressif__esp_diagnostics.a"]
+    },
+    {
+      "name": "newlib C library (from the compiler)",
+      "version": "toolchain",
+      "license": "BSD-style licenses of newlib (COPYING.NEWLIB)",
+      "source": "https://sourceware.org/newlib/",
+      "files": ["toolchain:share/licenses/newlib/COPYING.NEWLIB"],
+      "archives": ["libc.a", "libm.a"]
+    },
+    {
+      "name": "GCC runtime libraries libgcc and libstdc++ (from the compiler)",
+      "version": "toolchain",
+      "license": "GPL-3.0-or-later WITH GCC-exception-3.1",
+      "source": "https://gcc.gnu.org/",
+      "files": ["toolchain:share/licenses/gcc/COPYING3", "toolchain:share/licenses/gcc/COPYING.RUNTIME"],
+      "archives": ["libgcc.a", "libstdc++.a"]
+    }
+  ],
+  "libraries": {
+    "ArduinoJson": {
+      "license": "MIT",
+      "files": ["LICENSE.txt"]
+    }
+  }
+}

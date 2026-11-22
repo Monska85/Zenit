@@ -9,6 +9,8 @@
 #include "app.h"
 #include "output.h"
 #include "platform.h"
+#include "protocol.h"
+#include "serial_link.h"
 #include "settings.h"
 
 namespace
@@ -25,6 +27,7 @@ void setup()
   Serial.setRxBufferSize(SERIAL_RX_BUFFER);
   Serial.begin(SERIAL_BAUD);
   settings::begin();
+  protocol::begin(platform::random32());
   const uint64_t now = platform::now_ms();
   app::begin(now, platform::random32());
   app::tick(now);
@@ -35,6 +38,7 @@ void setup()
 void loop()
 {
   const uint64_t now = platform::now_ms();
+  serial_link::poll(now);
   if (now >= next_tick)
   {
     app::tick(now);
