@@ -131,8 +131,8 @@ The app, loaded from a board, probes `/board.json` on its own origin; when it ge
 
 The protocol over WiFi is specified in the [protocol document](../protocol/protocol-v1.md#websocket). The board implements it on the HTTP server's WebSocket support (`esp_http_server`):
 
-- One client at a time. A second handshake is accepted and closed at once with status 1013 (try later); the simulator's bridge answers HTTP 503 for the same case. Page requests are not affected.
-- The `Origin` header is checked after the handshake: missing, the site address the firmware was built with, `localhost`, a `.local` name or a private IPv4 address (10/8, 172.16/12, 192.168/16, 169.254/16, 127/8) pass; anything else is closed with 1008.
+- One client at a time. The HTTP server of ESP-IDF answers a WebSocket handshake by itself and calls the firmware for the frames only, so a connection becomes the client with its first message. A second connection is accepted and closed with status 1013 (try later) at its first message; the simulator's bridge answers HTTP 503 for the same case. A WebSocket connection that has not become the client 10 seconds after it opened is closed, so idle connections cannot fill the server's sockets. Page requests are not affected.
+- The `Origin` header is read from the bytes of the handshake as they arrive (the server keeps no headers for the frames) and checked at the first message: missing, the site address the firmware was built with, `localhost`, a `.local` name or a private IPv4 address (10/8, 172.16/12, 192.168/16, 169.254/16, 127/8) pass; anything else is closed with 1008.
 - A message over 1,024 bytes after reassembly closes with 1009, a binary message with 1003, a text message with a newline with 1008, and invalid UTF-8 with 1007. Fragments are reassembled; pings are answered by the server; an unmasked client frame is a protocol error (1002).
 - A client that vanished (WiFi lost) is detected with TCP keep-alive (15 s idle, 5 s interval, 3 probes) and frees the slot.
 - A client that holds the slot and stays silent is not closed by the board while its connection lives; a second client has to wait or the first tab has to close.

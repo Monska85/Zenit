@@ -27,4 +27,4 @@ Status: accepted
 - The board's HTTP page and WebSocket are unencrypted. Network login protects commands, not privacy of the traffic. This is stated in the app.
 - Updates trust the site's HTTPS and its host: a compromise of the GitHub account compromises the units. The risk is accepted for ten gifts and recorded here; signing is the next step if the audience grows.
 - A repository that is still private has no site: update checks report `not_published` until the site exists.
-- A second WebSocket handshake is closed with 1013 on the board and answered 503 by the simulator's bridge, because the HTTP server calls the handler after the handshake.
+- A second WebSocket connection is closed with 1013 at its first message on the board and answered 503 by the simulator's bridge, because the HTTP server answers the handshake by itself and calls the firmware for frames only; the board reads the `Origin` header from the raw request.

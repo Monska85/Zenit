@@ -14,6 +14,7 @@
 #include <lwip/sockets.h>
 #include <net_http.h>
 #include <net_origin.h>
+#include <origin_scan.h>
 #include <proto_limits.h>
 #include <ws_message.h>
 
@@ -48,7 +49,9 @@ constexpr size_t SERVER_STACK_BYTES = 5120;
 constexpr int KEEP_ALIVE_IDLE_S = 15;
 constexpr int KEEP_ALIVE_INTERVAL_S = 5;
 constexpr int KEEP_ALIVE_COUNT = 3;
-constexpr size_t MAX_ORIGIN = 255;
+// A WebSocket connection that has not become the client by then is closed, so idle connections cannot fill the sockets.
+constexpr uint32_t UNCLAIMED_WAIT_MS = zenit::proto::LOGIN_WAIT_MS;
+constexpr uint32_t SWEEP_EVERY_MS = 1000;
 const char BUSY_RESPONSE[] = "HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
 
 char site_origin[site::ORIGIN_SIZE];
@@ -80,6 +83,15 @@ std::atomic<int> client_fd{-1};
 
 // Only the server task touches these.
 MessageAssembler assembler;
+// Every open connection, with the Origin header of its request. This server answers a WebSocket handshake by itself and
+// never shows it to a handler, so the header is read from the bytes on their way in.
+struct Session
+{
+  int fd = -1;
+  TickType_t opened = 0;
+  zenit::net::OriginScan scan;
+};
+Session sessions[MAX_SOCKETS];
 uint8_t payload[zenit::proto::MAX_LINE + 1];
 uint32_t next_id = 1;
 
@@ -100,28 +112,60 @@ esp_err_t refuse(httpd_req_t *req, uint16_t code)
   return ESP_FAIL;
 }
 
-bool origin_ok(httpd_req_t *req)
+Session *session_of(int fd)
 {
-  const size_t length = httpd_req_get_hdr_value_len(req, "Origin");
-  if (length == 0)
-    return true;
-  if (length > MAX_ORIGIN)
-    return false;
-  char origin[MAX_ORIGIN + 1];
-  if (httpd_req_get_hdr_value_str(req, "Origin", origin, sizeof(origin)) != ESP_OK)
-    return false;
-  return zenit::net::origin_allowed(origin, site_origin);
+  for (Session &session : sessions)
+    if (session.fd == fd)
+      return &session;
+  return nullptr;
 }
 
-// The handshake of a WebSocket has been answered: this connection is allowed or closed at once.
-esp_err_t on_handshake(httpd_req_t *req)
+// The server's receive, which also reads the Origin header of the connection's request.
+int recv_scanning(httpd_handle_t, int fd, char *buf, size_t size, int flags)
 {
-  if (!origin_ok(req))
-    return refuse(req, zenit::proto::CLOSE_POLICY);
-  const int fd = httpd_req_to_sockfd(req);
+  if (!buf)
+    return HTTPD_SOCK_ERR_INVALID;
+  const int got = lwip_recv(fd, buf, size, flags);
+  if (got < 0)
+    return errno == EAGAIN || errno == EWOULDBLOCK ? HTTPD_SOCK_ERR_TIMEOUT : HTTPD_SOCK_ERR_FAIL;
+  Session *session = session_of(fd);
+  if (got > 0 && !(flags & MSG_PEEK) && session && !session->scan.done())
+    session->scan.feed(buf, static_cast<size_t>(got));
+  return got;
+}
+
+bool origin_ok(int fd)
+{
+  const Session *session = session_of(fd);
+  if (!session || !session->scan.done())
+    return false;
+  if (session->scan.missing())
+    return true;
+  const char *origin = session->scan.origin();
+  return origin && zenit::net::origin_allowed(origin, site_origin);
+}
+
+// Reads the frame that is waiting, then closes with `code`: a socket closed with bytes unread is reset, and the reset
+// would drop the close frame on its way out.
+esp_err_t read_and_refuse(httpd_req_t *req, uint16_t code)
+{
+  httpd_ws_frame_t frame = {};
+  if (httpd_ws_recv_frame(req, &frame, 0) == ESP_OK && frame.len > 0 && frame.len <= sizeof(payload))
+  {
+    frame.payload = payload;
+    httpd_ws_recv_frame(req, &frame, sizeof(payload));
+  }
+  return refuse(req, code);
+}
+
+// The first message of a WebSocket connection: the connection becomes the client, or is closed.
+esp_err_t claim(httpd_req_t *req, int fd)
+{
+  if (!origin_ok(fd))
+    return read_and_refuse(req, zenit::proto::CLOSE_POLICY);
   int expected = -1;
   if (!client_fd.compare_exchange_strong(expected, fd))
-    return refuse(req, zenit::proto::CLOSE_TRY_LATER);
+    return read_and_refuse(req, zenit::proto::CLOSE_TRY_LATER);
   assembler.reset();
   xSemaphoreTake(reply_ready, 0); // an answer to a line of an earlier connection
   Event open;
@@ -197,12 +241,16 @@ esp_err_t on_frame(httpd_req_t *req)
   return ESP_FAIL;
 }
 
+// Called for each frame only: this server answers the handshake by itself.
 esp_err_t handle_ws(httpd_req_t *req)
 {
-  if (req->method == HTTP_GET)
-    return on_handshake(req);
-  if (httpd_req_to_sockfd(req) != client_fd.load())
-    return ESP_FAIL;
+  const int fd = httpd_req_to_sockfd(req);
+  if (fd != client_fd.load())
+  {
+    const esp_err_t claimed = claim(req, fd);
+    if (claimed != ESP_OK)
+      return claimed;
+  }
   return on_frame(req);
 }
 
@@ -267,19 +315,43 @@ esp_err_t handle_not_found(httpd_req_t *req, httpd_err_code_t)
 }
 
 // A new connection is turned away with 503 while the network task holds the large allocation of a TLS connection.
-esp_err_t on_open(httpd_handle_t, int fd)
+esp_err_t on_open(httpd_handle_t handle, int fd)
 {
   if (network::holds_large_allocation())
   {
     lwip_send(fd, BUSY_RESPONSE, sizeof(BUSY_RESPONSE) - 1, MSG_DONTWAIT);
     return ESP_FAIL;
   }
-  return ESP_OK;
+  Session *session = session_of(-1);
+  if (!session)
+    return ESP_FAIL; // more connections than the server opens: it does not happen
+  // Small answers and close frames go out at once, not held back waiting for an acknowledgement
+  const int on = 1;
+  lwip_setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
+  session->fd = fd;
+  session->opened = xTaskGetTickCount();
+  session->scan.reset();
+  return httpd_sess_set_recv_override(handle, fd, recv_scanning);
+}
+
+// The server task: closes the WebSocket connections that did not become the client in time.
+void sweep(void *)
+{
+  httpd_handle_t handle = server.load();
+  if (!handle)
+    return;
+  const TickType_t now = xTaskGetTickCount();
+  for (const Session &session : sessions)
+    if (session.fd >= 0 && session.fd != client_fd.load() && now - session.opened >= pdMS_TO_TICKS(UNCLAIMED_WAIT_MS) &&
+        httpd_ws_get_fd_info(handle, session.fd) == HTTPD_WS_CLIENT_WEBSOCKET)
+      httpd_sess_trigger_close(handle, session.fd);
 }
 
 // Runs for every session that ends, whoever ended it; closing the socket is left to this function.
 void on_close(httpd_handle_t, int fd)
 {
+  if (Session *session = session_of(fd))
+    session->fd = -1;
   int expected = fd;
   if (client_fd.compare_exchange_strong(expected, -1))
   {
@@ -374,6 +446,13 @@ void stop()
 
 void poll(uint64_t now)
 {
+  static uint64_t last_sweep = 0;
+  if (now - last_sweep >= SWEEP_EVERY_MS)
+  {
+    last_sweep = now;
+    if (httpd_handle_t handle = server.load())
+      httpd_queue_work(handle, sweep, nullptr);
+  }
   static Event event;
   for (int handled = 0; handled < 4 && to_loop.receive(event, 0); handled++)
   {

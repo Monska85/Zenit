@@ -7,6 +7,7 @@
 
 #include <frame.h>
 #include <improv_frame.h>
+#include <origin_scan.h>
 #include <sha256.h>
 
 #include <cstring>
@@ -756,6 +757,60 @@ void test_a_close_request_is_read_once_and_cleared_by_a_new_connection()
   TEST_ASSERT_FALSE(protocol::take_wifi_close_request());
 }
 
+namespace
+{
+net::OriginScan scan_of(const std::vector<std::string> &chunks)
+{
+  net::OriginScan scan;
+  for (const std::string &chunk : chunks)
+    scan.feed(chunk.data(), chunk.size());
+  return scan;
+}
+} // namespace
+
+void test_the_origin_of_a_handshake_is_read_from_its_raw_bytes()
+{
+  const std::string request = "GET /ws HTTP/1.1\r\nHost: zenit-a1b2.local\r\norIGin:  http://zenit-a1b2.local \r\n"
+                              "Upgrade: websocket\r\n\r\n\x81\x85masked";
+  net::OriginScan scan = scan_of({request});
+  TEST_ASSERT_TRUE(scan.done());
+  TEST_ASSERT_EQUAL_STRING("http://zenit-a1b2.local", scan.origin());
+  // The same bytes one at a time
+  net::OriginScan bytes;
+  for (char c : request)
+    bytes.feed(&c, 1);
+  TEST_ASSERT_TRUE(bytes.done());
+  TEST_ASSERT_EQUAL_STRING("http://zenit-a1b2.local", bytes.origin());
+}
+
+void test_a_handshake_without_an_origin_is_told_apart_from_a_bad_one()
+{
+  net::OriginScan none = scan_of({"GET /ws HTTP/1.1\r\nHost: x\r\n\r\n"});
+  TEST_ASSERT_TRUE(none.done());
+  TEST_ASSERT_TRUE(none.missing());
+  TEST_ASSERT_NULL(none.origin());
+  // An origin on the request line is not a header
+  TEST_ASSERT_TRUE(scan_of({"GET /Origin:x HTTP/1.1\r\n\r\n"}).missing());
+  net::OriginScan twice = scan_of({"GET / HTTP/1.1\r\nOrigin: http://a.local\r\nOrigin: http://b.local\r\n\r\n"});
+  TEST_ASSERT_FALSE(twice.missing());
+  TEST_ASSERT_NULL(twice.origin());
+  const std::string longest(net::OriginScan::MAX_ORIGIN, 'a');
+  TEST_ASSERT_EQUAL_STRING(longest.c_str(), scan_of({"GET / HTTP/1.1\r\nOrigin: " + longest + "\r\n\r\n"}).origin());
+  net::OriginScan too_long = scan_of({"GET / HTTP/1.1\r\nOrigin: " + longest + "a\r\n\r\n"});
+  TEST_ASSERT_FALSE(too_long.missing());
+  TEST_ASSERT_NULL(too_long.origin());
+  net::OriginScan far_too_long = scan_of({"GET / HTTP/1.1\r\nOrigin: " + std::string(2000, 'a') + "\r\n\r\n"});
+  TEST_ASSERT_TRUE(far_too_long.done());
+  TEST_ASSERT_FALSE(far_too_long.missing());
+  TEST_ASSERT_NULL(far_too_long.origin());
+  // A long header of another name does not count, and nothing after the headers is read
+  net::OriginScan other = scan_of({"GET / HTTP/1.1\r\nCookie: " + std::string(2000, 'c') + "\r\n\r\nOrigin: x\r\n"});
+  TEST_ASSERT_TRUE(other.done());
+  TEST_ASSERT_TRUE(other.missing());
+  net::OriginScan partial = scan_of({"GET / HTTP/1.1\r\nOrigin: http://a.local\r\n"});
+  TEST_ASSERT_FALSE(partial.done());
+}
+
 int main()
 {
   UNITY_BEGIN();
@@ -772,6 +827,8 @@ int main()
   RUN_TEST(test_improv_refuses_bad_frames_and_commands);
   RUN_TEST(test_improv_scan_sorts_dedupes_and_ends_with_an_empty_result);
   RUN_TEST(test_a_scan_drops_the_names_that_cannot_be_reported);
+  RUN_TEST(test_the_origin_of_a_handshake_is_read_from_its_raw_bytes);
+  RUN_TEST(test_a_handshake_without_an_origin_is_told_apart_from_a_bad_one);
   RUN_TEST(test_a_scan_of_many_access_points_keeps_the_strongest_names_as_the_board_does);
   RUN_TEST(test_improv_stores_the_network_only_after_it_connected_and_blinks_meanwhile);
   RUN_TEST(test_improv_does_not_store_a_network_that_failed);
