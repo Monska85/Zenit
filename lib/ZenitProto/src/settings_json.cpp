@@ -79,6 +79,12 @@ Failure apply_board_field(const char *name, JsonVariantConst value, net::BoardSe
       return bad_value(name, "expected true or false");
     next.update_firmware = value.as<bool>();
   }
+  else if (std::strcmp(name, "update_web") == 0)
+  {
+    if (!value.is<bool>())
+      return bad_value(name, "expected true or false");
+    next.update_web = value.as<bool>();
+  }
   else if (std::strcmp(name, "check_hours") == 0)
   {
     if (!read_integer(value, 1, 168, number))
@@ -229,6 +235,7 @@ void write_settings(JsonObject target, const LightSettings &s, const net::BoardS
   target["wifi_power"] = net::wifi_power_name(b.wifi_power);
   target["update_mode"] = net::update_mode_name(b.update_mode);
   target["update_firmware"] = b.update_firmware;
+  target["update_web"] = b.update_web;
   target["check_hours"] = b.check_hours;
   target["install_start"] = b.install_start;
   target["install_end"] = b.install_end;

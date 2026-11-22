@@ -71,5 +71,43 @@ size_t board_json(const char *hostname, char *out, size_t size)
   return written > 0 && static_cast<size_t>(written) < size ? static_cast<size_t>(written) : 0;
 }
 
+size_t emergency_page(bool repairing, const char *site_url, char *out, size_t size)
+{
+  static const char HEAD[] = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+                             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                             "<meta http-equiv=\"refresh\" content=\"30\"><title>Zenit</title>"
+                             "<style>body{font-family:system-ui,sans-serif;max-width:32rem;margin:3rem auto;"
+                             "padding:0 1rem;line-height:1.5}</style></head><body><h1>Zenit</h1><p>";
+  static const char TAIL[] = "</p></body></html>";
+  size_t at = 0;
+  auto put = [&](const char *text) -> bool
+  {
+    const size_t length = std::strlen(text);
+    if (at + length >= size)
+      return false;
+    std::memcpy(out + at, text, length);
+    at += length;
+    return true;
+  };
+  bool ok = put(HEAD);
+  if (repairing)
+    ok = ok && put("The Zenit app is being installed. This page reloads by itself.");
+  else
+  {
+    ok = ok && put("The Zenit app is missing. Install it from the Zenit site over USB: ");
+    // The site address is fixed at build time; it is still written as text, never as markup.
+    for (const char *c = site_url; ok && *c; c++)
+    {
+      const char one[2] = {*c, '\0'};
+      ok = put(*c == '&' ? "&amp;" : *c == '<' ? "&lt;" : *c == '>' ? "&gt;" : *c == '"' ? "&quot;" : one);
+    }
+  }
+  ok = ok && put(TAIL);
+  if (!ok)
+    return 0;
+  out[at] = '\0';
+  return at;
+}
+
 } // namespace net
 } // namespace zenit

@@ -53,7 +53,13 @@ test("looks for an update now and follows the result by polling", async ({ page 
   await page.getByRole("button", { name: "Check now" }).click();
   await expect(page.getByTestId("update-progress")).toContainText("Looking for an update...");
   await expect(page.getByRole("button", { name: "Check now" })).toBeDisabled();
-  mock.board.update = { ...mock.board.update, state: "idle", last_result: "available", available: "9.9.9" };
+  mock.board.update = {
+    ...mock.board.update,
+    state: "idle",
+    target: null,
+    last_result: "available",
+    available: "9.9.9",
+  };
   await expect(result(page)).toHaveText("Version 9.9.9 is available.", { timeout: 5000 });
   await expect(page.getByRole("button", { name: "Install 9.9.9" })).toBeVisible();
   expect(mock.commands()).toContain("update_check");
@@ -92,7 +98,7 @@ test("shows that the board restarts and connects again by itself", async ({ page
   ).toBeVisible();
   // The board is back: the app finds it by itself
   mock.refuse = false;
-  mock.board.update = { ...mock.board.update, state: "idle", last_result: "installed", available: null };
+  mock.board.update = { ...mock.board.update, state: "idle", target: null, last_result: "installed", available: null };
   mock.board.info["firmware"] = "9.9.9";
   await expect(page.getByTestId("connection")).toHaveText("Connected over WiFi", { timeout: 15_000 });
   await expect(page.getByTestId("firmware-running")).toHaveText("9.9.9");
@@ -136,6 +142,47 @@ test("needs WiFi to look for updates", async ({ page }) => {
   });
   await expect(page.getByText("Zenit needs WiFi to look for and install updates.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Check now" })).toBeDisabled();
+});
+
+test.describe("the app on Zenit", () => {
+  const card = (page: Page) => page.getByRole("region", { name: "App on Zenit" });
+
+  test("shows the version of the app on board and the last check", async ({ page }) => {
+    await deviceView(page, {
+      web: { state: "ok", version: "1.0.0", available: null, last_result: "up_to_date", retry_in: null },
+    });
+    await expect(card(page).getByTestId("web-state")).toContainText("Zenit has this app on board");
+    await expect(card(page).getByTestId("web-version")).toHaveText("Version 1.0.0.");
+    await expect(card(page).getByTestId("web-result")).toHaveText("Zenit has the latest version of the app.");
+  });
+
+  test("says when a missing app is tried again", async ({ page }) => {
+    await deviceView(page, {
+      web: { state: "missing", version: null, available: null, last_result: "unreachable", retry_in: 300 },
+    });
+    await expect(card(page).getByTestId("web-state")).toContainText("no copy of this app on board");
+    await expect(card(page).getByTestId("web-retry")).toHaveText("Zenit tries again in about 5 minutes.");
+  });
+
+  test("asks before it installs a new app, then sends target web", async ({ page }) => {
+    const mock = await deviceView(page, {
+      web: { state: "ok", version: "1.0.0", available: "1.1.0", last_result: "available", retry_in: null },
+    });
+    await card(page).getByRole("button", { name: "Install app 1.1.0" }).click();
+    const dialog = page.getByRole("alertdialog");
+    await expect(dialog).toContainText("It does not restart.");
+    await dialog.getByRole("button", { name: "Install", exact: true }).click();
+    await expect
+      .poll(() => mock.board.requests.find((request) => request["cmd"] === "update_install"))
+      .toMatchObject({ target: "web" });
+  });
+
+  test("sends the app switch when it is chosen", async ({ page }) => {
+    const mock = await deviceView(page);
+    await page.getByRole("switch", { name: /Update the app on Zenit/ }).click();
+    await expect.poll(() => mock.board.settings["update_web"]).toBe(false);
+    await expect(card(page).getByTestId("web-off")).toBeVisible();
+  });
 });
 
 test.describe("the settings", () => {

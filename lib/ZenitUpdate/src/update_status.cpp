@@ -41,6 +41,8 @@ const char *result_name(Result result)
     return "skipped";
   case Result::Installed:
     return "installed";
+  case Result::Incompatible:
+    return "incompatible";
   case Result::NoNetwork:
     return "no_network";
   case Result::NoTime:
@@ -59,6 +61,34 @@ const char *result_name(Result result)
     return "flash_error";
   }
   return "never";
+}
+
+const char *web_state_name(WebState state)
+{
+  switch (state)
+  {
+  case WebState::Ok:
+    return "ok";
+  case WebState::Installing:
+    return "installing";
+  case WebState::Missing:
+    return "missing";
+  case WebState::Incompatible:
+    return "incompatible";
+  }
+  return "missing";
+}
+
+bool speaks(uint8_t protocol_min, uint8_t protocol_max, uint8_t protocol)
+{
+  return protocol_min <= protocol && protocol <= protocol_max;
+}
+
+WebState judge_web_image(bool valid, uint8_t protocol_min, uint8_t protocol_max, uint8_t protocol)
+{
+  if (!valid)
+    return WebState::Missing;
+  return speaks(protocol_min, protocol_max, protocol) ? WebState::Ok : WebState::Incompatible;
 }
 
 bool is_failure(Result result) { return result >= Result::NoNetwork; }

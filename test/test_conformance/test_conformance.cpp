@@ -22,6 +22,7 @@
 #include "network.h"
 #include "update_http.h"
 #include "updates.h"
+#include "www.h"
 #include "platform.h"
 #include "protocol.h"
 #include "settings.h"
@@ -282,6 +283,7 @@ void start_protocol_case()
   settings::begin();
   firmware::sim_reset();
   update_http::sim_reset();
+  www::sim_reset();
   platform::sim_set_version("0.1.0");
   platform::sim_queue_random_bytes(nullptr, 0);
   sim_control::set_quiet(true);
@@ -466,6 +468,8 @@ int main()
   RUN_TEST(test_board_record_cases);
   RUN_TEST(test_semver_cases);
   RUN_TEST(test_manifest_cases);
+  RUN_TEST(test_web_manifest_cases);
+  RUN_TEST(test_web_image_cases);
   RUN_TEST(test_schedule_cases);
   RUN_TEST(test_boot_cases);
   RUN_TEST(test_http_cases);

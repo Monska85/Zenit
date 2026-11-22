@@ -8,6 +8,7 @@
 #include "output.h"
 #include "protocol.h"
 #include "updates.h"
+#include "www.h"
 
 namespace app
 {
@@ -27,6 +28,7 @@ void begin(uint64_t now, uint32_t seed)
   net_time::set_zone(settings::board().timezone);
   network::begin(settings::board());
   improv_link::begin();
+  www::begin();
   updates::begin(now);
 }
 

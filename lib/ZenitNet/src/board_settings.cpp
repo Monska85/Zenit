@@ -39,11 +39,11 @@ bool read_text(const uint8_t *field, size_t capacity, size_t length, char *out, 
 bool operator==(const BoardSettings &a, const BoardSettings &b)
 {
   return a.wifi_power == b.wifi_power && a.update_mode == b.update_mode && a.update_firmware == b.update_firmware &&
-         a.check_hours == b.check_hours && a.install_start == b.install_start && a.install_end == b.install_end &&
-         a.time_sync_hours == b.time_sync_hours && a.network_login == b.network_login &&
-         std::strcmp(a.timezone, b.timezone) == 0 && std::strcmp(a.ntp_server, b.ntp_server) == 0 &&
-         std::strcmp(a.token, b.token) == 0 && std::strcmp(a.wifi_ssid, b.wifi_ssid) == 0 &&
-         std::strcmp(a.wifi_password, b.wifi_password) == 0;
+         a.update_web == b.update_web && a.check_hours == b.check_hours && a.install_start == b.install_start &&
+         a.install_end == b.install_end && a.time_sync_hours == b.time_sync_hours &&
+         a.network_login == b.network_login && std::strcmp(a.timezone, b.timezone) == 0 &&
+         std::strcmp(a.ntp_server, b.ntp_server) == 0 && std::strcmp(a.token, b.token) == 0 &&
+         std::strcmp(a.wifi_ssid, b.wifi_ssid) == 0 && std::strcmp(a.wifi_password, b.wifi_password) == 0;
 }
 
 const char *wifi_power_name(WifiPower power) { return POWERS[static_cast<size_t>(power)].name; }
@@ -168,7 +168,8 @@ void encode_board_record(const BoardSettings &s, uint8_t (&out)[BOARD_RECORD_SIZ
   out[0] = BOARD_RECORD_VERSION;
   out[1] = static_cast<uint8_t>(s.wifi_power);
   out[2] = static_cast<uint8_t>(s.update_mode);
-  out[3] = s.update_firmware ? 1 : 0;
+  // Bit 0: firmware updates on. Bit 1: web updates off, so a record written before the web setting reads as on.
+  out[3] = static_cast<uint8_t>((s.update_firmware ? 1 : 0) | (s.update_web ? 0 : 2));
   out[4] = s.check_hours;
   out[5] = s.install_start & 0xFF;
   out[6] = s.install_start >> 8;
@@ -196,8 +197,11 @@ bool decode_board_record(const uint8_t *in, size_t size, BoardSettings &s)
     s.wifi_power = static_cast<WifiPower>(in[1]);
   if (in[2] < UPDATE_MODE_COUNT)
     s.update_mode = static_cast<UpdateMode>(in[2]);
-  if (in[3] <= 1)
-    s.update_firmware = in[3] == 1;
+  if (in[3] <= 3)
+  {
+    s.update_firmware = (in[3] & 1) != 0;
+    s.update_web = (in[3] & 2) == 0;
+  }
   if (valid_check_hours(in[4]))
     s.check_hours = in[4];
   const uint16_t start = in[5] | (in[6] << 8), end = in[7] | (in[8] << 8);

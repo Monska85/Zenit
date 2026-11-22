@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BoardSession, POLL_MS } from "../src/board/session";
 import { CLOSE_MESSAGES } from "../src/board/messages";
 import { ConnectionClosed } from "../src/protocol/transport";
-import { FakeBoard, TOKEN, type ScriptedTransport } from "./helpers";
+import { FakeBoard, TOKEN, UPDATE_STATUS, type ScriptedTransport } from "./helpers";
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
@@ -236,7 +236,7 @@ describe("the commands of the milestone", () => {
     const { session } = await opened(board);
     await session.checkUpdate();
     expect(session.getState().update?.state).toBe("checking");
-    board.update = { ...board.update, state: "idle" };
+    board.update = { ...board.update, state: "idle", target: null };
     await session.installUpdate(false);
     expect(board.requests.at(-1)).toMatchObject({ cmd: "update_install", target: "firmware" });
     expect(board.requests.at(-1)).not.toHaveProperty("force");
@@ -320,6 +320,45 @@ describe("a board that restarts", () => {
     expect(session.getState()).toMatchObject({ phase: "lost", auto: null });
     await vi.advanceTimersByTimeAsync(200);
     expect(transports).toHaveLength(1);
+  });
+});
+
+describe("the app on Zenit", () => {
+  it("installs a new version of the app with target web", async () => {
+    const board = networked((fake) => {
+      fake.update = { ...fake.update, web: { ...UPDATE_STATUS.web, available: "1.1.0", last_result: "available" } };
+    });
+    const { session } = await opened(board);
+    await session.installWebUpdate();
+    expect(board.requests.at(-1)).toEqual({ seq: expect.any(Number), cmd: "update_install", target: "web" });
+    expect(session.getState().update).toMatchObject({ state: "downloading", target: "web" });
+  });
+
+  it("loads the page again when the board that served it closes with 1012", async () => {
+    const board = networked();
+    const reload = vi.fn();
+    const session = new BoardSession(null, { retryMs: 10, reload });
+    session.setServed({ hostname: "zenit-a1b2" });
+    const transport = board.transport();
+    const done = session.connect(transport, "zenit-a1b2.local");
+    await settle();
+    await done;
+    transport.drop(new ConnectionClosed(1012, ""));
+    await settle();
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  it("connects again, without loading the page, when it was not served by the board", async () => {
+    const board = networked();
+    const reload = vi.fn();
+    const { session, transports } = await opened(board, "websocket", { reload });
+    transports[0]?.drop(new ConnectionClosed(1012, ""));
+    await settle();
+    expect(reload).not.toHaveBeenCalled();
+    expect(session.getState()).toMatchObject({ phase: "lost", auto: "reconnecting", error: null });
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(transports).toHaveLength(2);
+    expect(session.getState().phase).toBe("connected");
   });
 });
 

@@ -36,6 +36,7 @@ export const BOARD_SETTINGS = {
   wifi_power: "auto",
   update_mode: "automatic",
   update_firmware: true,
+  update_web: true,
   check_hours: 6,
   install_start: 0,
   install_end: 0,
@@ -66,6 +67,14 @@ export const UPDATE_STATUS = {
   trial: false,
   skipped: null as string | null,
   rolled_back: null as string | null,
+  target: null as "firmware" | "web" | null,
+  web: {
+    state: "ok",
+    version: "1.0.0" as string | null,
+    available: null as string | null,
+    last_result: "never",
+    retry_in: null as number | null,
+  },
 };
 
 const BOARD_KEYS = Object.keys(BOARD_SETTINGS);
@@ -264,13 +273,20 @@ export class FakeBoard {
         if (update["mode"] === "off") return fail("updates_off");
         if (wifi["state"] !== "connected") return fail("no_network");
         if (cmd === "update_check") {
-          if (update["state"] === "idle") this.update = { ...update, state: "checking" };
+          if (update["state"] === "idle") this.update = { ...update, state: "checking", target: "firmware" };
           return [{ seq, ok: true, update: this.update }];
         }
         if (update["state"] !== "idle") return fail("busy");
+        if (fields["target"] === "web") {
+          if (fields["force"] !== undefined) return fail("bad_request");
+          const web = update["web"] as { available: string | null } | undefined;
+          if (!web || web.available === null) return fail("nothing_to_install");
+          this.update = { ...update, state: "downloading", progress: 0, target: "web" };
+          return [{ seq, ok: true, update: this.update }];
+        }
         if (update["available"] === null) return fail("nothing_to_install");
         if (update["last_result"] === "skipped" && fields["force"] !== true) return fail("nothing_to_install");
-        this.update = { ...update, state: "downloading", progress: 0 };
+        this.update = { ...update, state: "downloading", progress: 0, target: "firmware" };
         return [{ seq, ok: true, update: this.update }];
       }
       default:

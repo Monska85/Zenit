@@ -133,6 +133,14 @@ export function UpdateSettingsCard() {
             onChange={(update_firmware) => void commit({ update_firmware })}
           />
         )}
+        {settings.update_web !== undefined && (
+          <SwitchField
+            label="Update the app on Zenit"
+            hint="Turn this off to keep the app on Zenit as it is, whatever the choice above."
+            checked={settings.update_web}
+            onChange={(update_web) => void commit({ update_web })}
+          />
+        )}
         {settings.check_hours !== undefined && (
           <ValueForm
             label="Look for updates every (hours)"

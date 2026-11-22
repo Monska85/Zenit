@@ -21,7 +21,7 @@ constexpr size_t MAX_URL = 255;
 constexpr size_t MAX_SITE_URL = MAX_URL - (sizeof("firmware/") - 1) - MAX_FILE_NAME;
 constexpr uint32_t MIN_FIRMWARE_SIZE = 65536;
 // The size of an application slot in partitions.csv.
-constexpr uint32_t SLOT_SIZE = 0x1F0000;
+constexpr uint32_t SLOT_SIZE = 0x1B0000;
 constexpr const char *BOARD_ID = "esp32c3";
 
 struct Manifest
@@ -30,11 +30,18 @@ struct Manifest
   char file[MAX_FILE_NAME + 1] = {0};
   uint32_t size = 0;
   char sha256[65] = {0};
+  // The protocol versions a web image speaks; 0 in a firmware manifest.
+  uint8_t protocol_min = 0;
+  uint8_t protocol_max = 0;
 };
 
 // Reads a manifest. False when it is longer than MAX_MANIFEST, is not strict JSON, lacks a field, has another one, or
 // has a value that breaks its rule. `why` names the first problem, for the log.
 bool parse_manifest(const char *json, size_t size, Manifest &out, const char *&why);
+
+// Reads a web manifest (docs/board/wifi-and-updates-v1.md#web-updates): the firmware manifest's rules without `board`,
+// a size that fits the `www` partition, and the protocol range. The same failures as parse_manifest.
+bool parse_web_manifest(const char *json, size_t size, Manifest &out, const char *&why);
 
 // The address of the firmware file: the manifest's address up to its last `/`, then the file name. False when it does
 // not fit.

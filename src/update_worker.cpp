@@ -33,7 +33,7 @@ Result result_of(update_http::Outcome outcome)
 }
 } // namespace
 
-CheckResult check(const char *manifest_url)
+CheckResult check(install_target::Target target, const char *manifest_url)
 {
   CheckResult out;
   char body[zenit::update::MAX_MANIFEST + 1];
@@ -47,7 +47,10 @@ CheckResult check(const char *manifest_url)
   else
   {
     const char *why = nullptr;
-    if (!zenit::update::parse_manifest(body, size, out.manifest, why))
+    const bool parsed = target == install_target::Target::Web
+                            ? zenit::update::parse_web_manifest(body, size, out.manifest, why)
+                            : zenit::update::parse_manifest(body, size, out.manifest, why);
+    if (!parsed)
     {
       platform::log("update manifest refused: %s", why);
       out.result = Result::BadManifest;
@@ -56,12 +59,13 @@ CheckResult check(const char *manifest_url)
   return out;
 }
 
-Result download(const char *manifest_url, const zenit::update::Manifest &manifest, void (*progress)(uint8_t))
+Result download(install_target::Target target, const char *manifest_url, const zenit::update::Manifest &manifest,
+                void (*progress)(uint8_t))
 {
   char url[zenit::update::MAX_URL + 1];
   if (!zenit::update::firmware_url(manifest_url, manifest, url, sizeof(url)))
     return Result::BadManifest;
-  return result_of(update_http::download_firmware(url, manifest.size, manifest.sha256, progress));
+  return result_of(update_http::download(target, url, manifest, progress));
 }
 
 } // namespace update_worker

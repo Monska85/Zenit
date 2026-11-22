@@ -36,6 +36,7 @@ export interface BoardSettings {
   wifi_power?: string;
   update_mode?: string;
   update_firmware?: boolean;
+  update_web?: boolean;
   check_hours?: number;
   install_start?: number;
   install_end?: number;
@@ -80,6 +81,18 @@ export interface UpdateStatus {
   trial: boolean;
   skipped: string | null;
   rolled_back: string | null;
+  /** What `state` and `progress` refer to while not idle; a firmware from before the web app partition has none. */
+  target?: "firmware" | "web" | null;
+  /** The web app in the board's own partition; a firmware from before it has none. */
+  web?: WebAppStatus;
+}
+
+export interface WebAppStatus {
+  state: string;
+  version: string | null;
+  available: string | null;
+  last_result: string;
+  retry_in: number | null;
 }
 
 /** What `status` reports: the light, and from the WiFi and updates milestone the rest (null from an older board). */

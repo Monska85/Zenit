@@ -107,7 +107,12 @@ export interface SessionOptions {
   /** The wait between the tries to reconnect by itself; short in tests. */
   retryMs?: number;
   retryAttempts?: number;
+  /** Loads the page again: the board installed a new web app (close status 1012). The browser's by default. */
+  reload?: () => void;
 }
+
+/** The close status of a board that installed a new web app: the page it served loads again to get it. */
+export const CLOSE_RELOAD = 1012;
 
 /** The page's visibility, so polling can pause while it is hidden. Missing in Node. */
 export interface Visibility {
@@ -138,6 +143,7 @@ export class BoardSession {
   private retryRun = 0;
   private readonly retryMs: number;
   private readonly retryAttempts: number;
+  private readonly reload: () => void;
 
   constructor(
     private readonly visibility: Visibility | null = null,
@@ -145,6 +151,7 @@ export class BoardSession {
   ) {
     this.retryMs = options.retryMs ?? RETRY_MS;
     this.retryAttempts = options.retryAttempts ?? RETRY_ATTEMPTS;
+    this.reload = options.reload ?? (() => globalThis.location?.reload());
   }
 
   getState = (): BoardState => this.state;
@@ -402,6 +409,14 @@ export class BoardSession {
     });
   }
 
+  /** `update_install` of the web app: the board installs the version the last check found, without a restart. */
+  async installWebUpdate(): Promise<void> {
+    await this.run(async (client) => {
+      const update = toUpdate(await client.call("update_install", { target: "web" }));
+      this.show(client, { update, error: null });
+    });
+  }
+
   /** Logs in with the token the person typed, while the phase is `login`. The token stays in memory. */
   async submitToken(token: string): Promise<void> {
     if (this.state.phase !== "login") return;
@@ -526,6 +541,16 @@ export class BoardSession {
   private lose(error?: unknown, message?: string): void {
     const client = this.client;
     if (client === null) return;
+    // The board installed a new web app. A page it served loads again to get it; any other page connects again.
+    const newApp = error instanceof ClientError && error.closeCode === CLOSE_RELOAD;
+    if (newApp && this.state.served !== null) {
+      this.stopPolling();
+      this.client = null;
+      void client.close().catch(() => undefined);
+      this.reload();
+      return;
+    }
+    if (newApp) this.expectDrop = true;
     this.stopPolling();
     this.client = null;
     void client.close().catch(() => undefined);

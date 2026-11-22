@@ -111,6 +111,25 @@ void write_update(JsonObject update)
     update["rolled_back"] = std::string(status.rolled_back);
   else
     update["rolled_back"] = nullptr;
+  if (status.has_target)
+    update["target"] = status.target == install_target::Target::Web ? "web" : "firmware";
+  else
+    update["target"] = nullptr;
+  JsonObject web = update["web"].to<JsonObject>();
+  web["state"] = zenit::update::web_state_name(status.web.state);
+  if (status.web.version[0])
+    web["version"] = std::string(status.web.version);
+  else
+    web["version"] = nullptr;
+  if (status.web.available[0])
+    web["available"] = std::string(status.web.available);
+  else
+    web["available"] = nullptr;
+  web["last_result"] = zenit::update::result_name(status.web.last_result);
+  if (status.web.retry_in >= 0)
+    web["retry_in"] = status.web.retry_in;
+  else
+    web["retry_in"] = nullptr;
 }
 
 } // namespace protocol

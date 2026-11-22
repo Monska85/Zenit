@@ -38,6 +38,7 @@
           "wifi_power": "auto",
           "update_mode": "automatic",
           "update_firmware": true,
+          "update_web": true,
           "check_hours": 6,
           "install_start": 0,
           "install_end": 0,

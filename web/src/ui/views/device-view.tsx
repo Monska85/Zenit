@@ -16,7 +16,7 @@ import {
   AlertDialogTitle,
 } from "../components/alert-dialog";
 import { AccessCard, TimeCard, UpdateSettingsCard } from "../device/settings-cards";
-import { UpdateCard } from "../device/update-card";
+import { UpdateCard, WebAppCard } from "../device/update-card";
 import { WifiCard } from "../device/wifi-card";
 import type { Route } from "../route";
 import { FirmwareInstall } from "./firmware-install";
@@ -196,6 +196,7 @@ export function DeviceView({ go }: { go: (route: Route) => void }) {
       <WifiCard />
       <FirmwareCard published={published} />
       <UpdateCard />
+      <WebAppCard />
       <UpdateSettingsCard />
       <TimeCard />
       <AccessCard />

@@ -50,7 +50,38 @@ class ServerTest(unittest.TestCase):
             self.assertEqual(self.get(path)[0], 404, path)
 
 
+class WebServerTest(ServerTest):
+    def setUp(self):
+        import web_image
+
+        self.image = web_image.build_image([("index.html", "text/html; charset=utf-8", b"page", False)], "1.3.0", 1, 1)
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), update_server.handler_for(None, None, self.image))
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
+        self.base = f"http://127.0.0.1:{self.server.server_address[1]}"
+
+    def test_the_manifest_describes_the_file_it_serves(self):
+        status, body = self.get("/web/update.json")
+        self.assertEqual(status, 200)
+        manifest = json.loads(body)
+        self.assertEqual((manifest["version"], manifest["file"]), ("1.3.0", "zenit-web-1.3.0.bin"))
+        status, file = self.get("/web/zenit-web-1.3.0.bin")
+        self.assertEqual((status, file), (200, self.image))
+        self.assertEqual(manifest["sha256"], hashlib.sha256(self.image).hexdigest())
+        self.assertEqual(self.get("/firmware/update.json")[0], 404)
+
+
 class MainTest(unittest.TestCase):
+    def test_nothing_to_serve_is_refused(self):
+        self.assertEqual(update_server.main([]), 1)
+
+    def test_a_file_that_is_not_a_web_image_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / "bad.bin"
+            bad.write_bytes(b"x" * 5000)
+            self.assertEqual(update_server.main(["--web", str(bad)]), 1)
+
     def test_a_bad_version_or_file_is_refused(self):
         with tempfile.TemporaryDirectory() as tmp:
             small = Path(tmp) / "small.bin"

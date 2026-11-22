@@ -113,7 +113,7 @@ Failure cmd_info(const Context &context, JsonDocument &reply)
 {
   if (Failure failure = zenit::proto::allow_only(context.request, {}))
     return failure;
-  reply["protocol"] = 1;
+  reply["protocol"] = zenit::proto::PROTOCOL_VERSION;
   reply["firmware"] = platform::firmware_version();
   reply["board"] = platform::board_name();
   reply["boot_id"] = boot_id;
@@ -308,12 +308,17 @@ Failure cmd_update_install(const Context &context, JsonDocument &reply)
   if (Failure failure = zenit::proto::allow_only(context.request, {"target", "force"}))
     return failure;
   JsonVariantConst target = context.request["target"];
-  if (!target.is<const char *>() || std::strcmp(target.as<const char *>(), "firmware") != 0)
-    return zenit::proto::fail("bad_request", "\"target\" must be \"firmware\"");
+  const bool is_text = target.is<const char *>();
+  const bool web = is_text && std::strcmp(target.as<const char *>(), "web") == 0;
+  if (!is_text || (!web && std::strcmp(target.as<const char *>(), "firmware") != 0))
+    return zenit::proto::fail("bad_request", "\"target\" must be \"firmware\" or \"web\"");
   JsonVariantConst force = context.request["force"];
   if (!force.isUnbound() && !force.is<bool>())
     return zenit::proto::fail("bad_request", "\"force\" must be true or false");
-  if (Failure failure = update_failure(updates::request_install(force | false)))
+  if (web && !force.isUnbound())
+    return zenit::proto::fail("bad_request", "\"force\" applies to the firmware only");
+  if (Failure failure = update_failure(updates::request_install(
+          web ? install_target::Target::Web : install_target::Target::Firmware, force | false)))
     return failure;
   write_update(reply["update"].to<JsonObject>());
   return {};

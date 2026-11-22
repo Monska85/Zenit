@@ -1,5 +1,5 @@
 {
-  "description": "With update_mode off, or update_firmware false, update_check and update_install are updates_off and the status shows the mode off.",
+  "description": "With update_mode off, or update_firmware and update_web both false, update_check is updates_off; update_install is updates_off for a target whose updates are off; the status shows the mode off. With firmware updates off and web updates on, a check reads the web manifest alone.",
   "steps": [
     {
       "advance_ms": 1100
@@ -32,6 +32,7 @@
           "wifi_power": "auto",
           "update_mode": "off",
           "update_firmware": true,
+          "update_web": true,
           "check_hours": 6,
           "install_start": 0,
           "install_end": 0,
@@ -74,10 +75,22 @@
     {
       "send": {
         "seq": 4,
-        "cmd": "status"
+        "cmd": "update_install",
+        "target": "web"
       },
       "expect": {
         "seq": 4,
+        "ok": false,
+        "error": "updates_off"
+      }
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 5,
         "ok": true,
         "light": {
           "on": true,
@@ -108,19 +121,30 @@
           "progress": null,
           "trial": false,
           "skipped": null,
-          "rolled_back": null
+          "rolled_back": null,
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     },
     {
       "send": {
-        "seq": 5,
+        "seq": 6,
         "cmd": "settings_set",
         "update_mode": "notify",
-        "update_firmware": false
+        "update_firmware": false,
+        "update_web": false
       },
       "expect": {
-        "seq": 5,
+        "seq": 6,
         "ok": true,
         "settings": {
           "brightness": 60,
@@ -141,6 +165,7 @@
           "wifi_power": "auto",
           "update_mode": "notify",
           "update_firmware": false,
+          "update_web": false,
           "check_hours": 6,
           "install_start": 0,
           "install_end": 0,
@@ -156,23 +181,23 @@
     },
     {
       "send": {
-        "seq": 6,
+        "seq": 7,
         "cmd": "update_check"
       },
       "expect": {
-        "seq": 6,
+        "seq": 7,
         "ok": false,
         "error": "updates_off"
       }
     },
     {
       "send": {
-        "seq": 7,
+        "seq": 8,
         "cmd": "update_install",
         "target": "firmware"
       },
       "expect": {
-        "seq": 7,
+        "seq": 8,
         "ok": false,
         "error": "updates_off"
       },
@@ -180,11 +205,23 @@
     },
     {
       "send": {
-        "seq": 8,
+        "seq": 9,
+        "cmd": "update_install",
+        "target": "web"
+      },
+      "expect": {
+        "seq": 9,
+        "ok": false,
+        "error": "updates_off"
+      }
+    },
+    {
+      "send": {
+        "seq": 10,
         "cmd": "status"
       },
       "expect": {
-        "seq": 8,
+        "seq": 10,
         "ok": true,
         "light": {
           "on": true,
@@ -215,7 +252,88 @@
           "progress": null,
           "trial": false,
           "skipped": null,
-          "rolled_back": null
+          "rolled_back": null,
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 11,
+        "cmd": "settings_set",
+        "update_web": true
+      },
+      "expect": {
+        "seq": 11,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "notify",
+          "update_firmware": false,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 12,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 12,
+        "ok": true,
+        "update": {
+          "mode": "off",
+          "state": "checking",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null,
+          "target": "web",
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": "never",
+            "retry_in": null
+          }
         }
       }
     }

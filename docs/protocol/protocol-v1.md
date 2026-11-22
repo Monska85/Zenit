@@ -112,7 +112,7 @@ The light, and from the WiFi and updates milestone the WiFi, time and update sta
 | `light.timer`             | `null` with no timer, otherwise `minutes` (the setting) and `remaining`, the whole seconds until the fade-out starts, 0 after it. |
 | `wifi`                    | From the WiFi and updates milestone: `state` (`not_configured`, `connecting`, `connected`, `not_found`, `wrong_password`, `no_address`), `ssid` (the stored network, or `null`), `rssi` (dBm, a whole number from -128 to 127, since a very strong signal can read slightly above 0; or `null` when not connected), `ip` (or `null`) and `hostname` (`zenit-XXXX`). |
 | `time`                    | `synced`, `epoch` (Unix seconds, or `null` until synced) and `local_minute` (minutes after midnight in `timezone`, or `null`).    |
-| `update`                  | `mode`, `state`, `available`, `last_check`, `last_result`, `progress`, `trial`, `skipped` and `rolled_back`, as [WiFi and updates](../board/wifi-and-updates-v1.md#status) defines them. |
+| `update`                  | `mode`, `state`, `available`, `last_check`, `last_result`, `progress`, `trial`, `skipped`, `rolled_back`, `target` and `web` (`state`, `version`, `available`, `last_result`, `retry_in`), as [WiFi and updates](../board/wifi-and-updates-v1.md#status) defines them. |
 
 ### `settings_get`, `settings_set`
 
@@ -140,6 +140,7 @@ Board settings, from the WiFi and updates milestone, which adds them to `setting
 | `wifi_power`      | string  | `auto`              | `auto`, `8.5`, `11`, `13`, `15`, `17`, `18.5`, `19.5`.                         |
 | `update_mode`     | string  | `automatic`         | `off`, `notify`, `automatic`.                                                 |
 | `update_firmware` | boolean | `true`              | `true` or `false`.                                                            |
+| `update_web`      | boolean | `true`              | `true` or `false`.                                                            |
 | `check_hours`     | integer | `6`                 | 1 to 168.                                                                     |
 | `install_start`   | integer | `0`                 | 0 to 1,439, minutes after midnight.                                           |
 | `install_end`     | integer | `0`                 | 0 to 1,439. Equal to `install_start`: the whole day.                          |
@@ -189,11 +190,11 @@ From the WiFi and updates milestone. [Authentication](#authentication) for a WiF
 
 ### `update_check`, `update_install`
 
-From the WiFi and updates milestone. Firmware updates from the project's manifest: `update_check` starts a check in the background; `update_install` has `target` (`firmware`, the only value) and an optional `force` (installs a version on the skip list). Both are `updates_off` when `update_mode` is `off` or `update_firmware` is `false`, and `no_network` when the board is not connected.
+From the WiFi and updates milestone. Firmware and web app updates from the project's manifests: `update_check` starts a check in the background; `update_install` has `target` (`firmware` or `web`) and, for the firmware only, an optional `force` (installs a version on the skip list). `update_check` is `updates_off` when `update_mode` is `off`, or when `update_firmware` and `update_web` are both `false`; `update_install` is `updates_off` when `update_mode` is `off` or the setting of its target is `false`. Both are `no_network` when the board is not connected.
 
-- `update_check` starts a check in the background. Its reply holds `update`, the same object as `status.update`, with `state` `checking` (or the state the board is in when a check or install is already running; a second check does not start). The client follows the result with `status`.
-- `update_install` starts the download of the version the last check found, and its reply holds `update` with `state` `downloading`. `nothing_to_install` when no check has found a newer version (or the board is on trial, or the last check was not successful); `busy` when a check or an install is running; the version on the skip list is installed only with `force: true`. A version that is not newer than the running one is never installed. `target` must be `firmware`, and `force` a boolean; another value is `bad_request`.
-- When the download is verified, the board restarts. The connection drops and the client reconnects.
+- `update_check` starts a check in the background: the firmware manifest, then the web manifest, each when its updates are on. Its reply holds `update`, the same object as `status.update`, with `state` `checking` (or the state the board is in when a check or install is already running; a second check does not start). The client follows the result with `status`.
+- `update_install` starts the download of the version the last check found for its target, and its reply holds `update` with `state` `downloading` and `target`. `nothing_to_install` when no check has found a newer version (or the board is on trial, or, for the firmware, the last check was not successful); `busy` when a check or an install is running; the firmware version on the skip list is installed only with `force: true`. A version that is not newer than the running one (or the web image in place) is never installed. `target` must be `firmware` or `web`, and `force` a boolean given with `firmware` only; anything else is `bad_request`.
+- When a firmware download is verified, the board restarts. The connection drops and the client reconnects. When a web image is installed, the board closes the WebSocket client with code `1012` and the app reloads the page.
 
 ## Errors
 

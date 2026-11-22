@@ -21,6 +21,10 @@
         {
           "path": "zenit-esp32c3-firmware.bin",
           "offset": 65536
+        },
+        {
+          "path": "zenit-web.bin",
+          "offset": 3604480
         }
       ]
     }

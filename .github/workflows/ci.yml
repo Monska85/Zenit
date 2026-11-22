@@ -60,8 +60,7 @@ jobs:
           tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" -color
 
-  # Formatting, the tool tests, the native tests with the conformance cases, and the firmware (with the web app inside)
-  # and simulator builds
+  # Formatting, the tool tests, the native tests with the conformance cases, and the firmware and simulator builds
   check:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}
@@ -76,16 +75,6 @@ jobs:
 
       - uses: ./.github/actions/setup
 
-      # The firmware embeds the built web app, so the web app is built first (make check does it)
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version-file: web/package.json
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Install the web app's dependencies from the lockfile
-        run: make web-install
-
       - name: Check
         run: make check
 
@@ -93,7 +82,8 @@ jobs:
         run: |
           set -eu
           size=$(stat -c %s .pio/build/esp32c3/firmware.bin)
-          slot=$((0x1F0000))
+          # The size of the first application slot in partitions.csv
+          slot=$(($(awk -F, '$1 == "app0" { gsub(/ /, "", $5); print $5 }' partitions.csv)))
           echo "firmware $size bytes, slot $slot bytes"
           test $((slot - size)) -ge 65536
 

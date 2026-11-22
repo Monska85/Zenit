@@ -284,6 +284,7 @@ SETTINGS = {
     "wifi_power": Maybe(is_text),
     "update_mode": Maybe(is_text),
     "update_firmware": Maybe(is_bool),
+    "update_web": Maybe(is_bool),
     "check_hours": Maybe(int_in(1, 168)),
     "install_start": Maybe(int_in(0, 1439)),
     "install_end": Maybe(int_in(0, 1439)),
@@ -319,6 +320,26 @@ TIME = where(
     lambda time: (time["synced"] is True) == (time["epoch"] is not None)
     and (time["synced"] is True) == (time["local_minute"] is not None),
 )
+# The web app in the board's own partition: a version while it holds one that reads, a version offered after a check
+# that found one, a wait only while a missing or incompatible app is being repaired. A state this client does not know
+# has no rule.
+WEB_STATES_WITH_VERSION = ("ok", "incompatible")
+WEB_STATES_WITHOUT_VERSION = ("missing", "installing")
+WEB = where(
+    {
+        "state": is_text,
+        # A release of at most 16 characters, as the image's header holds
+        "version": (matching(r"(?=.{1,16}$)(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})"), is_null),
+        "available": (RELEASE, is_null),
+        "last_result": is_text,
+        "retry_in": (int_in(0, 2**32), is_null),
+    },
+    lambda web: (web["state"] not in WEB_STATES_WITH_VERSION or web["version"] is not None)
+    and (web["state"] not in WEB_STATES_WITHOUT_VERSION or web["version"] is None)
+    and (web["state"] != "ok" or web["retry_in"] is None)
+    and (web["last_result"] != "available" or web["available"] is not None)
+    and (web["last_result"] not in ("up_to_date", "incompatible") or web["available"] is None),
+)
 UPDATE = where(
     {
         "mode": is_text,
@@ -330,9 +351,13 @@ UPDATE = where(
         "trial": is_bool,
         "skipped": (RELEASE, is_null),
         "rolled_back": (RELEASE, is_null),
+        "target": Maybe((one_of("firmware", "web"), is_null)),
+        "web": Maybe(WEB),
     },
-    # A percentage only while downloading; a version offered after a check that found one
-    lambda update: (
+    # A percentage only while downloading; a version offered after a check that found one; a target only while a
+    # check or an install runs
+    lambda update: (update["state"] != "idle" or update.get("target") is None)
+    and (
         update["progress"] is not None
         if update["state"] == "downloading"
         else update["state"] not in UPDATE_STATES_WITHOUT_PROGRESS or update["progress"] is None
@@ -503,9 +528,11 @@ def build_parser():
     settings.add_argument("settings", nargs="+", metavar="KEY=VALUE")
     commands.add_parser("wifi-forget", help="forget the stored WiFi network (USB only)")
     commands.add_parser("token-regenerate", help="make a new token (USB only)")
-    commands.add_parser("update-check", help="check for a firmware update now")
+    commands.add_parser("update-check", help="check for a firmware and web app update now")
     install = commands.add_parser("update-install", help="install the firmware version the last check found")
-    install.add_argument("--force", action="store_true", help="install a version on the skip list")
+    what = install.add_mutually_exclusive_group()
+    what.add_argument("--force", action="store_true", help="install a version on the skip list")
+    what.add_argument("--web", action="store_true", help="install the web app version the last check found instead")
     light = commands.add_parser("light", help="turn the light on or off, without saving")
     light.add_argument("state", choices=["on", "off"])
     raw = commands.add_parser("raw", help="send a request object as it is; `seq` is added unless given")
@@ -520,6 +547,8 @@ def request_of(args):
     if args.command == "light":
         return "light", {"on": args.state == "on"}
     if args.command == "update-install":
+        if args.web:
+            return "update_install", {"target": "web"}
         return "update_install", {"target": "firmware", **({"force": True} if args.force else {})}
     if args.command == "raw":
         fields = json.loads(args.json)

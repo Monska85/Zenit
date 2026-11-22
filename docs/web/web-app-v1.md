@@ -82,6 +82,7 @@ Shows what the Zenit reports, its network and update settings, and the firmware 
 - **WiFi.** See [WiFi setup](#wifi-setup).
 - **Firmware.** The version the board runs, the latest published version, and one sentence: up to date, an update is available, or this board runs a newer or development build. The latest version comes from `firmware/manifest.json` on the site the app was loaded from; when it cannot be read (the app runs locally, or offline) the sentence says so and the install still works if the manifest exists. On a page served by a Zenit there is no published version: the row and the sentence are left out.
 - **Firmware updates.** What the board does about updates and the two actions on it. See [Firmware updates](#firmware-updates).
+- **App on Zenit.** The copy of this app the board serves from its own partition, and its updates. See [The app on Zenit](#the-app-on-zenit).
 - **Update settings.** See [Board settings](#board-settings).
 - **Time.** See [Board settings](#board-settings).
 - **Access over WiFi.** The login switch and, over USB, the token. See [Login](#login).
@@ -143,6 +144,8 @@ A reply with `ok: true` must have the known fields of its command with their typ
 A page loaded over `http:` (never over `https:`: a board has no HTTPS) asks its own origin for `GET /board.json` once at start, with no credentials, no cache and no redirect, and gives up after 2 seconds. It is served by a board only when the answer is exactly `{"zenit":true,"hostname":"zenit-xxxx","ws":"/ws"}`: strict JSON of at most 256 bytes, no other field, `zenit` true, `ws` exactly `/ws`, and a hostname of `zenit-` and four lowercase hexadecimal digits (the simulator's bridge reports `zenit-0000`). Anything else, a 404 included, means the page is not served by a board, and the Connect screen is the one of any other site. The only request is to the page's own origin.
 
 When a board served the page the app connects to `ws://<location.host>/ws` by itself, shows the board's name in the header, and hides what cannot work there: the USB option and the firmware installer (Web Serial needs a secure page). The Light and Device views work as over any WebSocket. A connection that did not open leaves the "Your Zenit" screen with a Connect button.
+
+A board that installed a new web app closes the connection with status 1012. A page that board served loads itself again (`location.reload()`), so it runs the new app and connects by itself. Any other page connects again by itself, as after network login is turned on, and does not reload.
 
 ### Login
 
@@ -207,6 +210,17 @@ The **Firmware updates** card shows `status.update` and is left out for a board 
 
 The errors `updates_off`, `no_network`, `nothing_to_install` and `busy` have their own sentences (see [Errors](#errors)).
 
+While the board downloads the web app (`target` `web`) the progress says "Downloading the new app: 42 %". With the firmware's updates off and the app's on, **Check now** still works: the board then looks for a new app only.
+
+## The app on Zenit
+
+The **App on Zenit** card shows `status.update.web` and is left out for a board that does not report it:
+
+- **State.** A sentence for each state: `ok` "Zenit has this app on board, ready for any phone or computer on your WiFi.", `installing`, `missing` "Zenit has no copy of this app on board right now. It installs one by itself as soon as it can." and `incompatible`. A state the app does not know is named, not hidden. The version on board shows under it when the board reports one.
+- **What it found.** A sentence for the last web result, the firmware results' words plus `incompatible` "A newer version of the app exists, but it needs newer firmware, so Zenit keeps the one it has." and `available` "Version 1.1.0 of the app is available." With the app's updates off (`update_mode` `off` or `update_web` false) the card says Zenit does not look for new versions and where to turn it on.
+- **Next try.** While a missing or incompatible app waits for its next repair, `retry_in` in plain words: "Zenit tries again in about 5 minutes."
+- **Install app** shows for a version that is `available` (not while busy, on trial, off WiFi or with the app's updates off) and asks first: "Zenit downloads the new app and keeps the light as it is. It does not restart. When the app is installed, pages open on Zenit load it again by themselves." It sends `update_install` with `target` `web`, never `force`.
+
 ## Board settings
 
 The settings of the WiFi and updates milestone are sent when the user commits them, never while typing: a choice of a list or a switch when it is chosen, a text or number field with its button (or Enter). A choice is shown at once and replaced by what the board answers, as for the light. The limits are constants in `web/src/device/settings.ts`, equal to the protocol's, with a test that compares them.
@@ -216,6 +230,7 @@ The settings of the WiFi and updates milestone are sent when the user commits th
 | `wifi_power`      | select                                          | WiFi strength                          | `auto`, `8.5`, `11`, `13`, `15`, `17`, `18.5`, `19.5` |
 | `update_mode`     | three option buttons                            | Off, Tell me, Install automatically    | `off`, `notify`, `automatic`              |
 | `update_firmware` | switch                                          | Update the firmware                    | boolean                                   |
+| `update_web`      | switch                                          | Update the app on Zenit                | boolean                                   |
 | `check_hours`     | number field and Set                            | Look for updates every (hours)         | 1 to 168                                  |
 | `install_start`, `install_end` | two time fields and Set window     | Install window, From, Until            | 0 to 1,439 minutes, shown as `HH:MM`      |
 | `timezone`        | select of common zones, and a text field        | Time zone, Time zone text              | 1 to 64 printable ASCII, no space         |
@@ -310,7 +325,7 @@ Plain, short and warm. "Zenit" for the projector, "light" for what it shines, "d
 ## Tests
 
 - **Unit (Vitest, Node):** CRC-32, the strict reader, framing, reply validation, the client with a scripted link (retries, immediate resend on `bad_frame`, one in flight, malformed replies), the protocol conformance cases (every framing case and every command case, with the client's framing and parsing; the simulator's control lines and the close flags are the board's business and are skipped, and a `$pattern` becomes a sample text), the Web Serial transport with a fake port (open options, no `setSignals`, line splitting, close, Improv frames cut out of the stream), the WebSocket transport with a fake socket (the close statuses), the settings model and limits (the light's and the board's), the version comparison, the manifest reader, the address rules, the time formats, SHA-256 and HMAC against `conformance/net/hash.json`, the login, the Improv codec and splitter against `conformance/improv/frames.json`, the Improv client with a scripted link (scan, connect, every failure, timeouts, wiped buffers), the board probe of a served page, the session with a board that logs in, closes connections and restarts, and the update and WiFi sentences.
-- **End to end (Playwright, Chromium):** the built app served from a folder with a fixture `firmware/manifest.json`, against `tools/ws_bridge.py` and the simulator (`just sim-build` first): connect, power, brightness on release, every effect with its settings, timer, status, errors, the lost connection and its reconnection, the Device view, the privacy page, the theme, the keyboard, no outside request, a USB connection through a fake Web Serial port wired to a scripted board, the page the simulator's bridge serves with `--app web/dist` (found by `/board.json`, connected by itself, no installer, the login turned on, three wrong tokens), the WiFi card with Improv frames of `conformance/improv/frames.json` played by the fake port, the login and the token with a scripted board, and the update card and settings with a scripted board (checks, installs, forced installs, progress, a restart and the automatic reconnection).
+- **End to end (Playwright, Chromium):** the built app served from a folder with a fixture `firmware/manifest.json`, against `tools/ws_bridge.py` and the simulator (`just sim-build` first): connect, power, brightness on release, every effect with its settings, timer, status, errors, the lost connection and its reconnection, the Device view, the privacy page, the theme, the keyboard, no outside request, a USB connection through a fake Web Serial port wired to a scripted board, the page the simulator's bridge serves with `--app web/dist` (found by `/board.json`, connected by itself, no installer, the login turned on, three wrong tokens), the WiFi card with Improv frames of `conformance/improv/frames.json` played by the fake port, the login and the token with a scripted board, and the update card and settings with a scripted board (checks, installs, forced installs, progress, a restart and the automatic reconnection), the App on Zenit card (state, next try, install with `target` `web`, the switch) and a page served by a board that loads itself again when the board closes with 1012.
 - **Layout checks** at 360 px and at desktop width in both themes: no sideways scroll, nothing outside its box, touch targets, accessible names.
 - **Reference screenshots,** one per main state and view at both widths and both themes, drawn inside the Playwright container so text renders the same everywhere.
 - **Size budget:** the JavaScript loaded at start stays under 150 KB gzip; ESP Web Tools loads on demand and does not count.

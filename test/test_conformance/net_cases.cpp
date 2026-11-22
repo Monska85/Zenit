@@ -17,6 +17,7 @@
 #include <sha256.h>
 #include <update_record.h>
 #include <update_status.h>
+#include <web_image.h>
 #include <wifi_logic.h>
 #include <ws_message.h>
 
@@ -206,6 +207,7 @@ void read_board_settings(JsonObjectConst json, net::BoardSettings &s)
   TEST_ASSERT_TRUE(net::wifi_power_from_name(json["wifi_power"].as<const char *>(), s.wifi_power));
   TEST_ASSERT_TRUE(net::update_mode_from_name(json["update_mode"].as<const char *>(), s.update_mode));
   s.update_firmware = json["update_firmware"].as<bool>();
+  s.update_web = json["update_web"].as<bool>();
   s.check_hours = json["check_hours"].as<uint8_t>();
   s.install_start = json["install_start"].as<uint16_t>();
   s.install_end = json["install_end"].as<uint16_t>();
@@ -281,6 +283,100 @@ void test_semver_cases()
                        : got == update::Candidate::Skipped ? "skipped"
                                                            : "up_to_date";
     TEST_ASSERT_EQUAL_STRING_MESSAGE(c["result"].as<const char *>(), name, c["published"].as<const char *>());
+  }
+}
+
+// The bytes of a web image case: the header from its fields, then the body and any tail.
+std::vector<uint8_t> web_image_of(JsonObjectConst c)
+{
+  JsonObjectConst h = c["header"];
+  const std::vector<uint8_t> body = unhex(c["body_hex"].as<const char *>());
+  std::vector<uint8_t> image(net::WEB_HEADER_SIZE, 0);
+  std::memcpy(image.data(), h["magic"].as<const char *>(), 4);
+  image[4] = h["format"].as<uint8_t>();
+  image[5] = h["protocol_min"].as<uint8_t>();
+  image[6] = h["protocol_max"].as<uint8_t>();
+  image[7] = h["reserved7"] | 0;
+  const char *version = h["version"].as<const char *>();
+  std::memcpy(image.data() + 8, version, std::strlen(version));
+  const uint16_t count = h["count"].as<uint16_t>();
+  image[24] = count & 0xFF;
+  image[25] = count >> 8;
+  image[26] = image[27] = h["reserved26"] | 0;
+  const uint32_t size = h["body_size"].as<uint32_t>();
+  for (int i = 0; i < 4; i++)
+    image[28 + i] = static_cast<uint8_t>(size >> (8 * i));
+  const std::string sha = h["sha256"].as<const char *>();
+  if (sha == "of_body")
+  {
+    net::Sha256 hash;
+    hash.update(body.data(), body.size());
+    uint8_t digest[net::SHA256_SIZE];
+    hash.finish(digest);
+    std::memcpy(image.data() + 32, digest, sizeof(digest));
+  }
+  else
+  {
+    const std::vector<uint8_t> digest = unhex(sha.c_str());
+    std::memcpy(image.data() + 32, digest.data(), net::SHA256_SIZE);
+  }
+  image.insert(image.end(), body.begin(), body.end());
+  if (c["tail_hex"].is<const char *>())
+  {
+    const std::vector<uint8_t> tail = unhex(c["tail_hex"].as<const char *>());
+    image.insert(image.end(), tail.begin(), tail.end());
+  }
+  return image;
+}
+
+void test_web_image_cases()
+{
+  JsonDocument doc = load("update/web_image.json");
+  for (JsonObjectConst c : doc["cases"].as<JsonArrayConst>())
+  {
+    const std::string name = c["note"].as<std::string>();
+    const std::vector<uint8_t> image = web_image_of(c);
+    net::WebImageInfo info;
+    net::Asset assets[net::MAX_WEB_FILES];
+    size_t count = 0;
+    const char *why = "";
+    const bool valid = net::read_web_image(image.data(), image.size(), info, assets, count, why);
+    TEST_ASSERT_EQUAL_MESSAGE(c["valid"].as<bool>(), valid, (name + ": " + why).c_str());
+    if (!valid)
+      continue;
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(c["header"]["version"].as<const char *>(), info.version, name.c_str());
+    JsonArrayConst files = c["files"];
+    TEST_ASSERT_EQUAL_size_t_MESSAGE(files.size(), count, name.c_str());
+    const uint8_t *body = image.data() + net::WEB_HEADER_SIZE;
+    for (size_t n = 0; n < count; n++)
+    {
+      TEST_ASSERT_EQUAL_STRING_MESSAGE(files[n]["path"].as<const char *>(), assets[n].path, name.c_str());
+      TEST_ASSERT_EQUAL_STRING_MESSAGE(files[n]["type"].as<const char *>(), assets[n].content_type, name.c_str());
+      TEST_ASSERT_EQUAL_PTR_MESSAGE(body + files[n]["offset"].as<size_t>(), assets[n].data, name.c_str());
+      TEST_ASSERT_EQUAL_size_t_MESSAGE(files[n]["length"].as<size_t>(), assets[n].size, name.c_str());
+    }
+  }
+}
+
+void test_web_manifest_cases()
+{
+  JsonDocument doc = load("update/web_manifest.json");
+  size_t index = 0;
+  for (JsonObjectConst c : doc["cases"].as<JsonArrayConst>())
+  {
+    const std::string name = label("web manifest", index++) + " " + c["note"].as<std::string>();
+    const std::string text = c["text"].as<const char *>();
+    update::Manifest manifest;
+    const char *why = nullptr;
+    const bool valid = update::parse_web_manifest(text.data(), text.size(), manifest, why);
+    TEST_ASSERT_EQUAL_MESSAGE(c["valid"].as<bool>(), valid, name.c_str());
+    if (!valid)
+      continue;
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(c["version"].as<const char *>(), manifest.version, name.c_str());
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(c["file"].as<const char *>(), manifest.file, name.c_str());
+    TEST_ASSERT_EQUAL_UINT32_MESSAGE(c["size"].as<uint32_t>(), manifest.size, name.c_str());
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(c["protocol_min"].as<uint8_t>(), manifest.protocol_min, name.c_str());
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(c["protocol_max"].as<uint8_t>(), manifest.protocol_max, name.c_str());
   }
 }
 

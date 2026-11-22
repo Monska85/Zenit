@@ -26,12 +26,8 @@
 #include "platform.h"
 #include "protocol.h"
 #include "site.h"
-
-namespace web_assets
-{
-extern const zenit::net::Asset ASSETS[];
-extern const size_t COUNT;
-} // namespace web_assets
+#include "updates.h"
+#include "www.h"
 
 namespace ws_server
 {
@@ -277,10 +273,28 @@ esp_err_t send_text(httpd_req_t *req, const char *status, const char *body)
   return finish(req, ESP_OK);
 }
 
-// GET of anything but /ws: an embedded file, /board.json, or nothing.
+// The page served instead of the web app while it is not usable, with 503.
+esp_err_t send_emergency(httpd_req_t *req)
+{
+  static char page[zenit::net::MAX_EMERGENCY_PAGE];
+  const size_t size = zenit::net::emergency_page(updates::web_repairable(), site::URL, page, sizeof(page));
+  httpd_resp_set_status(req, "503 Service Unavailable");
+  httpd_resp_set_type(req, "text/html; charset=utf-8");
+  httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+  common_headers(req);
+  httpd_resp_send(req, page, size);
+  return finish(req, ESP_OK);
+}
+
+// GET of anything but /ws: a file of the web app, /board.json, the emergency page, or nothing.
 esp_err_t handle_get(httpd_req_t *req)
 {
-  const zenit::net::Resolved found = zenit::net::resolve(web_assets::ASSETS, web_assets::COUNT, req->uri);
+  const zenit::net::Asset *assets = nullptr;
+  size_t count = 0;
+  const bool serving = www::serve_begin(assets, count);
+  const zenit::net::Resolved found = zenit::net::resolve(assets, count, req->uri);
+  if (found.route != zenit::net::Route::Asset && serving)
+    www::serve_end();
   if (found.route == zenit::net::Route::BoardJson)
   {
     char body[96];
@@ -292,6 +306,8 @@ esp_err_t handle_get(httpd_req_t *req)
     httpd_resp_send(req, body, size);
     return finish(req, ESP_OK);
   }
+  if (!serving)
+    return send_emergency(req);
   if (found.route != zenit::net::Route::Asset)
     return send_text(req, "404 Not Found", "not found\n");
   const zenit::net::Asset &asset = *found.asset;
@@ -299,7 +315,9 @@ esp_err_t handle_get(httpd_req_t *req)
   httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
   httpd_resp_set_hdr(req, "Cache-Control", zenit::net::cache_control(asset));
   common_headers(req);
+  // The file is read from the mapped partition: an install waits until it is sent.
   const esp_err_t sent = httpd_resp_send(req, reinterpret_cast<const char *>(asset.data), asset.size);
+  www::serve_end();
   return finish(req, sent);
 }
 
@@ -368,7 +386,9 @@ void after_close_frame(esp_err_t, int fd, void *)
     httpd_sess_trigger_close(handle, fd);
 }
 
-uint8_t close_payload[2] = {zenit::proto::CLOSE_POLICY >> 8, zenit::proto::CLOSE_POLICY & 0xFF};
+// The payloads of the close frames close_client sends: constant, so a frame still queued keeps its code.
+uint8_t policy_payload[2] = {zenit::proto::CLOSE_POLICY >> 8, zenit::proto::CLOSE_POLICY & 0xFF};
+uint8_t reload_payload[2] = {zenit::proto::CLOSE_RELOAD >> 8, zenit::proto::CLOSE_RELOAD & 0xFF};
 
 // The loop task: the reply of a line goes back to the server task, which is waiting for it.
 void keep_reply(const char *line, size_t length)
@@ -479,16 +499,17 @@ void poll(uint64_t now)
     close_client();
 }
 
-void close_client()
+void close_client(uint16_t code)
 {
   const int fd = client_fd.load();
   httpd_handle_t handle = server.load();
   if (fd < 0 || !handle)
     return;
+
   httpd_ws_frame_t frame = {};
   frame.type = HTTPD_WS_TYPE_CLOSE;
-  frame.payload = close_payload;
-  frame.len = sizeof(close_payload);
+  frame.payload = code == zenit::proto::CLOSE_RELOAD ? reload_payload : policy_payload;
+  frame.len = 2;
   // The close frame goes out in the server task, after the handler that may be waiting for its reply.
   if (httpd_ws_send_data_async(handle, fd, &frame, after_close_frame, nullptr) != ESP_OK)
     httpd_sess_trigger_close(handle, fd);

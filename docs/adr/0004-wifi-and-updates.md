@@ -2,7 +2,7 @@
 
 Date: 2026-11-22
 
-Status: accepted
+Status: accepted; decision 1 and the slot budget of the consequences amended by [ADR 0005](0005-web-app-partition.md): the app is in its own partition, not in the firmware
 
 ## Context
 

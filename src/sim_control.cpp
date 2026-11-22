@@ -4,9 +4,11 @@
 
 #include "sim_control.h"
 
+#include <manifest.h>
 #include <semver.h>
 #include <sha256.h>
 #include <update_record.h>
+#include <web_image.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -23,6 +25,7 @@
 #include "settings.h"
 #include "update_http.h"
 #include "updates.h"
+#include "www.h"
 
 namespace sim_control
 {
@@ -104,11 +107,60 @@ void net_line(const std::string &line, uint64_t now)
 
 void announce(const char *line);
 
+// The SHA-256 of `data` as 64 lowercase hexadecimal digits.
+std::string sha256_hex(const uint8_t *data, size_t size)
+{
+  zenit::net::Sha256 hash;
+  hash.update(data, size);
+  uint8_t digest[zenit::net::SHA256_SIZE];
+  hash.finish(digest);
+  char hex[zenit::net::SHA256_HEX + 1];
+  zenit::net::to_hex(digest, hex);
+  return hex;
+}
+
+void announce_hash(const uint8_t *data, size_t size)
+{
+  char out[96];
+  std::snprintf(out, sizeof(out), "!sha256 %s %u\n", sha256_hex(data, size).c_str(), static_cast<unsigned>(size));
+  announce(out);
+}
+
+// A web image the words `VERSION MIN MAX` describe: one page that speaks protocols MIN to MAX.
+struct ImageWords
+{
+  std::string version;
+  int low = 0;
+  int high = 0;
+  uint8_t *data = nullptr;
+  size_t size = 0;
+};
+
+// False when the words do not read.
+bool image_words(const std::string &text, ImageWords &out)
+{
+  std::istringstream in(text);
+  if (!(in >> out.version >> out.low >> out.high) || out.version.size() > zenit::net::WEB_VERSION_FIELD ||
+      out.low < 1 || out.high > 255 || out.low > out.high)
+    return false;
+  www::sim_make_image(out.version.c_str(), static_cast<uint8_t>(out.low), static_cast<uint8_t>(out.high), out.data,
+                      out.size);
+  return true;
+}
+
+// `!update [web] ...`: the scripted source of the firmware update, or of the web app update with `web`.
 void update_line(const std::string &line)
 {
-  const std::string rest = rest_after(line, "!update ");
+  std::string rest = rest_after(line, "!update ");
+  using install_target::Target;
+  Target target = Target::Firmware;
+  if (rest.rfind("web ", 0) == 0)
+  {
+    target = Target::Web;
+    rest = rest.substr(4);
+  }
   if (rest.rfind("manifest ", 0) == 0)
-    update_http::sim_set_manifest(rest.substr(9).c_str());
+    update_http::sim_set_manifest(target, rest.substr(9).c_str());
   else if (rest.rfind("fail ", 0) == 0)
   {
     const std::string what = rest.substr(5);
@@ -122,38 +174,74 @@ void update_line(const std::string &line)
       outcome = Outcome::TlsError;
     else
       return complain(line, "expected unreachable, not_published or tls_error");
-    update_http::sim_set_manifest_outcome(outcome);
+    update_http::sim_set_manifest_outcome(target, outcome);
   }
-  else if (rest.rfind("firmware ", 0) == 0)
+  else if (target == Target::Firmware && rest.rfind("firmware ", 0) == 0)
   {
-    // `firmware SIZE FILL`: a file of SIZE bytes of the byte FILL, and its SHA-256 on standard output.
+    // `firmware SIZE FILL`: a file of SIZE bytes of the byte FILL, and its SHA-256 and size on standard output.
     std::istringstream in(rest.substr(9));
     size_t size = 0;
     int fill = 0;
     if (!(in >> size >> fill) || size == 0 || size > 4u * 1024 * 1024)
       return complain(line, "expected SIZE FILL");
     const std::vector<uint8_t> file(size, static_cast<uint8_t>(fill));
-    update_http::sim_set_firmware(file.data(), file.size());
-    zenit::net::Sha256 hash;
-    hash.update(file.data(), file.size());
-    uint8_t digest[zenit::net::SHA256_SIZE];
-    hash.finish(digest);
-    char hex[zenit::net::SHA256_HEX + 1];
-    zenit::net::to_hex(digest, hex);
-    char out[80];
-    std::snprintf(out, sizeof(out), "!sha256 %s\n", hex);
-    announce(out);
+    update_http::sim_set_file(target, file.data(), file.size());
+    announce_hash(file.data(), file.size());
+  }
+  else if (target == Target::Web && rest.rfind("image ", 0) == 0)
+  {
+    // `web image VERSION MIN MAX`: the web image served, and its SHA-256 and size on standard output.
+    ImageWords image;
+    if (!image_words(rest.substr(6), image))
+      return complain(line, "expected VERSION MIN MAX");
+    update_http::sim_set_file(target, image.data, image.size);
+    announce_hash(image.data, image.size);
+  }
+  else if (target == Target::Web && rest.rfind("publish ", 0) == 0)
+  {
+    // `web publish VERSION MIN MAX`: the web image served and a manifest that describes it.
+    ImageWords image;
+    if (!image_words(rest.substr(8), image))
+      return complain(line, "expected VERSION MIN MAX");
+    update_http::sim_set_file(target, image.data, image.size);
+    char manifest[zenit::update::MAX_MANIFEST + 1];
+    std::snprintf(manifest, sizeof(manifest),
+                  "{\"schema\":1,\"version\":\"%s\",\"file\":\"zenit-web.bin\",\"size\":%u,\"sha256\":\"%s\","
+                  "\"protocol_min\":%d,\"protocol_max\":%d}",
+                  image.version.c_str(), static_cast<unsigned>(image.size), sha256_hex(image.data, image.size).c_str(),
+                  image.low, image.high);
+    update_http::sim_set_manifest(target, manifest);
   }
   else if (rest.rfind("download ", 0) == 0)
   {
     const std::string what = rest.substr(9);
-    update_http::sim_set_download_outcome(what == "ok"            ? update_http::Outcome::Ok
-                                          : what == "unreachable" ? update_http::Outcome::Unreachable
-                                          : what == "tls_error"   ? update_http::Outcome::TlsError
-                                                                  : update_http::Outcome::BadDownload);
+    update_http::sim_set_download_outcome(target, what == "ok"            ? update_http::Outcome::Ok
+                                                  : what == "unreachable" ? update_http::Outcome::Unreachable
+                                                  : what == "tls_error"   ? update_http::Outcome::TlsError
+                                                                          : update_http::Outcome::BadDownload);
   }
   else
     complain(line, "unknown update control");
+}
+
+// `!www ...`: the `www` partition. `load VERSION MIN MAX` puts an image there, `erase` leaves none, `fail STEP` fails
+// the next install at `begin`, `write` or `end` (`none` clears). Each reads the partition again, as a restart does.
+void www_line(const std::string &line)
+{
+  const std::string rest = rest_after(line, "!www ");
+  if (rest.rfind("load ", 0) == 0)
+  {
+    ImageWords image;
+    if (!image_words(rest.substr(5), image))
+      return complain(line, "expected VERSION MIN MAX");
+    www::sim_load(image.data, image.size);
+  }
+  else if (rest == "erase")
+    www::sim_erase();
+  else if (rest.rfind("fail ", 0) == 0)
+    www::sim_fail(rest.substr(5) == "none" ? "" : rest.substr(5).c_str());
+  else
+    complain(line, "unknown www control");
 }
 
 void firmware_line(const std::string &line)
@@ -224,6 +312,8 @@ bool handle(const std::string &line, uint64_t now)
     update_line(line);
   else if (line.rfind("!firmware ", 0) == 0)
     firmware_line(line);
+  else if (line.rfind("!www ", 0) == 0)
+    www_line(line);
   else if (line == "!restart")
     restart(now);
   else if (line == "!restart rollback" || line == "!restart lost")
@@ -315,8 +405,12 @@ void after_step(uint64_t now)
 {
   if (firmware::sim_restarted())
     restart(now);
-  if (network::sim_take_close_client())
-    announce("!close-client\n");
+  if (const uint16_t code = network::sim_take_close_client())
+  {
+    char out[32];
+    std::snprintf(out, sizeof(out), "!close-client %u\n", static_cast<unsigned>(code));
+    announce(out);
+  }
 }
 
 void set_quiet(bool value) { quiet = value; }

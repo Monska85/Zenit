@@ -10,6 +10,8 @@
 
 #include <cstdint>
 
+#include "install_target.h"
+
 namespace update_worker
 {
 
@@ -20,10 +22,12 @@ struct CheckResult
   zenit::update::Manifest manifest;
 };
 
-CheckResult check(const char *manifest_url);
+// The manifest of `target`: the firmware's or the web app's rules.
+CheckResult check(install_target::Target target, const char *manifest_url);
 
 // Installed: the image is in the inactive slot, checked, and not yet activated. Anything else is the failure.
-zenit::update::Result download(const char *manifest_url, const zenit::update::Manifest &manifest,
-                               void (*progress)(uint8_t percent));
+// For the web app, Installed means the image is written and reads.
+zenit::update::Result download(install_target::Target target, const char *manifest_url,
+                               const zenit::update::Manifest &manifest, void (*progress)(uint8_t percent));
 
 } // namespace update_worker

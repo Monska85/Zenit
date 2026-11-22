@@ -70,7 +70,8 @@ struct Command
     Download
   };
   Type type = Type::Scan;
-  uint32_t id = 0; // of a Provision: the id its result carries
+  install_target::Target target = install_target::Target::Firmware; // of a Manifest or a Download
+  uint32_t id = 0;                                                  // of a Provision: the id its result carries
   char ssid[zenit::net::MAX_SSID + 1] = {0};
   char password[zenit::net::MAX_PASSWORD + 1] = {0};
   char url[zenit::update::MAX_URL + 1] = {0}; // a manifest or firmware address: the build refuses a longer one
@@ -501,10 +502,11 @@ void run_command(const Command &command, uint32_t now)
   case Command::Type::Manifest:
   {
     large = true;
-    const update_worker::CheckResult found = update_worker::check(command.url);
+    const update_worker::CheckResult found = update_worker::check(command.target, command.url);
     large = false;
     UpdateEvent event;
     event.type = UpdateEvent::Type::Manifest;
+    event.target = command.target;
     event.result = found.result;
     event.manifest = found.manifest;
     post_result(event);
@@ -515,7 +517,8 @@ void run_command(const Command &command, uint32_t now)
     large = true;
     UpdateEvent event;
     event.type = UpdateEvent::Type::Downloaded;
-    event.result = update_worker::download(command.url, command.manifest, post_progress);
+    event.target = command.target;
+    event.result = update_worker::download(command.target, command.url, command.manifest, post_progress);
     large = false;
     post_result(event);
     break;
@@ -660,14 +663,15 @@ size_t take_scan(Network *out, size_t capacity)
   return count;
 }
 
-void close_client() { ws_server::close_client(); }
+void close_client(uint16_t code) { ws_server::close_client(code); }
 
-bool request_manifest(const char *url)
+bool request_manifest(install_target::Target target, const char *url)
 {
   if (transfer.exchange(true))
     return false;
   Command command;
   command.type = Command::Type::Manifest;
+  command.target = target;
   std::snprintf(command.url, sizeof(command.url), "%s", url);
   if (!commands.send(command, 0))
   {
@@ -677,12 +681,13 @@ bool request_manifest(const char *url)
   return true;
 }
 
-bool request_download(const char *manifest_url, const zenit::update::Manifest &manifest)
+bool request_download(install_target::Target target, const char *manifest_url, const zenit::update::Manifest &manifest)
 {
   if (transfer.exchange(true))
     return false;
   Command command;
   command.type = Command::Type::Download;
+  command.target = target;
   std::snprintf(command.url, sizeof(command.url), "%s", manifest_url);
   command.manifest = manifest;
   if (!commands.send(command, 0))
@@ -709,11 +714,11 @@ void poll(uint64_t now)
     {
     case UpdateEvent::Type::Manifest:
       transfer = false;
-      updates::on_manifest(event.result, event.manifest, now);
+      updates::on_manifest(event.target, event.result, event.manifest, now);
       break;
     case UpdateEvent::Type::Downloaded:
       transfer = false;
-      updates::on_download(event.result, now);
+      updates::on_download(event.target, event.result, now);
       break;
     }
   }

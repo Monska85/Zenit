@@ -22,14 +22,18 @@ import {
 } from "../src/device/settings";
 import {
   canCheck,
+  canInstallWeb,
   describeResult,
+  describeRetry,
+  describeWebResult,
+  describeWebState,
   describeUpdateState,
   formatCheckTime,
   installAction,
   updateBusy,
 } from "../src/device/update";
 import { settingsProblem } from "../src/light/model";
-import type { UpdateStatus } from "../src/protocol/types";
+import type { UpdateStatus, WebAppStatus } from "../src/protocol/types";
 import {
   WIFI_LIMITS,
   boardAddress,
@@ -290,5 +294,72 @@ describe("the update sentences", () => {
     const text = formatCheckTime(1_800_000_000, "en-GB");
     expect(text).toMatch(/2027/);
     expect(new Date(1_800_000_000 * 1000).getUTCFullYear()).toBe(2027);
+  });
+});
+
+describe("the sentences of the app on Zenit", () => {
+  const update = (patch: Partial<UpdateStatus> = {}): UpdateStatus => ({ ...UPDATE_STATUS, ...patch });
+  const web = (patch: Partial<WebAppStatus> = {}): WebAppStatus => ({ ...UPDATE_STATUS.web, ...patch });
+  const RESULTS = [
+    "never",
+    "up_to_date",
+    "available",
+    "installed",
+    "incompatible",
+    "no_network",
+    "no_time",
+    "unreachable",
+    "not_published",
+    "tls_error",
+    "bad_manifest",
+    "bad_download",
+    "flash_error",
+  ];
+
+  it("has a plain sentence for every state and result", () => {
+    for (const state of ["ok", "installing", "missing", "incompatible"]) {
+      expect(describeWebState(web({ state })), state).toMatch(/\.$/);
+      expect(describeWebState(web({ state }))).not.toContain("(");
+    }
+    const sentences = RESULTS.map((last_result) => describeWebResult(web({ last_result })));
+    for (const sentence of sentences) expect(sentence).toMatch(/\.$/);
+    expect(new Set(sentences).size).toBe(RESULTS.length);
+    expect(describeWebResult(web({ last_result: "available", available: "1.1.0" }))).toBe(
+      "Version 1.1.0 of the app is available.",
+    );
+    expect(describeWebState(web({ state: "odd" }))).toContain("odd");
+    expect(describeWebResult(web({ last_result: "odd" }))).toContain("odd");
+  });
+
+  it("says when the next try is", () => {
+    expect(describeRetry(null)).toBeNull();
+    expect(describeRetry(20)).toBe("Zenit tries again in less than a minute.");
+    expect(describeRetry(70)).toBe("Zenit tries again in about a minute.");
+    expect(describeRetry(1800)).toBe("Zenit tries again in about 30 minutes.");
+  });
+
+  it("names what is downloading", () => {
+    expect(describeUpdateState(update({ state: "downloading", progress: 5, target: "web" }))).toBe(
+      "Downloading the new app: 5 %",
+    );
+  });
+
+  it("offers to install a new app only when the board can", () => {
+    const found = update({ web: web({ last_result: "available", available: "1.1.0" }) });
+    expect(canInstallWeb(found, WIFI_STATUS, true)).toBe(true);
+    expect(canInstallWeb(found, WIFI_STATUS, false)).toBe(false);
+    expect(canInstallWeb(update(), WIFI_STATUS, true)).toBe(false);
+    expect(canInstallWeb({ ...found, state: "checking" }, WIFI_STATUS, true)).toBe(false);
+    expect(canInstallWeb({ ...found, trial: true }, WIFI_STATUS, true)).toBe(false);
+    expect(canInstallWeb(found, { ...WIFI_STATUS, state: "connecting" }, true)).toBe(false);
+    const older: UpdateStatus = { ...found };
+    delete older.web;
+    expect(canInstallWeb(older, WIFI_STATUS, true)).toBe(false);
+  });
+
+  it("lets a check run for the app when the firmware's updates are off", () => {
+    const off = update({ mode: "off" });
+    expect(canCheck(off, WIFI_STATUS)).toBe(false);
+    expect(canCheck(off, WIFI_STATUS, true)).toBe(true);
   });
 });

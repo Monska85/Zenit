@@ -38,7 +38,17 @@
           "progress": null,
           "trial": false,
           "skipped": null,
-          "rolled_back": null
+          "rolled_back": null,
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     },
@@ -82,7 +92,17 @@
           "progress": null,
           "trial": false,
           "skipped": null,
-          "rolled_back": null
+          "rolled_back": null,
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     },
@@ -126,7 +146,17 @@
           "progress": null,
           "trial": false,
           "skipped": null,
-          "rolled_back": null
+          "rolled_back": null,
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     },
@@ -170,7 +200,17 @@
           "progress": null,
           "trial": false,
           "skipped": null,
-          "rolled_back": null
+          "rolled_back": null,
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     }

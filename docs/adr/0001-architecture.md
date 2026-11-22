@@ -28,6 +28,8 @@ Constraints that shape the firmware:
    | `app1`     | app  | ota_1    | `0x200000` | `0x1F0000` |
    | `coredump` | data | coredump | `0x3F0000` | `0x10000`  |
 
+   Amended before the first release by [ADR 0005](0005-web-app-partition.md): the slots are `0x1B0000` each (`app1` at `0x1C0000`) and a `www` data partition of `0x80000` at `0x370000` holds the web app as one read-only image.
+
    No file system: settings, WiFi credentials, token and update records live in NVS. The core dump of a crash stays readable over USB.
 
 3. **Pure logic in `lib/`, hardware behind board and simulator pairs.** The light engine (perceptual curve, power limit, fades, effects, timer), the protocol decisions, the network rules and the update decisions are plain C++ in `lib/`, with no Arduino or ESP-IDF calls. Hardware access sits in `src/<module>_board.cpp` and `src/<module>_sim.cpp`, selected at build time.

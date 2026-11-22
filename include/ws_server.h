@@ -5,6 +5,10 @@
 
 #pragma once
 
+#include <ws_message.h>
+
+#include <cstdint>
+
 #include <cstdint>
 
 namespace ws_server
@@ -19,7 +23,8 @@ bool running();
 void stop();
 // The loop task: runs the protocol lines that clients sent and hands the replies back.
 void poll(uint64_t now);
-// The loop task asks to close the client's connection (a failed login, a new token).
-void close_client();
+// The loop task asks to close the client's connection: CLOSE_POLICY (a failed login, a new token) or CLOSE_RELOAD (a
+// new web app). Any other code is sent as CLOSE_POLICY.
+void close_client(uint16_t code = zenit::proto::CLOSE_POLICY);
 
 } // namespace ws_server

@@ -2,7 +2,7 @@
 
 Status: **implemented** by the firmware of milestone 4, with simulator support for tests.
 
-This document specifies how a Zenit board joins a WiFi network, serves the web app and the [command protocol](../protocol/protocol-v1.md) on it, and updates its own firmware from the project's published site, with a trial boot and a rollback. Why it works this way is recorded in [ADR 0004](../adr/0004-wifi-and-updates.md). The commands and settings it mentions are specified in the protocol document, the screens in the [web app specification](../web/web-app-v1.md). The light is specified in [Light](light-v1.md).
+This document specifies how a Zenit board joins a WiFi network, serves the web app and the [command protocol](../protocol/protocol-v1.md) on it, and updates its own firmware and its web app from the project's published site, the firmware with a trial boot and a rollback. Why it works this way is recorded in [ADR 0004](../adr/0004-wifi-and-updates.md) and, for the web app's own partition, [ADR 0005](../adr/0005-web-app-partition.md). The commands and settings it mentions are specified in the protocol document, the screens in the [web app specification](../web/web-app-v1.md). The light is specified in [Light](light-v1.md).
 
 ## Tasks and memory
 
@@ -13,11 +13,11 @@ Two FreeRTOS tasks share the work (ADR 0001):
 
 The two talk through static, fixed-size queues (`include/mailbox.h`, no allocation after start):
 
-- Loop task to network task: `Provision` (name and password of an Improv try), `Scan`, `Manifest` (read the update manifest) and `Download` (the firmware). The configuration (the stored network, power, time zone, NTP server, sync interval) is not a queue entry: the loop task writes it under the lock with a generation number and the network task takes it up when the number changes, so it always gets the latest. Closing the WebSocket client goes straight to the server. A command that does not fit the queue is refused: `busy` to an update command, `unable to connect` to an Improv one.
+- Loop task to network task: `Provision` (name and password of an Improv try), `Scan`, `Manifest` (read an update manifest) and `Download` (the firmware or the web image), each of the last two with its target: the firmware or the web app. The configuration (the stored network, power, time zone, NTP server, sync interval) is not a queue entry: the loop task writes it under the lock with a generation number and the network task takes it up when the number changes, so it always gets the latest. Closing the WebSocket client goes straight to the server. A command that does not fit the queue is refused: `busy` to an update command, `unable to connect` to an Improv one.
 - Network task to loop task: `ClientOpened`, `ClientLine` (one WebSocket message, at most 1,024 bytes), `ClientClosed`, `UpdateChecked`, `UpdateInstalled`. A scan is not a queue entry: the network task keeps the scan state (idle, running, done) in an atomic and the list of networks under the lock, and the loop task reads them; a new scan discards a list nobody has read. The download progress is a value the loop task reads, not a queue entry, so the queue holds only the end of a transfer (one at a time) and cannot fill up; the network task delivers that end even when the queue is briefly full.
 - The server task of the HTTP server hands a line to the loop task and waits for its reply, so a request has one reply on its connection, in order.
 - The state the loop task reports (`status.wifi`, `status.time`, `status.update`) comes from a **snapshot** the network task writes under a mutex and the loop task copies under the same mutex. Nobody holds the mutex across a call that can block.
-- **One large allocation at a time.** A TLS connection (the update check and the firmware download) takes tens of kilobytes. The network task holds a lock while one is open, and the HTTP server answers every new connection with `503` meanwhile. The firmware download writes each chunk straight to the flash, with no copy of the image in memory.
+- **One large allocation at a time.** A TLS connection (the update checks and the downloads) takes tens of kilobytes. The network task holds a lock while one is open, and the HTTP server answers every new connection with `503` meanwhile. A download writes each chunk straight to the flash, with no copy of the image in memory (a web install keeps only the image's first 4,096 bytes, its header, in memory until the end).
 
 ## WiFi
 
@@ -82,7 +82,7 @@ The board settings are a record of 255 bytes, stored in NVS (namespace `zenit`) 
 | 0      | Version, `1`                                                                                      |
 | 1      | `wifi_power`: `auto` 0, `8.5` 1, `11` 2, `13` 3, `15` 4, `17` 5, `18.5` 6, `19.5` 7               |
 | 2      | `update_mode`: `off` 0, `notify` 1, `automatic` 2                                                 |
-| 3      | `update_firmware`, 0 or 1                                                                         |
+| 3      | Bit 0: `update_firmware`. Bit 1: `update_web` is `false` (so a record written before the setting reads as `true`). 0 to 3 |
 | 4      | `check_hours`                                                                                     |
 | 5..6   | `install_start`, little endian                                                                    |
 | 7..8   | `install_end`, little endian                                                                      |
@@ -110,18 +110,67 @@ The token is 16 characters from `a-z` and `0-9`, drawn with the hardware random 
 
 ## The served web app
 
-The firmware embeds the built web app (`web/dist`), gzipped, in its flash image: a pre-build script (`scripts/web_assets.py`) compresses every file, writes `web_assets.cpp` with the bytes, the path, the media type and the SHA-256 of each file into the build folder, and fails when `web/dist` is missing (build the web app first: `just build` does it). The firmware installer (ESP Web Tools) is left out: the board serves plain http, where a browser gives no USB port, so the served page shows a note instead of the installer and never loads it. Vite's build manifest (`.vite/manifest.json`, not served) names the files only the installer uses, and the build fails when the manifest or the installer's entry is missing. The bytes are served from flash, so a request allocates nothing.
+The web app is not part of the firmware: it is one read-only image in its own flash partition, `www`, updated on its own (see [Web updates](#web-updates)). The firmware maps the partition into memory at the start and serves the files from there, so a request allocates nothing. The firmware installer (ESP Web Tools) is left out of the image: the board serves plain http, where a browser gives no USB port, so the served page shows a note instead of the installer and never loads it.
+
+### Flash layout
+
+| Name       | Type | SubType  | Offset     | Size       |
+| ---------- | ---- | -------- | ---------- | ---------- |
+| `nvs`      | data | nvs      | `0x9000`   | `0x5000`   |
+| `otadata`  | data | ota      | `0xe000`   | `0x2000`   |
+| `app0`     | app  | ota_0    | `0x10000`  | `0x1B0000` |
+| `app1`     | app  | ota_1    | `0x1C0000` | `0x1B0000` |
+| `www`      | data | `0x40`   | `0x370000` | `0x80000`  |
+| `coredump` | data | coredump | `0x3F0000` | `0x10000`  |
+
+A firmware slot is 1,769,472 bytes and the firmware must leave at least 64 KiB of it free, checked in CI. The `www` partition is 524,288 bytes.
+
+### Web image
+
+One file, built by `tools/web_image.py` from `web/dist` (`just web-image`) and attached to each web release. Every file is gzipped, in a fixed order and without timestamps, so the same app gives the same image. Vite's build manifest (`.vite/manifest.json`, not in the image) names the files only the installer uses; the build fails when the manifest or the installer's entry is missing. All numbers are little-endian.
+
+The **header** is the first 4,096 bytes; after its fields every byte is zero:
+
+| Bytes  | Field          | Value                                                        |
+| ------ | -------------- | ------------------------------------------------------------ |
+| 0..3   | `magic`        | `ZWEB`                                                       |
+| 4      | `format`       | `1`                                                          |
+| 5      | `protocol_min` | the lowest protocol version the app speaks, 1 to 255         |
+| 6      | `protocol_max` | the highest, not below `protocol_min`                        |
+| 7      | reserved       | `0`                                                          |
+| 8..23  | `version`      | the web version, `X.Y.Z` (each part 0 to 999999, no leading zeros), zero-padded |
+| 24..25 | `count`        | the number of files, 1 to 64                                 |
+| 26..27 | reserved       | `0`                                                          |
+| 28..31 | `body_size`    | the bytes after the header                                   |
+| 32..63 | `body_sha256`  | the SHA-256 of those bytes                                   |
+
+The **body** (from byte 4,096) is the index, then the files. Each index entry is the path length (1 byte), the path (1 to 127 printable ASCII characters, no backslash, no leading `/`, no `..`), a zero byte, the media type length (1 byte), the media type (1 to 63 printable characters), a zero byte, the offset of the file from the start of the body (4 bytes) and its length (4 bytes). A file starts after the index and lies inside the body. `index.html` is one of the files, and no path appears twice. The protocol range comes from `web/src/protocol/speaks.json`, which the app's client also uses to accept a board; the tool refuses an app whose range does not hold the protocol of the firmware in the same commit. Each firmware release attaches `zenit-esp32c3-protocol.txt`, the protocol it speaks, and the site is not built when the latest web image does not speak the protocol of the latest firmware release, so the installer never pairs them wrongly; a board whose firmware a published app does not speak reports it as `incompatible` and keeps its own.
+
+The board reads the image at the start and after each install: the magic, the format, the reserved bytes, the version, the range, the count, the body size, the SHA-256 of the body and every index entry. A published image file is exactly its header and its body; the partition holds `0xFF` after them. The cases in `conformance/update/web_image.json` are read by the board's reader and by the release tools' reader alike.
+
+### State of the web app
+
+| State          | Meaning                                                          | The board serves      |
+| -------------- | ---------------------------------------------------------------- | --------------------- |
+| `ok`           | A valid image whose protocol range holds the firmware's protocol | the app               |
+| `installing`   | A web install is writing the partition                           | the emergency page    |
+| `missing`      | No valid image (never installed, cut short, or damaged)          | the emergency page    |
+| `incompatible` | A valid image that does not speak the firmware's protocol        | the emergency page    |
+
+### Answers
 
 The board answers on HTTP port 80:
 
 | Request                               | Answer                                                                                                      |
 | ------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `GET /`                               | `index.html`, gzipped (`Content-Encoding: gzip`), `Cache-Control: no-cache`.                                |
-| `GET /<path>` of an embedded file     | The file, gzipped, with its media type; files under `assets/` carry a hash in their names and are cached for a year. |
+| `GET /<path>` of a file of the image  | The file, gzipped, with its media type; files under `assets/` carry a hash in their names and are cached for a year. |
 | `GET /board.json`                     | `{"zenit":true,"hostname":"zenit-a1b2","ws":"/ws"}`: how the app knows it is served by a board.             |
 | `GET /ws` with a WebSocket handshake  | The protocol (see [WebSocket](#websocket)).                                                                 |
 | Any other path                        | `404`, plain text.                                                                                          |
 | Any other method                      | `405` with `Allow: GET`.                                                                                    |
+
+While the state is not `ok`, every path but `/board.json` and `/ws` gets the **emergency page** with `503` and `Cache-Control: no-store`: a page of the firmware, at most 4,096 bytes, with no script, that reloads itself every 30 seconds (`<meta http-equiv="refresh">`). When web updates are on it says "The Zenit app is being installed. This page reloads by itself."; when they are off it says the app is missing and names the site to install it from over USB, as text. `/board.json` and the WebSocket answer in every state, so the command line client and an open page keep working.
 
 Every answer carries `Content-Security-Policy: default-src 'self'; connect-src 'self' ws:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Cross-Origin-Resource-Policy: same-origin` and `Connection: close`. The page makes no outside request, as the web app specification requires.
 
@@ -146,23 +195,23 @@ With `network_login` on the client authenticates as the [protocol specifies](../
 
 ### Source
 
-The board reads the **update manifest** from `<site address>firmware/update.json`. The site address is set when the firmware is built (`ZENIT_SITE_URL`, an `https://` URL ending in `/`, default `https://monska85.github.io/Zenit/`; forks and test builds override it) and is also the origin the WebSocket accepts. The address is at most 182 characters (`MAX_SITE_URL`), so that the manifest and firmware URLs, with a file name of 64 characters, fit the 255 characters the board builds; a longer address is a compile error and `tools/site_url.py` refuses it. The manifest is not the ESP Web Tools manifest (`firmware/manifest.json`), which the web app installs from.
+The board reads the **update manifest** from `<site address>firmware/update.json`. The site address is set when the firmware is built (`ZENIT_SITE_URL`, an `https://` URL ending in `/`, default `https://monska85.github.io/Zenit/`; forks and test builds override it) and is also the origin the WebSocket accepts. The address is at most 182 characters (`MAX_SITE_URL`), so that the manifest and firmware URLs, with a file name of 64 characters, fit the 255 characters the board builds; a longer address is a compile error and `tools/site_url.py` refuses it. The manifest is not the ESP Web Tools manifest (`firmware/manifest.json`), which the web app installs from, and which writes the latest web image at the `www` offset too, so a board installed over USB has the app at once.
 
 ```json
 {"schema":1,"board":"esp32c3","version":"1.2.0","file":"zenit-esp32c3-firmware.bin","size":412160,"sha256":"<64 lowercase hexadecimal digits>"}
 ```
 
-The board reads it as strict JSON (the protocol's rules), at most 1,024 bytes, with exactly these fields and no others. `schema` is 1, `board` is `esp32c3`, `version` is `X.Y.Z` without a prerelease, `file` is 1 to 64 characters of `a-z0-9._-`, never starting with a dot, resolved next to the manifest, `size` is a whole number from 65,536 to the slot size (2,031,616), `sha256` is 64 lowercase hexadecimal digits. Anything else is a bad manifest. The release workflow writes it (`tools/pages_site.py`) from the firmware file it publishes, so size and hash are those of the file, and it refuses a file the board would refuse. The web app a board serves is the one embedded in the firmware the board runs; a web release alone does not change it, the next firmware release does, while the published site always has the latest web app.
+The board reads it as strict JSON (the protocol's rules), at most 1,024 bytes, with exactly these fields and no others. `schema` is 1, `board` is `esp32c3`, `version` is `X.Y.Z` without a prerelease, `file` is 1 to 64 characters of `a-z0-9._-`, never starting with a dot, resolved next to the manifest, `size` is a whole number from 65,536 to the slot size (1,769,472), `sha256` is 64 lowercase hexadecimal digits. One line break (LF or CRLF) at the end of the file is not part of the JSON. Anything else is a bad manifest. The release workflow writes it (`tools/pages_site.py`) from the firmware file it publishes, so size and hash are those of the file, and it refuses a file the board would refuse.
 
 ### Transport
 
-HTTPS only, certificate checked against the ESP-IDF certificate bundle (the framework's full Mozilla bundle) and the host name, redirects not followed, the time out of every read 10 seconds, the whole check 30 seconds and the whole download 10 minutes. The download streams into the inactive slot while a SHA-256 runs over the same bytes. A test build (`esp32c3_test_http`, see [Tests](#tests-and-simulator)) can read from a plain HTTP address on a local test server; the release build cannot, and `scripts/site_url.py` refuses a non-HTTPS site address for it.
+HTTPS only, certificate checked against the ESP-IDF certificate bundle (the framework's full Mozilla bundle) and the host name, redirects not followed, the time out of every read 10 seconds, each manifest read 30 seconds and the whole download 10 minutes. A download streams into the inactive slot or the `www` partition while a SHA-256 runs over the same bytes. Both updates use the same transport. A test build (`esp32c3_test_http`, see [Tests](#tests-and-simulator)) can read from a plain HTTP address on a local test server; the release build cannot, and `scripts/site_url.py` refuses a non-HTTPS site address for it.
 
 While the repository is private the site does not exist, and a check says so: a `404` or `403` is `not_published`.
 
 ### Modes and checks
 
-`update_mode` and `update_firmware` decide what the board does with firmware updates; they are on when `update_mode` is not `off` and `update_firmware` is `true`.
+`update_mode` and `update_firmware` decide what the board does with firmware updates; they are on when `update_mode` is not `off` and `update_firmware` is `true`. Web updates follow `update_mode` and `update_web` the same way (see [Web updates](#web-updates)).
 
 | Mode        | Checks                                  | Installs                                                                  |
 | ----------- | --------------------------------------- | ------------------------------------------------------------------------- |
@@ -170,7 +219,7 @@ While the repository is private the site does not exist, and a check says so: a 
 | `notify`    | every `check_hours`, and on request     | only by `update_install`                                                  |
 | `automatic` | every `check_hours`, and on request     | by itself inside the window, and by `update_install` at any time          |
 
-The first check runs 2 minutes after the board is connected and its time is synced; later ones every `check_hours` after the last attempt; a failed check is tried again after 30 minutes. A check reads the manifest and compares its version with the running one by semantic versioning precedence. The result is one of:
+The first check runs 2 minutes after the board is connected and its time is synced; later ones every `check_hours` after the last attempt; a check in which a manifest failed is tried again after 30 minutes. A check reads the firmware manifest when firmware updates are on, then the web manifest when web updates are on, one connection at a time, and compares each version with the running one by semantic versioning precedence. The result of each is one of:
 
 | `last_result`   | Meaning                                                                                  |
 | --------------- | ---------------------------------------------------------------------------------------- |
@@ -178,7 +227,8 @@ The first check runs 2 minutes after the board is connected and its time is sync
 | `up_to_date`    | The published version is not newer than the running one.                                 |
 | `available`     | A newer version was found (`available` holds it).                                        |
 | `skipped`       | The newer version is on the skip list: it is reported but not installed by itself.       |
-| `installed`     | A newer version was installed and the board is restarting.                               |
+| `installed`     | A newer version was installed: the firmware is restarting, or the web app is in place.   |
+| `incompatible`  | Web only: a newer web app that does not speak the firmware's protocol: not installed.    |
 | `no_network`    | The board is not connected.                                                              |
 | `no_time`       | The time is not synced yet.                                                              |
 | `unreachable`   | The site did not answer, or the connection failed.                                       |
@@ -187,6 +237,24 @@ The first check runs 2 minutes after the board is connected and its time is sync
 | `bad_manifest`  | The manifest is not valid.                                                               |
 | `bad_download`  | The download is not the size or the SHA-256 the manifest gave, or ended early.           |
 | `flash_error`   | The slot could not be written or activated.                                              |
+
+### Web updates
+
+The board reads the **web manifest** from `<site address>web/update.json`, with the same transport, strict JSON, size limit and line break rule as the firmware manifest:
+
+```json
+{"schema":1,"version":"1.3.0","file":"zenit-web-1.3.0.bin","size":171520,"sha256":"<64 lowercase hexadecimal digits>","protocol_min":1,"protocol_max":1}
+```
+
+Exactly these seven fields: `schema`, `version` (at most 16 characters, as the image's header holds), `file` and `sha256` as in the firmware manifest, `size` a whole number from 4,097 to 524,288, and `protocol_min` and `protocol_max` whole numbers from 1 to 255, `protocol_min` not above `protocol_max`. The release workflow writes it from the image it publishes.
+
+- **Setting:** `update_web`, default `true`. Web updates are on when `update_mode` is not `off` and `update_web` is `true`.
+- **Offer:** a web version is `available` when its range holds the firmware's protocol and it is newer than the image in the partition, or the image is not `ok` (missing or `incompatible`: then any compatible version replaces it, an older one too); a candidate whose range does not hold the firmware's protocol is `incompatible`.
+- **Install:** in `automatic` mode inside the [install window](#install-window), or by `update_install` with `target` `web`. A firmware install and a web install never run together; when both are available, the firmware goes first. The board does not restart, and the light keeps running.
+- **Install steps:** the state is `installing` from the start (the server waits for any file it is sending first, and stops serving the app). Keep the first 4,096 bytes of the download (the header) in memory and check them before anything is erased: the header must read, carry the version the manifest offered, speak the firmware's protocol and announce a body that fills the manifest's size. A header that does not is a `bad_download` and leaves the old image as it was. Then erase the old header with the first body sector, erase each later sector just before its first byte and write the bytes as they arrive while a SHA-256 runs over the whole download; check size and SHA-256 against the manifest; write the header; read the image as at the start. A power cut or a failure after the first erase leaves no header, so the partition reads as `missing`, never as half an image. A `bad_download` drops the offer, so the next try starts with a new check.
+- **After an install:** the board closes the WebSocket client with code `1012`; the app reloads the page when it sees that code.
+- **Repair:** when the state is `missing` or `incompatible`, the board is connected and synced, and web updates are on, the board checks and installs at once, whatever the window, `notify` and the state of the firmware's update record (only a firmware on trial waits, for the second its health check takes). A failed repair (a failed check or install, or a check that finds nothing to install) is tried again after 1 minute, then 2, 4, 8 and so on up to 60 minutes, each wait varied from 80 % to 120 % at random so boards do not ask together. The wait goes back to 1 minute after a success, a new connection or a restart. While a repair is needed, its waits alone decide when the board checks, the ordinary schedule waits.
+- **Firmware rollback** does not touch the web image. If the firmware that comes back does not speak the image's protocol, the state becomes `incompatible` and the repair starts.
 
 ### Install window
 
@@ -202,7 +270,7 @@ The install runs only when the board is idle, not on trial, connected and synced
 
 ### Status
 
-`status.update` holds:
+`status.update` holds the firmware's side, the transfer running and the web app's side:
 
 | Field         | Meaning                                                                                                     |
 | ------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -215,6 +283,8 @@ The install runs only when the board is idle, not on trial, connected and synced
 | `trial`       | `true` while this firmware runs on trial (before it confirmed itself).                                      |
 | `skipped`     | The version on the skip list, or `null`.                                                                    |
 | `rolled_back` | The version that failed its trial the last time and was rolled back, or `null`.                             |
+| `target`      | What `state` and `progress` refer to: `firmware`, `web`, or `null` while idle.                              |
+| `web`         | The web app: `state` (`ok`, `installing`, `missing`, `incompatible`), `version` (of the valid image, or `null`), `available` (the newer compatible version the last check found, or `null`), `last_result` (one of the results above) and `retry_in` (the seconds to the next repair try, or `null`). |
 
 ### Rollback
 
@@ -249,9 +319,9 @@ All commands of the protocol work over WiFi except the ones reserved for USB: `s
 
 ## Tests and simulator
 
-- Pure logic in `lib/ZenitNet`, `lib/ZenitImprov` and `lib/ZenitUpdate` has native tests; the protocol, the board record and the update manifest have conformance cases under `conformance/`.
-- The simulator has the same module boundaries as the board: `network_sim`, `firmware_sim` and an update source that serves a scripted manifest. Failure injection (control lines of `--protocol`): no network, a bad hash, a failed trial, a rollback, a failing flash write.
-- `tools/ws_bridge.py --transport wifi` serves the simulator as a board on WiFi: login, `usb_only`, one client, and `--app web/dist` serves the built app and `/board.json` on the same port, so the served-by-board mode is tested end to end.
+- Pure logic in `lib/ZenitNet`, `lib/ZenitImprov` and `lib/ZenitUpdate` has native tests (the web image reader and the order its writer uses, with a power cut at every step, the repair waits, the emergency page); the protocol, the board record, the update manifest and the web manifest have conformance cases under `conformance/`. The image layout is tested on both sides against the table above: an image built byte by byte in the native tests, and the layout `tools/web_image.py` writes in its own tests.
+- The simulator has the same module boundaries as the board: `network_sim`, `firmware_sim`, `www_sim` (the partition in memory, with the board's reader and writer) and an update source that serves scripted manifests and files for each target. It starts with a valid web image, version 1.0.0, that the source also offers. Failure injection (control lines of `--protocol`): no network, a bad hash, a failed trial, a rollback, a failing flash write; for the web app `!www load VERSION MIN MAX`, `!www erase`, `!www fail STEP` and `!update web publish|image|manifest|fail|download ...`.
+- `tools/ws_bridge.py --transport wifi` serves the simulator as a board on WiFi: login, `usb_only`, one client, and `--app web/dist` serves the built app and `/board.json` on the same port, so the served-by-board mode is tested end to end. The simulator's line `!close-client CODE` closes the connection with that code (1012 after a web install).
 - A test firmware (`esp32c3_test_http`) accepts an `http://` site address for a local test server. It is never released.
 
 ## Board test plan
@@ -263,10 +333,11 @@ What needs a real WiFi network, a phone and a real release. Over USB alone the f
 3. **Transmit power.** With `wifi_power` `auto` on a board that cannot hold the connection at full power, check the fallback to 8.5 dBm (the log line and a stable connection); try each fixed value.
 4. **Network login.** Turn it on from the phone: the connection closes and the app asks for the token (printed over USB by `settings-get`); three wrong tokens close the connection; the right one works; `token_regenerate` over USB closes the client and the old token fails. The command line client works with `--token`.
 5. **Time.** `status.time` shows the synced time and the right local minute for the time zone, also after a restart and after the router loses the Internet.
-6. **Updates with the test firmware.** Build `just build-update-test http://<computer>:8000/` (flash it over USB), serve a newer firmware file with `just update-server`, then: a check says `available`; an install downloads while the light keeps running without a flicker, the board restarts, the new firmware reports `trial` and confirms itself within seconds; `settings` and the network are kept. Serve a file with a wrong hash or a short file (`bad_download`), stop the server during a download (`unreachable`), and serve the same version (`up_to_date`).
-7. **Rollback.** Install a firmware, then cut the power within a second of the restart: the board must come back on the old firmware and report `rolled_back` and `skipped`. (The bench check of the other paths is the native tests, which model every row of the table.)
-8. **Real release.** When the repository is public and a release is published: the check reads `https://monska85.github.io/Zenit/firmware/update.json` over HTTPS with the certificate bundle (`unreachable` or `tls_error` mean the time or the certificate), reports `available` for a newer release, and the install of the real file works. Until then the result is `not_published`.
-9. **Memory.** With WiFi connected, a page open and an install in progress, read the stack lines on the USB log (`loop stack`, `network stack`, `heap`) and compare them with the figures below.
+6. **Web app.** Flash the firmware without a web image (or erase the image's header): the board serves the emergency page with `503`, repairs the app from the site and the page loads the app. With the test firmware and `just update-server` serving a newer web image (`--web`): the board installs it without a restart, an open page reloads, and the light never flickers. Stop the server halfway through a web install: `missing`, the emergency page, retries after about 1, 2 and 4 minutes, then the repair succeeds when the server is back. Cut the power during a web install: the board starts with `missing` and repairs it. Serve an image whose range does not hold the firmware's protocol: `incompatible`, nothing installed.
+7. **Updates with the test firmware.** Build `just build-update-test http://<computer>:8000/` (flash it over USB), serve a newer firmware file with `just update-server`, then: a check says `available`; an install downloads while the light keeps running without a flicker, the board restarts, the new firmware reports `trial` and confirms itself within seconds; `settings` and the network are kept. Serve a file with a wrong hash or a short file (`bad_download`), stop the server during a download (`unreachable`), and serve the same version (`up_to_date`).
+8. **Rollback.** Install a firmware, then cut the power within a second of the restart: the board must come back on the old firmware and report `rolled_back` and `skipped`. (The bench check of the other paths is the native tests, which model every row of the table.)
+9. **Real release.** When the repository is public and a release is published: the check reads `https://monska85.github.io/Zenit/firmware/update.json` over HTTPS with the certificate bundle (`unreachable` or `tls_error` mean the time or the certificate), reports `available` for a newer release, and the install of the real file works. Until then the result is `not_published`.
+10. **Memory.** With WiFi connected, a page open and an install in progress, read the stack lines on the USB log (`loop stack`, `network stack`, `heap`) and compare them with the figures below.
 
 ## Limits
 
@@ -276,7 +347,11 @@ What needs a real WiFi network, a phone and a real release. Over USB alone the f
 | WiFi password               | empty, 8 to 63 characters, or 64 hexadecimal digits |
 | WebSocket message           | 1,024 bytes (the protocol's line limit)      |
 | Update manifest             | 1,024 bytes                                  |
-| Firmware size               | 65,536 to 2,031,616 bytes                    |
+| Firmware size               | 65,536 to 1,769,472 bytes                    |
+| Web image                   | 4,097 to 524,288 bytes, 1 to 64 files        |
+| Web manifest                | 1,024 bytes                                  |
+| Emergency page              | 4,096 bytes                                  |
+| Repair wait                 | 1 to 60 minutes, then up to 20 % either way  |
 | WebSocket clients           | 1                                            |
 | HTTP sockets                | 5                                            |
 | Improv frame data           | 255 bytes                                    |
@@ -289,7 +364,8 @@ What needs a real WiFi network, a phone and a real release. Over USB alone the f
 
 On the bare ESP32-C3 SuperMini over USB, with no WiFi network (2026-11-22), with the milestone 4 firmware:
 
-- The firmware is 1,485,232 bytes, 73.1 % of its 2,031,616-byte slot, which leaves 546,384 bytes (the web app inside is about 163 KB gzipped, without the installer).
+- The firmware is 1,317,871 bytes, 74.5 % of its 1,769,472-byte slot, which leaves 451,601 bytes. The web image of the app, without the installer, is 167,326 bytes of the 524,288-byte `www` partition (milestone 4 firmware with the app inside: 1,485,232 bytes).
+- Web app on the board (2026-11-22, home WiFi, update test firmware and `just update-server` on a computer of the same network): with the image's header erased the board answers `/` with the emergency page and `503`, reports `missing`, finds nothing published on the real site and waits 43 seconds before the next try; from the test server it downloads and installs the image without a restart and serves `/` again with `200`. The served app's main script (130 KB gzipped) loads in about 0.3 seconds from the partition.
 - The loop task's lowest free stack is 5,080 bytes of 8,192 after `info`, `settings_get` and `status` (the milestone 2 firmware had 5,044 after every command).
 - The network task's lowest free stack is 8,256 bytes of 12,288 after a scan with the radio on. A TLS connection (check, download) and the HTTP server's own task are not measured: they need a network, see the [test plan](#board-test-plan).
 - The heap has about 214,000 bytes free with the radio off (largest block 114,676); during a scan its lowest was 148,812 bytes.

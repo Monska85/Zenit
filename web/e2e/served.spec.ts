@@ -4,6 +4,8 @@
 // and the page opened from there finds the board by itself.
 
 import { expect, test } from "./fixtures.ts";
+import { mockBoard } from "./mock-board.ts";
+import { FakeBoard } from "../test/helpers.ts";
 
 test("finds the board that served it and connects by itself, with no Connect screen", async ({
   page,
@@ -140,4 +142,19 @@ test("a page that a board serves connects only to that board, though a Zenit ans
   expect(sockets).toEqual(["ws://localhost:4173/ws"]);
   // The page offers to try again
   await expect(page.getByRole("button", { name: "Connect", exact: true })).toBeVisible();
+});
+
+test("loads itself again when the board that served it installed a new app (close status 1012)", async ({ page }) => {
+  await page.route("**/board.json", (route) =>
+    route.fulfill({ contentType: "application/json", body: '{"zenit":true,"hostname":"zenit-1234","ws":"/ws"}' }),
+  );
+  const mock = await mockBoard(page, new FakeBoard().withNetwork(), ["ws://localhost:4173/ws"]);
+  await page.goto("/");
+  await expect(page.getByTestId("connection")).toHaveText("Connected over WiFi");
+  await page.evaluate(() => ((window as unknown as { zenitBefore: boolean }).zenitBefore = true));
+  const loaded = page.waitForEvent("load");
+  mock.drop(1012);
+  await loaded;
+  expect(await page.evaluate(() => (window as unknown as { zenitBefore?: boolean }).zenitBefore)).toBeUndefined();
+  await expect(page.getByTestId("connection")).toHaveText("Connected over WiFi");
 });

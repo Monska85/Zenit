@@ -45,7 +45,7 @@ class SlotTest(unittest.TestCase):
             self.assertEqual(assets.app_slot(path), (0x10000, 0x100))
 
     def test_the_real_layout(self):
-        self.assertEqual(assets.app_slot(ROOT / "partitions.csv"), (0x10000, 0x1F0000))
+        self.assertEqual(assets.app_slot(ROOT / "partitions.csv"), (0x10000, 0x1B0000))
 
     def test_no_slot_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -97,6 +97,7 @@ class AssetsTest(unittest.TestCase):
                 "zenit-esp32c3-bootloader.bin",
                 "zenit-esp32c3-partitions.bin",
                 "zenit-esp32c3-boot_app0.bin",
+                "zenit-esp32c3-protocol.txt",
                 "THIRD_PARTY_NOTICES.txt",
                 "SHA256SUMS",
             ],
@@ -113,6 +114,8 @@ class AssetsTest(unittest.TestCase):
         self.assertEqual((self.out / "zenit-esp32c3-bootloader.bin").read_bytes(), b"BOOT")
         self.assertEqual((self.out / "zenit-esp32c3-partitions.bin").read_bytes(), b"TABLE")
         self.assertEqual((self.out / "zenit-esp32c3-boot_app0.bin").read_bytes(), b"OTADATA")
+        # The protocol the firmware speaks, read from the protocol library
+        self.assertEqual((self.out / "zenit-esp32c3-protocol.txt").read_text(), f"{assets.firmware_protocol()}\n")
 
     def test_the_offsets_of_the_parts_leave_the_settings_memory_alone(self):
         # nvs is 0x9000 to 0xDFFF: no part written at its offset reaches it
@@ -126,13 +129,13 @@ class AssetsTest(unittest.TestCase):
     def test_the_checksums_match_the_files(self):
         self.make()
         lines = (self.out / "SHA256SUMS").read_text().splitlines()
-        self.assertEqual(len(lines), 6)
+        self.assertEqual(len(lines), 7)
         for line in lines:
             digest, name = line.split("  ")
             self.assertEqual(digest, hashlib.sha256((self.out / name).read_bytes()).hexdigest())
 
     def test_without_notices_there_is_no_notices_file(self):
-        self.assertEqual(self.make(notices=False)[-2:], ["zenit-esp32c3-boot_app0.bin", "SHA256SUMS"])
+        self.assertEqual(self.make(notices=False)[-2:], ["zenit-esp32c3-protocol.txt", "SHA256SUMS"])
         self.assertFalse((self.out / "THIRD_PARTY_NOTICES.txt").exists())
 
     def test_an_application_without_the_version_fails(self):

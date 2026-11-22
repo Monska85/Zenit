@@ -32,6 +32,7 @@
           "wifi_power": "auto",
           "update_mode": "automatic",
           "update_firmware": true,
+          "update_web": true,
           "check_hours": 6,
           "install_start": 0,
           "install_end": 0,
@@ -85,7 +86,17 @@
           "progress": null,
           "trial": false,
           "skipped": null,
-          "rolled_back": null
+          "rolled_back": null,
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     },
@@ -132,7 +143,17 @@
           "progress": null,
           "trial": false,
           "skipped": null,
-          "rolled_back": null
+          "rolled_back": null,
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     },
@@ -179,7 +200,17 @@
           "progress": null,
           "trial": false,
           "skipped": null,
-          "rolled_back": null
+          "rolled_back": null,
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       },
       "note": "t = 61 s: the fade-out starts now"
@@ -227,7 +258,17 @@
           "progress": null,
           "trial": false,
           "skipped": null,
-          "rolled_back": null
+          "rolled_back": null,
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       },
       "note": "t = 76 s: half way down"
@@ -275,7 +316,17 @@
           "progress": null,
           "trial": false,
           "skipped": null,
-          "rolled_back": null
+          "rolled_back": null,
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       },
       "note": "t = 91 s: off"
@@ -330,6 +381,7 @@
           "wifi_power": "auto",
           "update_mode": "automatic",
           "update_firmware": true,
+          "update_web": true,
           "check_hours": 6,
           "install_start": 0,
           "install_end": 0,
@@ -380,7 +432,17 @@
           "progress": null,
           "trial": false,
           "skipped": null,
-          "rolled_back": null
+          "rolled_back": null,
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     }

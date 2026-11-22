@@ -83,6 +83,7 @@ const SETTINGS = shape(
     wifi_power: isText,
     update_mode: isText,
     update_firmware: isBool,
+    update_web: isBool,
     check_hours: intIn(1, 168),
     install_start: intIn(0, 1439),
     install_end: intIn(0, 1439),
@@ -126,20 +127,47 @@ const TIME = and(
     (time["synced"] === true) === (time["epoch"] !== null) &&
     (time["synced"] === true) === (time["local_minute"] !== null),
 );
-const UPDATE = and(
+/** The web app states that hold a version, and the ones that do not. */
+const WEB_STATES_WITH_VERSION = ["ok", "incompatible"];
+const WEB_STATES_WITHOUT_VERSION = ["missing", "installing"];
+// The web app in the board's own partition: a version while it holds one that reads, a version offered after a check
+// that found one, a wait only while a missing or incompatible app is being repaired. A state this app does not know has
+// no rule.
+const WEB = and(
   shape({
-    mode: isText,
     state: isText,
+    // A release of at most 16 characters, as the image's header holds
+    version: anyOf(matching(/^(?=.{1,16}$)(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})$/), isNull),
     available: anyOf(RELEASE, isNull),
-    last_check: anyOf(intIn(0, Number.MAX_SAFE_INTEGER), isNull),
     last_result: isText,
-    progress: anyOf(intIn(0, 100), isNull),
-    trial: isBool,
-    skipped: anyOf(RELEASE, isNull),
-    rolled_back: anyOf(RELEASE, isNull),
+    retry_in: anyOf(intIn(0, 2 ** 32), isNull),
   }),
-  // A percentage only while downloading; a version offered after a check that found one
+  (web) =>
+    (!WEB_STATES_WITH_VERSION.includes(web["state"] as string) || web["version"] !== null) &&
+    (!WEB_STATES_WITHOUT_VERSION.includes(web["state"] as string) || web["version"] === null) &&
+    (web["state"] !== "ok" || web["retry_in"] === null) &&
+    (web["last_result"] !== "available" || web["available"] !== null) &&
+    ((web["last_result"] !== "up_to_date" && web["last_result"] !== "incompatible") || web["available"] === null),
+);
+const UPDATE = and(
+  shape(
+    {
+      mode: isText,
+      state: isText,
+      available: anyOf(RELEASE, isNull),
+      last_check: anyOf(intIn(0, Number.MAX_SAFE_INTEGER), isNull),
+      last_result: isText,
+      progress: anyOf(intIn(0, 100), isNull),
+      trial: isBool,
+      skipped: anyOf(RELEASE, isNull),
+      rolled_back: anyOf(RELEASE, isNull),
+    },
+    { target: anyOf(isNull, (value) => value === "firmware" || value === "web"), web: WEB },
+  ),
+  // A percentage only while downloading; a version offered after a check that found one; a target only while a check
+  // or an install runs
   (update) =>
+    (update["state"] !== "idle" || update["target"] === undefined || update["target"] === null) &&
     (update["state"] === "downloading"
       ? update["progress"] !== null
       : !UPDATE_STATES_WITHOUT_PROGRESS.includes(update["state"] as string) || update["progress"] === null) &&

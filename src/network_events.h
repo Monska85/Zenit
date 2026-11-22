@@ -10,6 +10,8 @@
 
 #include <cstdint>
 
+#include "install_target.h"
+
 namespace network
 {
 
@@ -21,6 +23,7 @@ struct UpdateEvent
     Downloaded // `result` Installed: the image is ready; otherwise the failure
   };
   Type type = Type::Manifest;
+  install_target::Target target = install_target::Target::Firmware;
   zenit::update::Result result = zenit::update::Result::Never;
   zenit::update::Manifest manifest;
 };

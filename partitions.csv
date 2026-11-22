@@ -1,9 +1,10 @@
-# Flash layout of every board and release image (docs/adr/0001-architecture.md): two firmware slots for over-the-air
-# updates, the settings memory and the core dump of the last crash. No file system. Changing this layout needs a USB
-# reflash that erases the settings.
+# Flash layout of every board and release image (docs/adr/0001-architecture.md, docs/adr/0005-web-app-partition.md): two
+# firmware slots for over-the-air updates, the web app, the settings memory and the core dump of the last crash. No
+# file system: the web app is one read-only image. Changing this layout needs a USB reflash that erases the settings.
 # Name,   Type, SubType,  Offset,   Size,     Flags
 nvs,      data, nvs,      0x9000,   0x5000,
 otadata,  data, ota,      0xe000,   0x2000,
-app0,     app,  ota_0,    0x10000,  0x1F0000,
-app1,     app,  ota_1,    0x200000, 0x1F0000,
+app0,     app,  ota_0,    0x10000,  0x1B0000,
+app1,     app,  ota_1,    0x1C0000, 0x1B0000,
+www,      data, 0x40,     0x370000, 0x80000,
 coredump, data, coredump, 0x3F0000, 0x10000,

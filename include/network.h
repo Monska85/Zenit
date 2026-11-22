@@ -12,8 +12,11 @@
 #include <update_status.h>
 #include <wifi_logic.h>
 
+#include "install_target.h"
+
 #include <cstddef>
 #include <cstdint>
+#include <ws_message.h>
 #include <string>
 #include <vector>
 
@@ -77,13 +80,14 @@ ScanState scan_state();
 // Copies the networks of the last scan, strongest first, and returns how many; the scan state goes back to idle.
 size_t take_scan(Network *out, size_t capacity);
 
-// Closes the WebSocket client's connection (board only; the simulator's bridge does it on the line `!close-client`).
-void close_client();
+// Closes the WebSocket client's connection with `code` (the simulator's bridge does it on the line
+// `!close-client CODE`).
+void close_client(uint16_t code = zenit::proto::CLOSE_POLICY);
 
-// Asks the network task to read the manifest at `url`, or to download the firmware the manifest describes. False when
-// the queue is full.
-bool request_manifest(const char *url);
-bool request_download(const char *manifest_url, const zenit::update::Manifest &manifest);
+// Asks the network task to read the manifest of `target` at `url`, or to download the file the manifest describes
+// into `target`. False when the queue is full.
+bool request_manifest(install_target::Target target, const char *url);
+bool request_download(install_target::Target target, const char *manifest_url, const zenit::update::Manifest &manifest);
 // Whether a transfer is running (a TLS connection is open): nothing else asks for one meanwhile.
 bool transfer_running();
 
@@ -111,8 +115,8 @@ size_t sim_scan_list(Network *out, size_t capacity);
 void sim_set_provision_succeeds(bool succeeds);
 // Simulator: the last settings applied, and how many times, for tests.
 const zenit::net::BoardSettings &sim_applied();
-// Simulator: whether close_client() was called since the last call here.
-bool sim_take_close_client();
+// Simulator: the code of the last close_client() since the last call here, or 0.
+uint16_t sim_take_close_client();
 #endif
 
 } // namespace network

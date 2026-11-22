@@ -1,0 +1,467 @@
+{
+  "description": "The web image (docs/board/wifi-and-updates-v1.md#web-image), read by the board (lib/ZenitNet/src/web_image.cpp) and by the release tools (tools/web_image.py). Each case gives the header's fields and the body's bytes, laid out by hand from the specification's tables: the test assembles the 4,096-byte header from the fields (magic, format, protocol_min, protocol_max, reserved7 default 0, version zero-padded to 16 bytes, count, reserved26 default 0 for bytes 26 and 27, body_size, sha256 'of_body' or 64 hexadecimal digits) and appends body_hex and tail_hex. `valid` is the board reading a partition; `valid_as_file`, when given, is the tools reading a published file (the same unless stated).",
+  "cases": [
+    {
+      "note": "the example of the specification: one 46-byte index entry, then index.html of 5 bytes",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 1,
+        "body_size": 51,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": true,
+      "files": [
+        {
+          "path": "index.html",
+          "type": "text/html; charset=utf-8",
+          "offset": 46,
+          "length": 5
+        }
+      ]
+    },
+    {
+      "note": "two files: entries of 46 and 31 bytes, then the files in index order",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 2,
+        "body_size": 84,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38004d0000000500000004612e6a73000f746578742f6a61766173637269707400520000000200000068656c6c6f6a73",
+      "valid": true,
+      "files": [
+        {
+          "path": "index.html",
+          "type": "text/html; charset=utf-8",
+          "offset": 77,
+          "length": 5
+        },
+        {
+          "path": "a.js",
+          "type": "text/javascript",
+          "offset": 82,
+          "length": 2
+        }
+      ]
+    },
+    {
+      "note": "bytes after the body: a partition reads, a published file must be exactly its header and body",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 1,
+        "body_size": 51,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": true,
+      "tail_hex": "ffff",
+      "valid_as_file": false,
+      "files": [
+        {
+          "path": "index.html",
+          "type": "text/html; charset=utf-8",
+          "offset": 46,
+          "length": 5
+        }
+      ]
+    },
+    {
+      "note": "a version part of six digits",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "999999.0.0",
+        "count": 1,
+        "body_size": 51,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": true,
+      "files": [
+        {
+          "path": "index.html",
+          "type": "text/html; charset=utf-8",
+          "offset": 46,
+          "length": 5
+        }
+      ]
+    },
+    {
+      "note": "a version part of seven digits",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1000000.0.0",
+        "count": 1,
+        "body_size": 51,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "a version with a leading zero",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "01.2.3",
+        "count": 1,
+        "body_size": 51,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "a version of two parts",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2",
+        "count": 1,
+        "body_size": 51,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "protocol_min 0",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 0,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 1,
+        "body_size": 51,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "protocol_min above protocol_max",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 3,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 1,
+        "body_size": 51,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "format 2",
+      "header": {
+        "magic": "ZWEB",
+        "format": 2,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 1,
+        "body_size": 51,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "another magic",
+      "header": {
+        "magic": "ZWEX",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 1,
+        "body_size": 51,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "reserved byte 7 is not zero",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 1,
+        "body_size": 51,
+        "sha256": "of_body",
+        "reserved7": 1
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "reserved bytes 26 and 27 are not zero",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 1,
+        "body_size": 51,
+        "sha256": "of_body",
+        "reserved26": 1
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "no file",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 0,
+        "body_size": 51,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "65 files",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 65,
+        "body_size": 51,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "a body size larger than the bytes there",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 1,
+        "body_size": 52,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "the SHA-256 of another body",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 1,
+        "body_size": 51,
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "a body of 0 bytes",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 1,
+        "body_size": 0,
+        "sha256": "of_body"
+      },
+      "body_hex": "",
+      "valid": false
+    },
+    {
+      "note": "a body size above what the partition holds after the header",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 1,
+        "body_size": 520193,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "a path named twice",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 2,
+        "body_size": 97,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38005c000000050000000a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38005c0000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "no index.html",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 1,
+        "body_size": 47,
+        "sha256": "of_body"
+      },
+      "body_hex": "06612e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002a0000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "a path with ..",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 2,
+        "body_size": 87,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38005000000005000000072e2e2f612e6a73000f746578742f6a61766173637269707400550000000200000068656c6c6f6a73",
+      "valid": false
+    },
+    {
+      "note": "a path that starts with /",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 2,
+        "body_size": 85,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38004e00000005000000052f612e6a73000f746578742f6a61766173637269707400530000000200000068656c6c6f6a73",
+      "valid": false
+    },
+    {
+      "note": "a path with a space",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 2,
+        "body_size": 85,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38004e00000005000000046120622e000f746578742f6a61766173637269707400530000000200000068656c6c6f6a73",
+      "valid": false
+    },
+    {
+      "note": "an empty media type",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 1,
+        "body_size": 27,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c000000160000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "a file that starts inside the index",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 1,
+        "body_size": 51,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d3800280000000500000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "a file that ends after the body",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 1,
+        "body_size": 51,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c0018746578742f68746d6c3b20636861727365743d7574662d38002e0000000600000068656c6c6f",
+      "valid": false
+    },
+    {
+      "note": "a path without its zero byte",
+      "header": {
+        "magic": "ZWEB",
+        "format": 1,
+        "protocol_min": 1,
+        "protocol_max": 2,
+        "version": "1.2.3",
+        "count": 1,
+        "body_size": 51,
+        "sha256": "of_body"
+      },
+      "body_hex": "0a696e6465782e68746d6c7818746578742f68746d6c3b20636861727365743d7574662d38002e0000000500000068656c6c6f",
+      "valid": false
+    }
+  ]
+}

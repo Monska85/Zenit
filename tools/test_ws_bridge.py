@@ -453,5 +453,13 @@ class SimulatorWifiTest(unittest.TestCase):
         self.assertNotIn("token", self.ask("settings_get")[0]["settings"])
 
 
+class CloseRequestTest(unittest.TestCase):
+    def test_the_simulator_names_the_close_code(self):
+        self.assertEqual(ws_bridge.close_request("!close-client"), 1008)
+        self.assertEqual(ws_bridge.close_request("!close-client 1012"), 1012)
+        for text in ("!close-client x", "!close-client 99999", "!close-clients", "!sha256 1", "!close-client \u00b2"):
+            self.assertIsNone(ws_bridge.close_request(text), text)
+
+
 if __name__ == "__main__":
     unittest.main()

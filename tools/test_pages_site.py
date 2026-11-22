@@ -17,6 +17,8 @@ PARTS = {name: name.encode() + b" bytes" for name, _ in pages_site.parts()}
 # The application is large enough for a board to install it (the update manifest refuses less)
 FIRMWARE = pages_site.assets.FIRMWARE_NAME
 PARTS[FIRMWARE] = b"zenit firmware " * 5000
+# The protocol the firmware release speaks
+PROTOCOL = pages_site.assets.PROTOCOL_NAME
 
 
 def make_archive(path, files, extra=None):
@@ -38,9 +40,10 @@ class SiteTest(unittest.TestCase):
         make_archive(self.web, {"index.html": b"<html></html>", "assets/app.js": b"1", "THIRD_PARTY_NOTICES.txt": b"n"})
         self.release = self.root / "release"
         self.release.mkdir()
-        for name, data in PARTS.items():
+        files = dict(PARTS, **{PROTOCOL: b"1\n"})
+        for name, data in files.items():
             (self.release / name).write_bytes(data)
-        sums = "".join(f"{hashlib.sha256(data).hexdigest()}  {name}\n" for name, data in PARTS.items())
+        sums = "".join(f"{hashlib.sha256(data).hexdigest()}  {name}\n" for name, data in files.items())
         (self.release / "SHA256SUMS").write_text(sums, encoding="utf-8")
         self.out = self.root / "site"
 
@@ -113,7 +116,7 @@ class SiteTest(unittest.TestCase):
         self.assertIn("ESP32-C3", [build["chipFamily"] for build in manifest["builds"]])
         # and the web app's own fixture is the same shape
         fixture = json.loads((Path(__file__).resolve().parent.parent / "web/e2e/site/firmware/manifest.json").read_text())
-        self.assertEqual(fixture["builds"], manifest["builds"])
+        self.assertEqual(fixture["builds"], pages_site.manifest("0.1.0", with_web=True)["builds"])
         self.assertEqual(fixture["name"], manifest["name"])
         self.assertEqual(fixture["new_install_prompt_erase"], manifest["new_install_prompt_erase"])
 
@@ -125,6 +128,84 @@ class SiteTest(unittest.TestCase):
         for (name, offset), size in zip(pages_site.parts(), [len(PARTS[n]) for n, _ in pages_site.parts()]):
             self.assertTrue(offset + size <= 0x9000 or offset >= 0xE000, name)
         self.assertEqual(pages_site.parts()[3][1], 0x10000)
+
+    def web_image(self, version="1.4.0", low=1, high=2):
+        import web_image
+
+        path = self.root / f"zenit-web-{version}.bin"
+        path.write_bytes(
+            web_image.build_image([("index.html", "text/html; charset=utf-8", b"page", False)], version, low, high)
+        )
+        return path
+
+    def test_the_web_image_and_its_manifest_are_under_web(self):
+        image = self.web_image()
+        self.build(web_image_path=image)
+        data = image.read_bytes()
+        self.assertEqual((self.out / "web" / "zenit-web-1.4.0.bin").read_bytes(), data)
+        text = (self.out / "web" / "update.json").read_text(encoding="utf-8")
+        self.assertEqual(
+            json.loads(text),
+            {
+                "schema": 1,
+                "version": "1.4.0",
+                "file": "zenit-web-1.4.0.bin",
+                "size": len(data),
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "protocol_min": 1,
+                "protocol_max": 2,
+            },
+        )
+        self.assertEqual(list(json.loads(text)), ["schema", "version", "file", "size", "sha256", "protocol_min", "protocol_max"])
+        self.assertNotIn(" ", text.strip())
+
+    def test_the_installer_writes_the_web_image_at_the_www_offset(self):
+        self.build(web_image_path=self.web_image())
+        manifest = json.loads((self.out / "firmware" / "manifest.json").read_text(encoding="utf-8"))
+        parts = manifest["builds"][0]["parts"]
+        self.assertEqual(parts[-1], {"path": "zenit-web.bin", "offset": 0x370000})
+        self.assertEqual(len(parts), 5)
+        self.assertEqual((self.out / "firmware" / "zenit-web.bin").read_bytes(), self.web_image().read_bytes())
+
+    def test_without_a_web_image_the_installer_writes_the_firmware_alone(self):
+        self.build()
+        manifest = json.loads((self.out / "firmware" / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(manifest["builds"][0]["parts"]), 4)
+        self.assertFalse((self.out / "web").exists())
+
+    def test_a_file_that_is_not_a_web_image_is_refused(self):
+        bad = self.root / "bad.bin"
+        bad.write_bytes(b"not an image" * 1000)
+        with self.assertRaises(pages_site.SiteError):
+            self.build(web_image_path=bad)
+        self.assertFalse(self.out.exists())
+
+    def test_a_web_app_that_does_not_speak_the_firmware_protocol_is_not_paired_with_it(self):
+        image = self.web_image(low=2, high=3)
+        with self.assertRaises(pages_site.SiteError):
+            self.build(web_image_path=image)
+        self.assertFalse(self.out.exists())
+        # without the firmware the site has nothing to pair it with
+        self.build(web_image_path=image, firmware=None, firmware_version=None)
+        self.assertTrue((self.out / "web" / "update.json").is_file())
+
+    def test_a_firmware_release_without_its_protocol_is_refused_with_a_web_app(self):
+        (self.release / PROTOCOL).unlink()
+        with self.assertRaises(pages_site.SiteError):
+            self.build(web_image_path=self.web_image())
+
+    def test_an_image_that_breaks_the_board_rules_is_refused(self):
+        import web_image
+
+        good = self.web_image().read_bytes()
+        broken_body = bytearray(good)
+        broken_body[-1] ^= 1  # the SHA-256 of the body no longer matches
+        no_index = web_image.build_image([("app.html", "text/html", b"page", False)], "1.4.0", 1, 2)
+        for name, data in (("body.bin", bytes(broken_body)), ("index.bin", no_index), ("long.bin", good + b"\0")):
+            path = self.root / name
+            path.write_bytes(data)
+            with self.subTest(name=name), self.assertRaises(pages_site.SiteError):
+                pages_site.checked_web_image(path)
 
     def test_a_site_without_firmware_holds_the_app_alone(self):
         self.build(firmware=None, firmware_version=None)

@@ -8,6 +8,10 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <manifest.h>
+
+#include "install_target.h"
+
 namespace update_http
 {
 
@@ -25,18 +29,23 @@ enum class Outcome : uint8_t
 // length.
 Outcome fetch_manifest(const char *url, char *body, size_t capacity, size_t &size);
 
-// Streams the file at `url` into the inactive slot (firmware::begin_install, write, end_install), hashing it, and
-// checks size and SHA-256 (64 lowercase hexadecimal digits). `progress` is called with a whole percentage when it
-// changes.
+// Streams the file at `url` into `target` (the inactive slot or the `www` partition), hashing it, and checks the size
+// and SHA-256 of `manifest`. `progress` is called with a whole percentage when it changes.
 using Progress = void (*)(uint8_t percent);
-Outcome download_firmware(const char *url, uint32_t size, const char *sha256, Progress progress);
+Outcome download(install_target::Target target, const char *url, const zenit::update::Manifest &manifest,
+                 Progress progress);
 
 #ifdef ZENIT_SIM
 // Simulator: scripts the source.
-void sim_set_manifest(const char *body);                 // served as it is
-void sim_set_manifest_outcome(Outcome outcome);          // fails the manifest instead
-void sim_set_firmware(const uint8_t *data, size_t size); // the file served
-void sim_set_download_outcome(Outcome outcome);          // fails the download instead
+// Simulator: scripts the source, per target: the firmware manifest and file, or the web ones (a manifest URL that ends
+// in `web/update.json` is the web one).
+using install_target::Target;
+void sim_set_manifest(Target target, const char *body);             // served as it is
+void sim_set_manifest_outcome(Target target, Outcome outcome);      // fails the manifest instead
+void sim_set_file(Target target, const uint8_t *data, size_t size); // the file served
+void sim_set_download_outcome(Target target, Outcome outcome);      // fails the download instead
+size_t sim_manifest_reads(Target target);                           // the manifests of `target` read since the reset
+// The firmware manifest fails as unreachable; the web manifest offers the image the simulator's partition starts with.
 void sim_reset();
 #endif
 

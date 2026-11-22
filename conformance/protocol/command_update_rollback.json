@@ -35,6 +35,7 @@
           "wifi_power": "auto",
           "update_mode": "notify",
           "update_firmware": true,
+          "update_web": true,
           "check_hours": 6,
           "install_start": 0,
           "install_end": 0,
@@ -74,7 +75,17 @@
           "progress": null,
           "trial": false,
           "skipped": null,
-          "rolled_back": null
+          "rolled_back": null,
+          "target": "firmware",
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     },
@@ -99,7 +110,17 @@
           "progress": 0,
           "trial": false,
           "skipped": null,
-          "rolled_back": null
+          "rolled_back": null,
+          "target": "firmware",
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     },
@@ -146,7 +167,17 @@
           "progress": null,
           "trial": false,
           "skipped": "0.2.0",
-          "rolled_back": "0.2.0"
+          "rolled_back": "0.2.0",
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     },
@@ -173,7 +204,17 @@
           "progress": null,
           "trial": false,
           "skipped": "0.2.0",
-          "rolled_back": "0.2.0"
+          "rolled_back": "0.2.0",
+          "target": "firmware",
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     },
@@ -217,7 +258,17 @@
           "progress": null,
           "trial": false,
           "skipped": "0.2.0",
-          "rolled_back": "0.2.0"
+          "rolled_back": "0.2.0",
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     },
@@ -261,6 +312,7 @@
           "wifi_power": "auto",
           "update_mode": "automatic",
           "update_firmware": true,
+          "update_web": true,
           "check_hours": 6,
           "install_start": 0,
           "install_end": 0,
@@ -314,7 +366,17 @@
           "progress": null,
           "trial": false,
           "skipped": "0.2.0",
-          "rolled_back": "0.2.0"
+          "rolled_back": "0.2.0",
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     },
@@ -346,6 +408,7 @@
           "wifi_power": "auto",
           "update_mode": "notify",
           "update_firmware": true,
+          "update_web": true,
           "check_hours": 6,
           "install_start": 0,
           "install_end": 0,
@@ -378,7 +441,17 @@
           "progress": 0,
           "trial": false,
           "skipped": "0.2.0",
-          "rolled_back": "0.2.0"
+          "rolled_back": "0.2.0",
+          "target": "firmware",
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     },
@@ -422,7 +495,17 @@
           "progress": null,
           "trial": false,
           "skipped": "0.2.0",
-          "rolled_back": "0.2.0"
+          "rolled_back": "0.2.0",
+          "target": "firmware",
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     },
@@ -466,7 +549,17 @@
           "progress": null,
           "trial": true,
           "skipped": "0.2.0",
-          "rolled_back": "0.2.0"
+          "rolled_back": "0.2.0",
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     },
@@ -510,7 +603,17 @@
           "progress": null,
           "trial": false,
           "skipped": null,
-          "rolled_back": "0.2.0"
+          "rolled_back": "0.2.0",
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     },
@@ -534,7 +637,17 @@
           "progress": null,
           "trial": false,
           "skipped": null,
-          "rolled_back": "0.2.0"
+          "rolled_back": "0.2.0",
+          "target": "firmware",
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     },
@@ -578,7 +691,17 @@
           "progress": null,
           "trial": false,
           "skipped": null,
-          "rolled_back": "0.2.0"
+          "rolled_back": "0.2.0",
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
         }
       }
     }

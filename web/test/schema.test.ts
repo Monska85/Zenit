@@ -99,6 +99,58 @@ describe("isBadFrameReply", () => {
   });
 });
 
+describe("the web app part of the update", () => {
+  const status = (update: object) => reply({ seq: 1, ok: true, light, update: { ...UPDATE_STATUS, ...update } });
+  const web = UPDATE_STATUS.web;
+
+  it("accepts a board without it, and every state the specification has", () => {
+    const older: Record<string, unknown> = { ...UPDATE_STATUS };
+    delete older["target"];
+    delete older["web"];
+    expect(validBody("status", reply({ seq: 1, ok: true, light, update: older }))).toBe(true);
+    for (const ok of [
+      {},
+      { state: "downloading", progress: 3, target: "web", web: { ...web, state: "installing", version: null } },
+      { web: { ...web, state: "missing", version: null, last_result: "unreachable", retry_in: 61 } },
+      { web: { ...web, state: "incompatible", last_result: "incompatible" } },
+      { web: { ...web, last_result: "available", available: "1.1.0" } },
+      { web: { ...web, state: "repairing", version: null } },
+    ]) {
+      expect(validBody("status", status(ok)), JSON.stringify(ok)).toBe(true);
+    }
+  });
+
+  it("refuses what the specification does not allow", () => {
+    for (const bad of [
+      { target: "both" },
+      { target: "web" },
+      { web: { ...web, version: null } },
+      { web: { ...web, state: "incompatible", version: null } },
+      { web: { ...web, state: "missing" } },
+      { web: { ...web, state: "installing" } },
+      { web: { ...web, retry_in: 30 } },
+      { web: { ...web, state: "missing", version: null, retry_in: -1 } },
+      { web: { ...web, last_result: "available" } },
+      { web: { ...web, last_result: "up_to_date", available: "1.1.0" } },
+      { web: { ...web, last_result: "incompatible", available: "2.0.0" } },
+      { web: { ...web, available: "1.1" } },
+      { web: { ...web, version: "1..2" } },
+      { web: { ...web, version: "1." } },
+      { web: { ...web, version: "01.2.3" } },
+      { web: { ...web, version: "12345.12345.12345" } },
+      { web: { state: "ok", version: "1.0.0", available: null, last_result: "never" } },
+    ]) {
+      expect(validBody("status", status(bad)), JSON.stringify(bad)).toBe(false);
+    }
+  });
+
+  it("checks the web setting when it is there", () => {
+    const settings = (patch: object) => reply({ seq: 1, ok: true, settings: { ...DEFAULT_SETTINGS, ...patch } });
+    expect(validBody("settings_get", settings({ update_web: false }))).toBe(true);
+    expect(validBody("settings_get", settings({ update_web: "no" }))).toBe(false);
+  });
+});
+
 describe("the replies of the WiFi and updates milestone", () => {
   it("accepts the status parts, and a status without them", () => {
     expect(validBody("status", reply({ seq: 1, ok: true, light }))).toBe(true);

@@ -24,6 +24,8 @@ constexpr uint16_t CLOSE_POLICY = 1008;
 constexpr uint16_t CLOSE_TOO_BIG = 1009;
 constexpr uint16_t CLOSE_INTERNAL_ERROR = 1011;
 constexpr uint16_t CLOSE_TRY_LATER = 1013;
+// The board installed a new web app: the page reloads to load it.
+constexpr uint16_t CLOSE_RELOAD = 1012;
 
 enum class FrameKind : uint8_t
 {

@@ -34,12 +34,13 @@ bool provision_ok = true;
 uint32_t last_provision_id = 0;
 uint32_t requested_provision_id = 0;
 uint64_t provision_started = 0;
-bool close_requested = false;
+uint16_t close_code = 0;
 bool transfer = false;
 Mailbox<UpdateEvent, 8> events;
 char pending_url[zenit::update::MAX_URL + 1];
 bool check_pending = false, download_pending = false;
 zenit::update::Manifest pending_manifest;
+install_target::Target pending_target = install_target::Target::Firmware;
 
 // One thread plays both tasks, so progress goes straight to the update flow.
 void post_progress(uint8_t percent) { updates::on_progress(percent); }
@@ -117,22 +118,24 @@ size_t take_scan(Network *out, size_t capacity)
   return count;
 }
 
-void close_client() { close_requested = true; }
+void close_client(uint16_t code) { close_code = code; }
 
-bool request_manifest(const char *url)
+bool request_manifest(install_target::Target target, const char *url)
 {
   if (transfer)
     return false;
+  pending_target = target;
   std::strncpy(pending_url, url, sizeof(pending_url) - 1);
   pending_url[sizeof(pending_url) - 1] = '\0';
   transfer = check_pending = true;
   return true;
 }
 
-bool request_download(const char *manifest_url, const zenit::update::Manifest &manifest)
+bool request_download(install_target::Target target, const char *manifest_url, const zenit::update::Manifest &manifest)
 {
   if (transfer)
     return false;
+  pending_target = target;
   std::strncpy(pending_url, manifest_url, sizeof(pending_url) - 1);
   pending_url[sizeof(pending_url) - 1] = '\0';
   pending_manifest = manifest;
@@ -159,39 +162,47 @@ void poll(uint64_t now)
   }
   else if (state.provision == Provision::Trying && now - provision_started >= 1000)
     state.provision = provision_ok ? Provision::Succeeded : Provision::Failed;
-  // The transfer runs here, as the network task would, then its events are handled like the board's.
-  if (check_pending)
+  // The transfers run here, as the network task would, then their events are handled like the board's. A check that
+  // asks for the web manifest after the firmware one finishes in the same pass, as a quick network would.
+  for (int pass = 0; pass < 4; pass++)
   {
-    check_pending = false;
-    const update_worker::CheckResult found = update_worker::check(pending_url);
-    UpdateEvent event;
-    event.type = UpdateEvent::Type::Manifest;
-    event.result = found.result;
-    event.manifest = found.manifest;
-    events.send(event);
-  }
-  if (download_pending)
-  {
-    download_pending = false;
-    UpdateEvent event;
-    event.type = UpdateEvent::Type::Downloaded;
-    event.result = update_worker::download(pending_url, pending_manifest, post_progress);
-    events.send(event);
-  }
-  UpdateEvent event;
-  while (events.receive(event))
-  {
-    switch (event.type)
+    if (check_pending)
     {
-    case UpdateEvent::Type::Manifest:
-      transfer = false;
-      updates::on_manifest(event.result, event.manifest, now);
-      break;
-    case UpdateEvent::Type::Downloaded:
-      transfer = false;
-      updates::on_download(event.result, now);
-      break;
+      check_pending = false;
+      const update_worker::CheckResult found = update_worker::check(pending_target, pending_url);
+      UpdateEvent event;
+      event.type = UpdateEvent::Type::Manifest;
+      event.target = pending_target;
+      event.result = found.result;
+      event.manifest = found.manifest;
+      events.send(event);
     }
+    if (download_pending)
+    {
+      download_pending = false;
+      UpdateEvent event;
+      event.type = UpdateEvent::Type::Downloaded;
+      event.target = pending_target;
+      event.result = update_worker::download(pending_target, pending_url, pending_manifest, post_progress);
+      events.send(event);
+    }
+    UpdateEvent event;
+    while (events.receive(event))
+    {
+      switch (event.type)
+      {
+      case UpdateEvent::Type::Manifest:
+        transfer = false;
+        updates::on_manifest(event.target, event.result, event.manifest, now);
+        break;
+      case UpdateEvent::Type::Downloaded:
+        transfer = false;
+        updates::on_download(event.target, event.result, now);
+        break;
+      }
+    }
+    if (!check_pending && !download_pending)
+      break;
   }
 }
 
@@ -220,11 +231,11 @@ size_t sim_scan_list(Network *out, size_t capacity)
 }
 void sim_set_provision_succeeds(bool succeeds) { provision_ok = succeeds; }
 const zenit::net::BoardSettings &sim_applied() { return applied; }
-bool sim_take_close_client()
+uint16_t sim_take_close_client()
 {
-  const bool was = close_requested;
-  close_requested = false;
-  return was;
+  const uint16_t code = close_code;
+  close_code = 0;
+  return code;
 }
 
 } // namespace network

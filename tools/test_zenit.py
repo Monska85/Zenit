@@ -463,6 +463,7 @@ class ArgumentsTest(unittest.TestCase):
         self.assertEqual(self.request("update-check"), ("update_check", {}))
         self.assertEqual(self.request("update-install"), ("update_install", {"target": "firmware"}))
         self.assertEqual(self.request("update-install", "--force"), ("update_install", {"target": "firmware", "force": True}))
+        self.assertEqual(self.request("update-install", "--web"), ("update_install", {"target": "web"}))
         with self.assertRaises(ValueError):
             self.request("raw", "[1]")
         with self.assertRaises(ValueError):
@@ -490,6 +491,44 @@ UPDATE = {
     "skipped": None,
     "rolled_back": None,
 }
+
+
+WEB = {"state": "ok", "version": "1.0.0", "available": None, "last_result": "never", "retry_in": None}
+
+
+class WebAppUpdatesRepliesTest(unittest.TestCase):
+    """The web app in its own partition: `update.target` and `update.web`, optional for a board from before them."""
+
+    def accepted(self, **update):
+        return zenit.valid_body("status", {"ok": True, "light": LIGHT, "update": {**UPDATE, **update}})
+
+    def test_the_web_part_is_optional_but_checked(self):
+        self.assertTrue(self.accepted())
+        self.assertTrue(self.accepted(target=None, web=WEB))
+        self.assertTrue(self.accepted(state="downloading", progress=10, target="web", web={**WEB, "state": "installing", "version": None}))
+        self.assertTrue(self.accepted(web={**WEB, "state": "missing", "version": None, "last_result": "unreachable", "retry_in": 61}))
+        self.assertTrue(self.accepted(web={**WEB, "last_result": "available", "available": "1.1.0"}))
+        self.assertTrue(self.accepted(web={**WEB, "state": "incompatible", "last_result": "incompatible"}))
+        self.assertTrue(self.accepted(web={**WEB, "state": "repairing", "version": None}))  # a newer state
+
+    def test_web_values_the_specification_does_not_allow_are_refused(self):
+        bad = [
+            {"target": "both"}, {"target": "web"}, {"web": {**WEB, "state": 1}},
+            {"web": {**WEB, "version": None}}, {"web": {**WEB, "state": "incompatible", "version": None}},
+            {"web": {**WEB, "state": "missing"}}, {"web": {**WEB, "state": "installing"}},
+            {"web": {**WEB, "retry_in": 30}}, {"web": {**WEB, "retry_in": -1}},
+            {"web": {**WEB, "last_result": "available"}}, {"web": {**WEB, "last_result": "up_to_date", "available": "1.1.0"}},
+            {"web": {**WEB, "last_result": "incompatible", "available": "2.0.0"}}, {"web": {**WEB, "available": "1.1"}},
+            {"web": {**WEB, "version": "1..2"}}, {"web": {**WEB, "version": "1."}}, {"web": {**WEB, "version": "01.2.3"}},
+            {"web": {**WEB, "version": "12345.12345.12345"}},
+            {"web": {k: v for k, v in WEB.items() if k != "retry_in"}},
+        ]  # fmt: skip
+        for change in bad:
+            self.assertFalse(self.accepted(**change), str(change))
+
+    def test_the_web_setting_is_optional_but_a_boolean(self):
+        self.assertTrue(zenit.valid_body("settings_get", {"ok": True, "settings": {**SETTINGS, "update_web": False}}))
+        self.assertFalse(zenit.valid_body("settings_get", {"ok": True, "settings": {**SETTINGS, "update_web": "no"}}))
 
 
 class WifiAndUpdatesRepliesTest(unittest.TestCase):

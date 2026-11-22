@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Assembles the GitHub Pages site: the latest web app at the root and the latest firmware under firmware/.
 
-    tools/pages_site.py --web zenit-web-1.2.3.tar.gz --out site/ [--firmware release/ --firmware-version 1.0.0]
+    tools/pages_site.py --web zenit-web-1.2.3.tar.gz --web-image zenit-web-1.2.3.bin --out site/
+        [--firmware release/ --firmware-version 1.0.0]
 
 --web is the archive a web release attaches (the built `web/dist`). --firmware is a folder with the files of a firmware
 release (the bootloader, partition table, boot_app0 and firmware binaries, and `SHA256SUMS` when it has one: each is
@@ -11,8 +12,13 @@ checked against it) and --firmware-version its version, X.Y.Z. The site then hol
 an update keeps the settings (docs/web/web-app-v1.md#installing-firmware), and `firmware/update.json`, the update
 manifest a board on WiFi reads (docs/board/wifi-and-updates-v1.md#source): the version, the application's file name,
 its size and SHA-256. Without
---firmware the site holds the app alone, which then says no firmware is published. `.nojekyll` is written so Pages
-serves the files as they are.
+--firmware the site holds the app alone, which then says no firmware is published.
+
+--web-image is the image of the board's `www` partition a web release attaches (tools/web_image.py). The site then also
+holds it under `web/`, with `web/update.json`, the web manifest a board reads (docs/board/wifi-and-updates-v1.md#web-
+updates): its version, file name, size, SHA-256 and protocol range. With a firmware too, the installer writes the image
+at the `www` offset, so a board installed over USB has the app at once. `.nojekyll` is written so Pages serves the files
+as they are.
 
 Standard library only.
 """
@@ -28,6 +34,7 @@ import tempfile
 from pathlib import Path
 
 import release_assets as assets
+import web_image
 
 # The parts of the factory image that the installer writes, each at its own offset: the file names and offsets are those
 # of tools/release_assets.py and partitions.csv. The settings memory (0x9000 to 0xDFFF) is not among them, so an update
@@ -43,8 +50,21 @@ class SiteError(Exception):
     pass
 
 
+# The web image as the installer writes it, beside the firmware parts.
+WEB_PART_NAME = "zenit-web.bin"
+
+
+def www_offset(partitions_csv=assets.ROOT / "partitions.csv"):
+    """The offset of the `www` partition in a partitions.csv."""
+    for line in partitions_csv.read_text(encoding="utf-8").splitlines():
+        fields = [field.strip() for field in line.split("#", 1)[0].split(",")]
+        if fields[0] == "www":
+            return int(fields[3], 0)
+    raise SiteError("partitions.csv has no www partition")
+
+
 def parts():
-    """(file name, offset) of each part the installer writes, in flash order."""
+    """(file name, offset) of each firmware part the installer writes, in flash order."""
     app_offset = assets.app_slot(assets.ROOT / "partitions.csv")[0]
     return [
         (assets.BOOTLOADER_NAME, assets.BOOTLOADER_OFFSET),
@@ -54,9 +74,11 @@ def parts():
     ]
 
 
-def manifest(version):
-    """The ESP Web Tools manifest of a firmware release: the parts at their offsets, and an offer to erase the whole
-    flash for a clean install (without it, an install keeps the settings)."""
+def manifest(version, with_web=False):
+    """The ESP Web Tools manifest of a firmware release: the parts at their offsets (with the web image at the `www`
+    offset when `with_web`), and an offer to erase the whole flash for a clean install (without it, an install keeps
+    the settings)."""
+    listed = parts() + ([(WEB_PART_NAME, www_offset())] if with_web else [])
     return {
         "name": "Zenit",
         "version": version,
@@ -64,7 +86,7 @@ def manifest(version):
         "builds": [
             {
                 "chipFamily": "ESP32-C3",
-                "parts": [{"path": name, "offset": offset} for name, offset in parts()],
+                "parts": [{"path": name, "offset": offset} for name, offset in listed],
             }
         ],
     }
@@ -84,6 +106,46 @@ def update_manifest(version, firmware_bytes):
         },
         separators=(",", ":"),
     )
+
+
+def web_update_manifest(image):
+    """The web manifest of a web image, as the board reads it: strict JSON with exactly these fields, in one line. The
+    version and the protocol range are the image's own."""
+    version, low, high = web_image.read_header(image)
+    return json.dumps(
+        {
+            "schema": 1,
+            "version": version,
+            "file": f"zenit-web-{version}.bin",
+            "size": len(image),
+            "sha256": hashlib.sha256(image).hexdigest(),
+            "protocol_min": low,
+            "protocol_max": high,
+        },
+        separators=(",", ":"),
+    )
+
+
+def checked_web_image(path):
+    """The bytes of a web image the board would install, or SiteError."""
+    try:
+        image = path.read_bytes()
+        web_image.read_image(image)
+    except (OSError, web_image.AssetsError) as error:
+        raise SiteError(f"{path}: {error}") from error
+    if not web_image.HEADER_SIZE < len(image) <= web_image.PARTITION_SIZE:
+        raise SiteError(f"{path} is {len(image)} bytes: a board installs {web_image.HEADER_SIZE + 1} to "
+                        f"{web_image.PARTITION_SIZE}")
+    return image
+
+
+def firmware_protocol(folder):
+    """The protocol a firmware release speaks, from its protocol file (checked against SHA256SUMS)."""
+    checked_sum(folder, assets.PROTOCOL_NAME)
+    text = (folder / assets.PROTOCOL_NAME).read_text(encoding="ascii").strip()
+    if not text.isdigit() or not 1 <= int(text) <= 255:
+        raise SiteError(f"{assets.PROTOCOL_NAME} does not hold a protocol version")
+    return int(text)
 
 
 def extract_web(archive, out):
@@ -116,7 +178,7 @@ def checked_sum(folder, name):
     return digest
 
 
-def assemble(web, out, firmware=None, firmware_version=None):
+def assemble(web, out, firmware=None, firmware_version=None, web_image_path=None):
     if (firmware is None) != (firmware_version is None):
         raise SiteError("--firmware and --firmware-version go together")
     if firmware_version is not None and not VERSION.fullmatch(firmware_version):
@@ -127,13 +189,32 @@ def assemble(web, out, firmware=None, firmware_version=None):
     staging = Path(tempfile.mkdtemp(prefix="zenit-site-"))
     try:
         extract_web(web, staging)
+        image = checked_web_image(web_image_path) if web_image_path is not None else None
+        if image is not None:
+            (staging / "web").mkdir()
+            update = web_update_manifest(image)
+            if len(update) > MAX_UPDATE_MANIFEST:
+                raise SiteError("the web manifest is longer than the board reads")
+            (staging / "web" / json.loads(update)["file"]).write_bytes(image)
+            (staging / "web" / "update.json").write_text(update + "\n", encoding="utf-8")
         if firmware is not None:
             target = staging / "firmware"
             target.mkdir()
             for name, _ in parts():
                 checked_sum(firmware, name)
                 shutil.copyfile(firmware / name, target / name)
-            (target / "manifest.json").write_text(json.dumps(manifest(firmware_version), indent=2) + "\n", encoding="utf-8")
+            if image is not None:
+                # The installer pairs this firmware with this app: the app must speak the firmware's protocol
+                protocol = firmware_protocol(firmware)
+                _, low, high = web_image.read_header(image)
+                if not low <= protocol <= high:
+                    raise SiteError(
+                        f"the web app speaks protocols {low} to {high}, the firmware {firmware_version} protocol {protocol}"
+                    )
+                (target / WEB_PART_NAME).write_bytes(image)
+            (target / "manifest.json").write_text(
+                json.dumps(manifest(firmware_version, with_web=image is not None), indent=2) + "\n", encoding="utf-8"
+            )
             firmware_bytes = (target / assets.FIRMWARE_NAME).read_bytes()
             slot_size = assets.app_slot(assets.ROOT / "partitions.csv")[1]
             if not MIN_FIRMWARE_SIZE <= len(firmware_bytes) <= slot_size:
@@ -157,11 +238,12 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Assemble the GitHub Pages site of the web app and the firmware.")
     parser.add_argument("--web", required=True, type=Path, help="the archive of a web release (zenit-web-X.Y.Z.tar.gz)")
     parser.add_argument("--out", required=True, type=Path, help="the folder to write the site into (empty or missing)")
+    parser.add_argument("--web-image", type=Path, help="the web image of that release (zenit-web-X.Y.Z.bin)")
     parser.add_argument("--firmware", type=Path, help="the folder with the files of a firmware release")
     parser.add_argument("--firmware-version", help="the version of that release, X.Y.Z")
     args = parser.parse_args(argv)
     try:
-        assemble(args.web, args.out, args.firmware, args.firmware_version)
+        assemble(args.web, args.out, args.firmware, args.firmware_version, args.web_image)
     except SiteError as error:
         print(f"pages_site: {error}", file=sys.stderr)
         return 1

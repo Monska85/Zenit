@@ -8,7 +8,9 @@
 #include <frame.h>
 #include <improv_frame.h>
 #include <origin_scan.h>
+#include <schedule.h>
 #include <sha256.h>
+#include <web_image.h>
 
 #include <cstring>
 #include <string>
@@ -25,6 +27,7 @@
 #include "sim_control.h"
 #include "update_http.h"
 #include "updates.h"
+#include "www.h"
 #include "zenit_test.h"
 
 namespace improv = zenit::improv;
@@ -87,6 +90,7 @@ void setUp()
   settings::begin();
   firmware::sim_reset();
   update_http::sim_reset();
+  www::sim_reset();
   platform::sim_set_version("0.1.0");
   platform::sim_set_now_ms(0);
   now = 0;
@@ -513,7 +517,7 @@ void go_online(const char *mode)
   TEST_ASSERT_TRUE(app::change_settings(settings::current(), board, now) == settings::Commit::Ok);
   sim_control::handle("!net state=connected ssid=HomeNet rssi=-50 ip=10.0.0.5 synced=1 epoch=1790000000", now);
   sim_control::handle("!update firmware 65536 0", now);
-  update_http::sim_set_manifest(MANIFEST_020);
+  update_http::sim_set_manifest(update_http::Target::Firmware, MANIFEST_020);
 }
 } // namespace
 
@@ -632,8 +636,10 @@ void test_no_install_starts_during_a_trial()
   network::poll(now); // the check finishes before the trial is confirmed
   TEST_ASSERT_TRUE(updates::status().last_result == zenit::update::Result::Available);
   TEST_ASSERT_TRUE(updates::status().trial);
-  TEST_ASSERT_TRUE(updates::request_install(false) == updates::Reply::NothingToInstall);
-  TEST_ASSERT_TRUE(updates::request_install(true) == updates::Reply::NothingToInstall);
+  TEST_ASSERT_TRUE(updates::request_install(install_target::Target::Firmware, false) ==
+                   updates::Reply::NothingToInstall);
+  TEST_ASSERT_TRUE(updates::request_install(install_target::Target::Firmware, true) ==
+                   updates::Reply::NothingToInstall);
 }
 
 void test_an_unreadable_update_record_installs_nothing()
@@ -645,7 +651,8 @@ void test_an_unreadable_update_record_installs_nothing()
   go_online("notify");
   updates::request_check(now);
   run_ms(now, 20);
-  TEST_ASSERT_TRUE(updates::request_install(false) == updates::Reply::NothingToInstall);
+  TEST_ASSERT_TRUE(updates::request_install(install_target::Target::Firmware, false) ==
+                   updates::Reply::NothingToInstall);
 }
 
 void test_a_pending_record_that_cannot_be_stored_aborts_the_install_before_the_slot_is_activated()
@@ -654,7 +661,7 @@ void test_a_pending_record_that_cannot_be_stored_aborts_the_install_before_the_s
   updates::request_check(now);
   run_ms(now, 20);
   settings::sim_fail_key("update");
-  TEST_ASSERT_TRUE(updates::request_install(false) == updates::Reply::Ok);
+  TEST_ASSERT_TRUE(updates::request_install(install_target::Target::Firmware, false) == updates::Reply::Ok);
   run_ms(now, 20);
   TEST_ASSERT_FALSE(firmware::sim_activated());
   TEST_ASSERT_TRUE(updates::status().last_result == zenit::update::Result::FlashError);
@@ -668,7 +675,7 @@ void test_a_failed_activation_leaves_no_pending_record()
   updates::request_check(now);
   run_ms(now, 20);
   firmware::sim_fail("activate");
-  updates::request_install(false);
+  updates::request_install(install_target::Target::Firmware, false);
   run_ms(now, 20);
   TEST_ASSERT_TRUE(updates::status().last_result == zenit::update::Result::FlashError);
   TEST_ASSERT_EQUAL_STRING("", settings::update_record().pending);
@@ -680,7 +687,7 @@ void test_the_pending_version_is_stored_before_the_restart()
   go_online("notify");
   updates::request_check(now);
   run_ms(now, 20);
-  updates::request_install(false);
+  updates::request_install(install_target::Target::Firmware, false);
   run_ms(now, 20);
   TEST_ASSERT_EQUAL_STRING("0.2.0", settings::update_record().pending);
   TEST_ASSERT_TRUE(firmware::sim_activated());
@@ -719,6 +726,13 @@ void test_checks_stop_when_updates_are_turned_off_and_the_state_is_reported()
   run_ms(now, 200000);
   TEST_ASSERT_TRUE(updates::status().last_result == zenit::update::Result::Never);
   TEST_ASSERT_EQUAL_STRING("off", updates::status().mode);
+  // Web updates are still on: a check reads the web manifest alone.
+  TEST_ASSERT_TRUE(updates::request_check(now) == updates::Reply::Ok);
+  run_ms(now, 1000);
+  TEST_ASSERT_TRUE(updates::status().last_result == zenit::update::Result::Never);
+  TEST_ASSERT_TRUE(updates::status().web.last_result == zenit::update::Result::UpToDate);
+  board.update_web = false;
+  app::change_settings(settings::current(), board, now);
   TEST_ASSERT_TRUE(updates::request_check(now) == updates::Reply::UpdatesOff);
 }
 
@@ -811,6 +825,633 @@ void test_a_handshake_without_an_origin_is_told_apart_from_a_bad_one()
   TEST_ASSERT_FALSE(partial.done());
 }
 
+// ---- The web app in its own partition ----
+
+namespace
+{
+// The image of the specification's example, built byte by byte: one file, index.html, of 5 bytes, protocols 1 to 2.
+std::vector<uint8_t> spec_image()
+{
+  const char path[] = "index.html", type[] = "text/html; charset=utf-8", page[] = "hello";
+  std::vector<uint8_t> body;
+  body.push_back(10);
+  body.insert(body.end(), path, path + 11); // with its NUL
+  body.push_back(24);
+  body.insert(body.end(), type, type + 25);
+  const uint8_t place[8] = {46, 0, 0, 0, 5, 0, 0, 0}; // offset 46 (the index's size), length 5
+  body.insert(body.end(), place, place + 8);
+  body.insert(body.end(), page, page + 5);
+  std::vector<uint8_t> image(net::WEB_HEADER_SIZE, 0);
+  std::memcpy(image.data(), "ZWEB\x01\x01\x02\x00", 8);
+  std::memcpy(image.data() + 8, "1.2.3", 5);
+  image[24] = 1;
+  image[28] = static_cast<uint8_t>(body.size());
+  net::Sha256 hash;
+  hash.update(body.data(), body.size());
+  uint8_t digest[net::SHA256_SIZE];
+  hash.finish(digest);
+  std::memcpy(image.data() + 32, digest, sizeof(digest));
+  image.insert(image.end(), body.begin(), body.end());
+  return image;
+}
+
+// An image of `files` (path, media type, bytes) laid out as the specification says, before any mutation.
+struct ImageFile
+{
+  std::string path, type, data;
+};
+
+std::vector<uint8_t> build_image(const std::vector<ImageFile> &files, const char *version = "1.0.0")
+{
+  size_t index = 0;
+  for (const ImageFile &f : files)
+    index += 1 + f.path.size() + 1 + 1 + f.type.size() + 1 + 8;
+  std::vector<uint8_t> body;
+  size_t offset = index;
+  for (const ImageFile &f : files)
+  {
+    body.push_back(static_cast<uint8_t>(f.path.size()));
+    body.insert(body.end(), f.path.begin(), f.path.end());
+    body.push_back(0);
+    body.push_back(static_cast<uint8_t>(f.type.size()));
+    body.insert(body.end(), f.type.begin(), f.type.end());
+    body.push_back(0);
+    for (int i = 0; i < 4; i++)
+      body.push_back(static_cast<uint8_t>(offset >> (8 * i)));
+    for (int i = 0; i < 4; i++)
+      body.push_back(static_cast<uint8_t>(f.data.size() >> (8 * i)));
+    offset += f.data.size();
+  }
+  for (const ImageFile &f : files)
+    body.insert(body.end(), f.data.begin(), f.data.end());
+  std::vector<uint8_t> image(net::WEB_HEADER_SIZE, 0);
+  std::memcpy(image.data(), "ZWEB\x01\x01\x01\x00", 8);
+  std::memcpy(image.data() + 8, version, std::strlen(version));
+  image[24] = static_cast<uint8_t>(files.size());
+  for (int i = 0; i < 4; i++)
+    image[28 + i] = static_cast<uint8_t>(body.size() >> (8 * i));
+  image.insert(image.end(), body.begin(), body.end());
+  return image;
+}
+
+// Writes the SHA-256 of the body into the header, so a mutation of the body is judged by the other rules.
+std::vector<uint8_t> rehashed(std::vector<uint8_t> image)
+{
+  net::Sha256 hash;
+  hash.update(image.data() + net::WEB_HEADER_SIZE, image.size() - net::WEB_HEADER_SIZE);
+  uint8_t digest[net::SHA256_SIZE];
+  hash.finish(digest);
+  std::memcpy(image.data() + 32, digest, sizeof(digest));
+  return image;
+}
+
+bool reads(const std::vector<uint8_t> &image)
+{
+  net::WebImageInfo info;
+  net::Asset assets[net::MAX_WEB_FILES];
+  size_t count = 0;
+  const char *why = "";
+  return net::read_web_image(image.data(), image.size(), info, assets, count, why);
+}
+
+// Flash that records the order of the writes and can lose its power after a number of operations.
+class RecordingFlash : public net::WebFlash
+{
+public:
+  std::vector<uint8_t> bytes = std::vector<uint8_t>(net::WEB_PARTITION_SIZE, 0x00);
+  std::vector<uint32_t> writes;
+  int power_left = -1; // operations before the power goes; -1 never
+  bool erase(uint32_t offset, uint32_t size) override
+  {
+    if (!step())
+      return false;
+    std::fill(bytes.begin() + offset, bytes.begin() + offset + size, 0xFF);
+    return true;
+  }
+  bool write(uint32_t offset, const uint8_t *data, size_t size) override
+  {
+    if (!step())
+      return false;
+    for (size_t i = 0; i < size; i++)
+      TEST_ASSERT_EQUAL_HEX8(0xFF, bytes[offset + i]); // only erased flash is written
+    std::memcpy(bytes.data() + offset, data, size);
+    writes.push_back(offset);
+    return true;
+  }
+
+private:
+  bool step() { return power_left < 0 || power_left-- > 0; }
+};
+
+std::string web_manifest(const char *version, size_t size, const char *sha, int low, int high)
+{
+  char text[400];
+  std::snprintf(text, sizeof(text),
+                "{\"schema\":1,\"version\":\"%s\",\"file\":\"zenit-web.bin\",\"size\":%u,\"sha256\":\"%s\","
+                "\"protocol_min\":%d,\"protocol_max\":%d}",
+                version, static_cast<unsigned>(size), sha, low, high);
+  return text;
+}
+
+// Publishes a web image of `version` that speaks `low` to `high`, with its manifest.
+void publish_web(const char *version, int low, int high)
+{
+  uint8_t *data;
+  size_t size;
+  www::sim_make_image(version, static_cast<uint8_t>(low), static_cast<uint8_t>(high), data, size);
+  update_http::sim_set_file(update_http::Target::Web, data, size);
+  net::Sha256 hash;
+  hash.update(data, size);
+  uint8_t digest[net::SHA256_SIZE];
+  hash.finish(digest);
+  char hex[net::SHA256_HEX + 1];
+  net::to_hex(digest, hex);
+  update_http::sim_set_manifest(update_http::Target::Web, web_manifest(version, size, hex, low, high).c_str());
+}
+
+void online_with_web(const char *mode)
+{
+  net::BoardSettings board = settings::board();
+  net::update_mode_from_name(mode, board.update_mode);
+  board.update_firmware = false;
+  TEST_ASSERT_TRUE(app::change_settings(settings::current(), board, now) == settings::Commit::Ok);
+  sim_control::handle("!net state=connected ssid=HomeNet rssi=-50 ip=10.0.0.5 synced=1 epoch=1790000000", now);
+}
+} // namespace
+
+void test_the_image_of_the_specification_reads_with_its_files()
+{
+  const std::vector<uint8_t> image = spec_image();
+  net::WebImageInfo info;
+  net::Asset assets[net::MAX_WEB_FILES];
+  size_t count = 0;
+  const char *why = "";
+  TEST_ASSERT_TRUE_MESSAGE(net::read_web_image(image.data(), image.size(), info, assets, count, why), why);
+  TEST_ASSERT_EQUAL_STRING("1.2.3", info.version);
+  TEST_ASSERT_EQUAL_UINT8(1, info.protocol_min);
+  TEST_ASSERT_EQUAL_UINT8(2, info.protocol_max);
+  TEST_ASSERT_EQUAL_size_t(1, count);
+  TEST_ASSERT_EQUAL_STRING("index.html", assets[0].path);
+  TEST_ASSERT_EQUAL_STRING("text/html; charset=utf-8", assets[0].content_type);
+  TEST_ASSERT_EQUAL_size_t(5, assets[0].size);
+  TEST_ASSERT_EQUAL_MEMORY("hello", assets[0].data, 5);
+  TEST_ASSERT_FALSE(assets[0].immutable);
+}
+
+void test_an_image_that_breaks_a_rule_does_not_read()
+{
+  struct Change
+  {
+    size_t at;
+    uint8_t value;
+  };
+  const size_t body = net::WEB_HEADER_SIZE;
+  const Change changes[] = {
+      {0, 'X'},         // magic
+      {4, 2},           // format
+      {5, 0},           // protocol_min 0
+      {5, 3},           // protocol_min above protocol_max
+      {7, 1},           // reserved
+      {8, 'v'},         // version not digits
+      {24, 0},          // no file
+      {24, 65},         // too many files
+      {26, 1},          // reserved
+      {100, 1},         // not zero after the fields
+      {body + 46, 'j'}, // a byte of the body: the SHA-256 no longer matches
+  };
+  TEST_ASSERT_TRUE(reads(spec_image()));
+  for (const Change &change : changes)
+  {
+    std::vector<uint8_t> image = spec_image();
+    image[change.at] = change.value;
+    TEST_ASSERT_FALSE_MESSAGE(reads(image), std::to_string(change.at).c_str());
+  }
+  std::vector<uint8_t> cut = spec_image();
+  cut.resize(cut.size() - 1);
+  TEST_ASSERT_FALSE(reads(cut));
+  // An index that points a file outside the body, with the hash made to match
+  std::vector<uint8_t> outside = spec_image();
+  outside[body + 42] = 6; // length 6 of a 51-byte body that starts the file at 46
+  net::Sha256 hash;
+  hash.update(outside.data() + body, outside.size() - body);
+  uint8_t digest[net::SHA256_SIZE];
+  hash.finish(digest);
+  std::memcpy(outside.data() + 32, digest, sizeof(digest));
+  TEST_ASSERT_FALSE(reads(outside));
+}
+
+void test_the_writer_writes_the_header_last()
+{
+  const std::vector<uint8_t> image = spec_image();
+  RecordingFlash flash;
+  net::WebWriter writer;
+  TEST_ASSERT_TRUE(writer.begin(flash, static_cast<uint32_t>(image.size()), "1.2.3", 1));
+  for (size_t at = 0; at < image.size(); at += 1000)
+    TEST_ASSERT_TRUE(writer.write(image.data() + at, std::min<size_t>(1000, image.size() - at)));
+  TEST_ASSERT_FALSE(flash.writes.empty());
+  for (uint32_t offset : flash.writes)
+    TEST_ASSERT_TRUE(offset >= net::WEB_HEADER_SIZE); // nothing of the header before finish
+  TEST_ASSERT_FALSE(reads(flash.bytes));
+  TEST_ASSERT_TRUE(writer.finish());
+  TEST_ASSERT_EQUAL_UINT32(0, flash.writes.back());
+  TEST_ASSERT_TRUE(reads(flash.bytes));
+}
+
+void test_a_power_cut_at_any_step_of_an_install_leaves_no_image()
+{
+  const std::vector<uint8_t> old_image = spec_image();
+  // The operations: the erase of the old header with the body's sector, the body, the header. Power lost before the
+  // first: the old image is untouched. Lost at any later step: no image.
+  for (int power = 0; power < 3; power++)
+  {
+    RecordingFlash flash;
+    std::copy(old_image.begin(), old_image.end(), flash.bytes.begin());
+    TEST_ASSERT_TRUE(reads(flash.bytes));
+    flash.power_left = power; // header erase, body erase, body write, header write
+    net::WebWriter writer;
+    const bool ok = writer.begin(flash, static_cast<uint32_t>(old_image.size()), "1.2.3", 1) &&
+                    writer.write(old_image.data(), old_image.size()) && writer.finish();
+    TEST_ASSERT_FALSE(ok);
+    TEST_ASSERT_TRUE_MESSAGE(reads(flash.bytes) == (power == 0), std::to_string(power).c_str());
+  }
+}
+
+void test_the_writer_refuses_more_bytes_than_announced_and_a_short_image()
+{
+  RecordingFlash flash;
+  net::WebWriter writer;
+  TEST_ASSERT_FALSE(writer.begin(flash, net::WEB_HEADER_SIZE, "1.2.3", 1));        // a header and no body
+  TEST_ASSERT_FALSE(writer.begin(flash, net::WEB_PARTITION_SIZE + 1, "1.2.3", 1)); // larger than the partition
+  const std::vector<uint8_t> image = spec_image();
+  TEST_ASSERT_TRUE(writer.begin(flash, static_cast<uint32_t>(image.size()) - 1, "1.2.3", 1));
+  TEST_ASSERT_FALSE(writer.write(image.data(), image.size()));
+  TEST_ASSERT_FALSE(writer.finish());
+  TEST_ASSERT_TRUE(writer.begin(flash, static_cast<uint32_t>(image.size()), "1.2.3", 1));
+  TEST_ASSERT_TRUE(writer.write(image.data(), image.size() - 1));
+  TEST_ASSERT_FALSE(writer.finish()); // a byte is missing
+}
+
+void test_the_web_manifest_rules()
+{
+  const char *sha = "de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31";
+  zenit::update::Manifest m;
+  const char *why = "";
+  const std::string good = web_manifest("1.3.0", 171520, sha, 1, 2);
+  TEST_ASSERT_TRUE_MESSAGE(zenit::update::parse_web_manifest(good.c_str(), good.size(), m, why), why);
+  TEST_ASSERT_EQUAL_STRING("1.3.0", m.version);
+  TEST_ASSERT_EQUAL_UINT32(171520, m.size);
+  TEST_ASSERT_EQUAL_UINT8(1, m.protocol_min);
+  TEST_ASSERT_EQUAL_UINT8(2, m.protocol_max);
+  const std::string bad[] = {
+      web_manifest("1.3.0", 4096, sha, 1, 1),   // a header and no body
+      web_manifest("1.3.0", 524289, sha, 1, 1), // larger than the partition
+      web_manifest("1.3.0", 5000, sha, 0, 1),   // protocol 0
+      web_manifest("1.3.0", 5000, sha, 2, 1),   // min above max
+      web_manifest("1.3.0", 5000, sha, 1, 256), // above 255
+      web_manifest("1.3", 5000, sha, 1, 1),     // not X.Y.Z
+      // A firmware manifest is not a web one: it has `board` and no range
+      "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"a.bin\",\"size\":65536,\"sha256\":\"" +
+          std::string(sha) + "\"}",
+  };
+  for (const std::string &text : bad)
+    TEST_ASSERT_FALSE_MESSAGE(zenit::update::parse_web_manifest(text.c_str(), text.size(), m, why), text.c_str());
+  TEST_ASSERT_EQUAL_UINT32(4097, net::MIN_WEB_IMAGE);
+}
+
+void test_the_repair_waits_double_from_one_minute_to_an_hour_with_a_fifth_either_way()
+{
+  TEST_ASSERT_EQUAL_UINT32(0, zenit::update::repair_wait_ms(0, 500));
+  TEST_ASSERT_EQUAL_UINT32(60000, zenit::update::repair_wait_ms(1, 500));
+  TEST_ASSERT_EQUAL_UINT32(120000, zenit::update::repair_wait_ms(2, 500));
+  TEST_ASSERT_EQUAL_UINT32(240000, zenit::update::repair_wait_ms(3, 500));
+  TEST_ASSERT_EQUAL_UINT32(1920000, zenit::update::repair_wait_ms(6, 500));
+  TEST_ASSERT_EQUAL_UINT32(3600000, zenit::update::repair_wait_ms(7, 500)); // 64 minutes, held to 60
+  TEST_ASSERT_EQUAL_UINT32(3600000, zenit::update::repair_wait_ms(1000, 500));
+  TEST_ASSERT_EQUAL_UINT32(48000, zenit::update::repair_wait_ms(1, 0));    // 80 %
+  TEST_ASSERT_EQUAL_UINT32(72000, zenit::update::repair_wait_ms(1, 1000)); // 120 %
+}
+
+void test_a_record_without_the_web_setting_reads_with_web_updates_on()
+{
+  net::BoardSettings s;
+  uint8_t record[net::BOARD_RECORD_SIZE];
+  net::encode_board_record(s, record);
+  TEST_ASSERT_EQUAL_UINT8(1, record[3]); // firmware on, web on
+  s.update_web = false;
+  net::encode_board_record(s, record);
+  TEST_ASSERT_EQUAL_UINT8(3, record[3]);
+  net::BoardSettings back;
+  TEST_ASSERT_TRUE(net::decode_board_record(record, sizeof(record), back));
+  TEST_ASSERT_FALSE(back.update_web);
+  TEST_ASSERT_TRUE(back.update_firmware);
+  record[3] = 0; // firmware off, as a record written before the web setting
+  TEST_ASSERT_TRUE(net::decode_board_record(record, sizeof(record), back));
+  TEST_ASSERT_TRUE(back.update_web);
+  TEST_ASSERT_FALSE(back.update_firmware);
+  record[3] = 4; // not a value: both stay at their defaults
+  TEST_ASSERT_TRUE(net::decode_board_record(record, sizeof(record), back));
+  TEST_ASSERT_TRUE(back.update_web && back.update_firmware);
+}
+
+void test_the_emergency_page_says_what_happens_and_escapes_the_site()
+{
+  char page[net::MAX_EMERGENCY_PAGE];
+  TEST_ASSERT_TRUE(net::emergency_page(true, "https://example.org/", page, sizeof(page)) > 0);
+  TEST_ASSERT_NOT_NULL(std::strstr(page, "being installed"));
+  TEST_ASSERT_NOT_NULL(std::strstr(page, "http-equiv=\"refresh\" content=\"30\""));
+  TEST_ASSERT_NULL(std::strstr(page, "<script"));
+  TEST_ASSERT_TRUE(net::emergency_page(false, "https://example.org/?a=<b>&c=\"d\"", page, sizeof(page)) > 0);
+  TEST_ASSERT_NOT_NULL(std::strstr(page, "over USB: https://example.org/?a=&lt;b&gt;&amp;c=&quot;d&quot;</p>"));
+  TEST_ASSERT_EQUAL_size_t(0, net::emergency_page(true, "", page, 100)); // does not fit
+}
+
+void test_a_missing_web_app_is_installed_at_once_then_retried_with_longer_waits()
+{
+  www::sim_erase();
+  publish_web("1.1.0", 1, 1);
+  update_http::sim_set_download_outcome(update_http::Target::Web, update_http::Outcome::Unreachable);
+  online_with_web("notify"); // repair ignores notify
+  run_ms(now, 1000);
+  updates::Status s = updates::status();
+  TEST_ASSERT_TRUE(s.web.state == zenit::update::WebState::Missing);
+  TEST_ASSERT_TRUE(s.web.last_result == zenit::update::Result::Unreachable);
+  TEST_ASSERT_TRUE(s.web.retry_in >= 48 && s.web.retry_in <= 72); // the first wait, a minute give or take a fifth
+  update_http::sim_set_download_outcome(update_http::Target::Web, update_http::Outcome::Ok);
+  run_ms(now, 73000);
+  s = updates::status();
+  TEST_ASSERT_TRUE(s.web.state == zenit::update::WebState::Ok);
+  TEST_ASSERT_EQUAL_STRING("1.1.0", s.web.version);
+  TEST_ASSERT_TRUE(s.web.last_result == zenit::update::Result::Installed);
+  TEST_ASSERT_EQUAL_INT64(-1, s.web.retry_in);
+}
+
+void test_an_incompatible_web_app_is_reported_and_not_installed()
+{
+  publish_web("2.0.0", 2, 2);
+  online_with_web("automatic");
+  updates::request_check(now);
+  run_ms(now, 1000);
+  const updates::Status s = updates::status();
+  TEST_ASSERT_TRUE(s.web.last_result == zenit::update::Result::Incompatible);
+  TEST_ASSERT_EQUAL_STRING("", s.web.available);
+  TEST_ASSERT_EQUAL_STRING("1.0.0", s.web.version);
+}
+
+void test_a_web_update_installs_in_the_window_without_a_restart()
+{
+  publish_web("1.2.0", 1, 2);
+  online_with_web("automatic");
+  updates::request_check(now);
+  run_ms(now, 1000);
+  const updates::Status s = updates::status();
+  TEST_ASSERT_EQUAL_STRING("1.2.0", s.web.version);
+  TEST_ASSERT_TRUE(s.web.state == zenit::update::WebState::Ok);
+  TEST_ASSERT_FALSE(firmware::sim_restarted());
+}
+
+void test_web_updates_off_leave_a_missing_app_alone()
+{
+  www::sim_erase();
+  publish_web("1.1.0", 1, 1);
+  online_with_web("automatic");
+  net::BoardSettings board = settings::board();
+  board.update_web = false;
+  TEST_ASSERT_TRUE(app::change_settings(settings::current(), board, now) == settings::Commit::Ok);
+  run_ms(now, 200000);
+  const updates::Status s = updates::status();
+  TEST_ASSERT_TRUE(s.web.state == zenit::update::WebState::Missing);
+  TEST_ASSERT_TRUE(s.web.last_result == zenit::update::Result::Never);
+  TEST_ASSERT_FALSE(updates::web_repairable());
+}
+
+void test_a_failed_web_write_leaves_the_app_missing()
+{
+  publish_web("1.2.0", 1, 1);
+  www::sim_fail("write");
+  online_with_web("automatic");
+  updates::request_check(now);
+  run_ms(now, 1000);
+  updates::Status s = updates::status();
+  TEST_ASSERT_TRUE(s.web.state == zenit::update::WebState::Missing);
+  TEST_ASSERT_TRUE(s.web.last_result == zenit::update::Result::FlashError);
+  www::sim_fail("");
+  run_ms(now, 73000); // the repair
+  s = updates::status();
+  TEST_ASSERT_TRUE(s.web.state == zenit::update::WebState::Ok);
+}
+
+void test_every_index_rule_refuses_an_image_with_a_matching_hash()
+{
+  const std::string html = "text/html; charset=utf-8";
+  TEST_ASSERT_TRUE(reads(rehashed(build_image({{"index.html", html, "a"}, {"assets/b.js", "text/javascript", "b"}}))));
+  const std::vector<std::vector<ImageFile>> refused = {
+      {{"index.html", html, "a"}, {"index.html", html, "b"}}, // a path named twice
+      {{"app.html", html, "a"}},                              // no index.html
+      {{"index.html", html, "a"}, {"../x.js", "text/javascript", "b"}},
+      {{"index.html", html, "a"}, {"/x.js", "text/javascript", "b"}},
+      {{"index.html", html, "a"}, {"a\\b.js", "text/javascript", "b"}},
+      {{"index.html", html, "a"}, {"a b.js", "text/javascript", "b"}},
+      {{"index.html", html, "a"}, {"x.js", "", "b"}},                               // an empty media type
+      {{"index.html", html, "a"}, {"x.js", std::string(64, 't'), "b"}},             // a media type of 64 characters
+      {{"index.html", html, "a"}, {std::string(128, 'p'), "text/javascript", "b"}}, // a path of 128 characters
+  };
+  for (size_t i = 0; i < refused.size(); i++)
+    TEST_ASSERT_FALSE_MESSAGE(reads(rehashed(build_image(refused[i]))), std::to_string(i).c_str());
+  // The longest path and media type the specification allows
+  TEST_ASSERT_TRUE(
+      reads(rehashed(build_image({{"index.html", html, "a"}, {std::string(127, 'p'), std::string(63, 't'), "b"}}))));
+
+  const size_t body = net::WEB_HEADER_SIZE;
+  std::vector<uint8_t> image = build_image({{"index.html", html, "abc"}});
+  // index.html: 1 + 10 + 1 + 1 + 24 + 1 + 8 = 46 bytes of index, the file from offset 46
+  std::vector<uint8_t> overlap = image;
+  overlap[body + 38] = 40; // the file starts inside the index
+  TEST_ASSERT_FALSE(reads(rehashed(overlap)));
+  std::vector<uint8_t> nul = image;
+  nul[body + 3] = 0; // a NUL inside the path
+  TEST_ASSERT_FALSE(reads(rehashed(nul)));
+  std::vector<uint8_t> unterminated = image;
+  unterminated[body + 11] = 'x'; // no NUL after the path
+  TEST_ASSERT_FALSE(reads(rehashed(unterminated)));
+  std::vector<uint8_t> control = image;
+  control[body + 14] = 0x07; // a control byte in the media type
+  TEST_ASSERT_FALSE(reads(rehashed(control)));
+  std::vector<uint8_t> short_index = image;
+  short_index[24] = 2; // two files announced, one in the index
+  TEST_ASSERT_FALSE(reads(rehashed(short_index)));
+  std::vector<uint8_t> padded = image;
+  padded[8 + 7] = '1'; // a byte after the version's zero padding began
+  TEST_ASSERT_FALSE(reads(rehashed(padded)));
+  std::vector<uint8_t> empty_body = image;
+  std::memset(empty_body.data() + 28, 0, 4);
+  TEST_ASSERT_FALSE(reads(empty_body));
+  std::vector<uint8_t> huge_body = image;
+  huge_body[28] = 0x01;
+  huge_body[29] = 0xF0;
+  huge_body[30] = 0x07; // 0x7F001, one byte more than the partition holds after the header
+  TEST_ASSERT_FALSE(reads(huge_body));
+}
+
+void test_a_power_cut_at_any_step_of_a_long_install_leaves_no_image()
+{
+  // Three sectors of files, so the writer erases and writes more than once, in chunks across sector ends.
+  const std::vector<uint8_t> image = rehashed(build_image(
+      {{"index.html", "text/html", std::string(5000, 'i')}, {"a.js", "text/javascript", std::string(7000, 'a')}}));
+  TEST_ASSERT_TRUE(reads(image));
+  int steps = 0;
+  for (int power = 0;; power++)
+  {
+    RecordingFlash flash;
+    std::copy(image.begin(), image.end(), flash.bytes.begin());
+    flash.power_left = power;
+    net::WebWriter writer;
+    bool ok = writer.begin(flash, static_cast<uint32_t>(image.size()), "1.0.0", 1);
+    for (size_t at = 0; ok && at < image.size(); at += 1500)
+      ok = writer.write(image.data() + at, std::min<size_t>(1500, image.size() - at));
+    ok = ok && writer.finish();
+    if (ok)
+    {
+      TEST_ASSERT_TRUE(reads(flash.bytes));
+      steps = power;
+      break;
+    }
+    TEST_ASSERT_TRUE_MESSAGE(reads(flash.bytes) == (power == 0), std::to_string(power).c_str());
+    TEST_ASSERT_TRUE(power < 100);
+  }
+  TEST_ASSERT_TRUE(steps > 6); // several erases and writes were cut
+}
+
+void test_an_incompatible_app_is_replaced_by_an_older_compatible_one()
+{
+  sim_control::handle("!www load 2.0.0 2 2", now);
+  TEST_ASSERT_TRUE(www::state() == zenit::update::WebState::Incompatible);
+  publish_web("1.9.0", 1, 1);
+  online_with_web("notify");
+  run_ms(now, 1000);
+  const updates::Status s = updates::status();
+  TEST_ASSERT_TRUE(s.web.state == zenit::update::WebState::Ok);
+  TEST_ASSERT_EQUAL_STRING("1.9.0", s.web.version);
+}
+
+void test_a_missing_app_is_repaired_while_the_update_record_cannot_be_stored()
+{
+  settings::sim_write_raw("update", {9, 9, 9});
+  settings::sim_fail_key("update");
+  settings::begin();
+  app::begin(now, 1);
+  updates::protocol_ready();
+  TEST_ASSERT_FALSE(settings::update_record_readable());
+  www::sim_erase();
+  publish_web("1.1.0", 1, 1);
+  online_with_web("automatic");
+  run_ms(now, 1000);
+  TEST_ASSERT_TRUE(updates::status().web.state == zenit::update::WebState::Ok);
+  TEST_ASSERT_EQUAL_STRING("1.1.0", updates::status().web.version);
+}
+
+void test_a_manual_check_reads_the_firmware_manifest_while_the_record_is_not_settled()
+{
+  settings::sim_write_raw("update", {9, 9, 9});
+  settings::sim_fail_key("update");
+  settings::begin();
+  app::begin(now, 1);
+  updates::protocol_ready();
+  go_online("notify");
+  net::BoardSettings board = settings::board();
+  board.update_web = false;
+  TEST_ASSERT_TRUE(app::change_settings(settings::current(), board, now) == settings::Commit::Ok);
+  TEST_ASSERT_TRUE(updates::request_check(now) == updates::Reply::Ok);
+  run_ms(now, 1000);
+  TEST_ASSERT_TRUE(updates::status().last_result == zenit::update::Result::Available);
+  // and nothing is installed while the record cannot be stored
+  TEST_ASSERT_TRUE(updates::request_install(install_target::Target::Firmware, false) ==
+                   updates::Reply::NothingToInstall);
+}
+
+void test_a_header_that_is_not_the_offer_leaves_the_old_image_untouched()
+{
+  const std::vector<uint8_t> old_image = spec_image(); // 1.2.3, protocols 1 to 2
+  struct Offer
+  {
+    const char *version;
+    uint8_t protocol;
+  };
+  // Another version than offered; a protocol the image does not speak
+  const Offer offers[] = {{"1.2.4", 1}, {"1.2.3", 3}};
+  for (const Offer &offer : offers)
+  {
+    RecordingFlash flash;
+    std::copy(old_image.begin(), old_image.end(), flash.bytes.begin());
+    net::WebWriter writer;
+    TEST_ASSERT_TRUE(writer.begin(flash, static_cast<uint32_t>(old_image.size()), offer.version, offer.protocol));
+    TEST_ASSERT_FALSE(writer.write(old_image.data(), old_image.size()));
+    TEST_ASSERT_TRUE(writer.refused());
+    TEST_ASSERT_TRUE(flash.writes.empty());
+    TEST_ASSERT_TRUE(reads(flash.bytes)); // nothing was erased
+  }
+}
+
+void test_a_web_image_whose_header_is_not_the_offer_keeps_the_app()
+{
+  // The manifest offers 1.5.0 for protocol 1, the file is an image of 1.5.0 for protocol 2 only.
+  uint8_t *data;
+  size_t size;
+  www::sim_make_image("1.5.0", 2, 2, data, size);
+  update_http::sim_set_file(update_http::Target::Web, data, size);
+  net::Sha256 hash;
+  hash.update(data, size);
+  uint8_t digest[net::SHA256_SIZE];
+  hash.finish(digest);
+  char hex[net::SHA256_HEX + 1];
+  net::to_hex(digest, hex);
+  update_http::sim_set_manifest(update_http::Target::Web, web_manifest("1.5.0", size, hex, 1, 1).c_str());
+  online_with_web("automatic");
+  updates::request_check(now);
+  run_ms(now, 1000);
+  const updates::Status s = updates::status();
+  TEST_ASSERT_TRUE(s.web.state == zenit::update::WebState::Ok);
+  TEST_ASSERT_EQUAL_STRING("1.0.0", s.web.version);
+  TEST_ASSERT_TRUE(s.web.last_result == zenit::update::Result::BadDownload);
+  TEST_ASSERT_EQUAL_STRING("", s.web.available);
+}
+
+void test_an_image_version_must_be_a_release()
+{
+  const char *bad[] = {"1..2", "1.", "1.2", "01.2.3", "1.2.3.4", "1.2.x", "1000000.0.0"};
+  for (const char *version : bad)
+  {
+    std::vector<uint8_t> image = spec_image();
+    std::memset(image.data() + 8, 0, 16);
+    std::memcpy(image.data() + 8, version, std::strlen(version));
+    TEST_ASSERT_FALSE_MESSAGE(reads(image), version);
+  }
+}
+
+void test_while_a_repair_is_needed_its_waits_alone_pace_the_checks()
+{
+  www::sim_erase();
+  update_http::sim_set_manifest_outcome(update_http::Target::Web, update_http::Outcome::Unreachable);
+  online_with_web("automatic");
+  // The repair's waits: about 1, 2, 4, 8, 16, 32, 60 and 60 minutes, so in 4 hours at most 10 checks, each varied by a
+  // fifth. The ordinary checks after a failure (every 30 minutes) would add more.
+  run_ms(now, 4ull * 60 * 60 * 1000);
+  const size_t reads = update_http::sim_manifest_reads(update_http::Target::Web);
+  TEST_ASSERT_TRUE_MESSAGE(reads >= 7 && reads <= 10, std::to_string(reads).c_str());
+  TEST_ASSERT_TRUE(updates::status().web.retry_in > 0);
+}
+
+void test_the_status_reports_no_web_version_while_installing()
+{
+  TEST_ASSERT_TRUE(www::begin_install(5000, "1.1.0"));
+  updates::Status s = updates::status();
+  TEST_ASSERT_TRUE(s.web.state == zenit::update::WebState::Installing);
+  TEST_ASSERT_EQUAL_STRING("", s.web.version);
+  www::abort_install(); // nothing was written: the old image is back
+  s = updates::status();
+  TEST_ASSERT_TRUE(s.web.state == zenit::update::WebState::Ok);
+  TEST_ASSERT_EQUAL_STRING("1.0.0", s.web.version);
+}
+
 int main()
 {
   UNITY_BEGIN();
@@ -855,5 +1496,29 @@ int main()
   RUN_TEST(test_checks_stop_when_updates_are_turned_off_and_the_state_is_reported);
   RUN_TEST(test_login_is_pending_only_for_a_wifi_client_of_a_board_with_the_login_on);
   RUN_TEST(test_a_close_request_is_read_once_and_cleared_by_a_new_connection);
+  RUN_TEST(test_the_image_of_the_specification_reads_with_its_files);
+  RUN_TEST(test_an_image_that_breaks_a_rule_does_not_read);
+  RUN_TEST(test_the_writer_writes_the_header_last);
+  RUN_TEST(test_a_power_cut_at_any_step_of_an_install_leaves_no_image);
+  RUN_TEST(test_the_writer_refuses_more_bytes_than_announced_and_a_short_image);
+  RUN_TEST(test_the_web_manifest_rules);
+  RUN_TEST(test_the_repair_waits_double_from_one_minute_to_an_hour_with_a_fifth_either_way);
+  RUN_TEST(test_a_record_without_the_web_setting_reads_with_web_updates_on);
+  RUN_TEST(test_the_emergency_page_says_what_happens_and_escapes_the_site);
+  RUN_TEST(test_a_missing_web_app_is_installed_at_once_then_retried_with_longer_waits);
+  RUN_TEST(test_an_incompatible_web_app_is_reported_and_not_installed);
+  RUN_TEST(test_a_web_update_installs_in_the_window_without_a_restart);
+  RUN_TEST(test_web_updates_off_leave_a_missing_app_alone);
+  RUN_TEST(test_a_failed_web_write_leaves_the_app_missing);
+  RUN_TEST(test_every_index_rule_refuses_an_image_with_a_matching_hash);
+  RUN_TEST(test_a_power_cut_at_any_step_of_a_long_install_leaves_no_image);
+  RUN_TEST(test_an_incompatible_app_is_replaced_by_an_older_compatible_one);
+  RUN_TEST(test_a_missing_app_is_repaired_while_the_update_record_cannot_be_stored);
+  RUN_TEST(test_a_manual_check_reads_the_firmware_manifest_while_the_record_is_not_settled);
+  RUN_TEST(test_a_header_that_is_not_the_offer_leaves_the_old_image_untouched);
+  RUN_TEST(test_a_web_image_whose_header_is_not_the_offer_keeps_the_app);
+  RUN_TEST(test_an_image_version_must_be_a_release);
+  RUN_TEST(test_while_a_repair_is_needed_its_waits_alone_pace_the_checks);
+  RUN_TEST(test_the_status_reports_no_web_version_while_installing);
   return UNITY_END();
 }

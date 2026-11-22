@@ -55,4 +55,4 @@ ESP32-C3 SuperMini, one CREE RGBW-1225 LED driven by four low-side MOSFET module
 9. **Smooth changes:** brightness, color and effect changes fade in about 0.5 s; a color change fades down to the floor, switches and fades up; power-on fades in over about 1 s; off from the app fades out in about 1 s; only the end of the timer uses 30 s.
 10. **Board LED (GPIO 8):** always off, except a blink during WiFi setup, so no blue light leaks from the base at night.
 11. **PWM:** a firmware constant, not a setting: 1 kHz at 14 bits (the ESP32-C3's maximum at that frequency) with a perceptual brightness curve. Changed in the firmware if hum, flicker or steps show up on the first unit; the fallback is about 19.5 kHz at 12 bits.
-12. **Partition table** (4 MB): `nvs` 0x9000 size 0x5000, `otadata` 0xE000 size 0x2000, `app0` 0x10000 size 0x1F0000, `app1` 0x200000 size 0x1F0000, `coredump` 0x3F0000 size 0x10000.
+12. **Partition table** (4 MB): `nvs` 0x9000 size 0x5000, `otadata` 0xE000 size 0x2000, `app0` 0x10000 size 0x1B0000, `app1` 0x1C0000 size 0x1B0000, `www` 0x370000 size 0x80000 (the web app, [ADR 0005](../adr/0005-web-app-partition.md)), `coredump` 0x3F0000 size 0x10000.

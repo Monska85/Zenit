@@ -15,6 +15,7 @@ namespace site
 {
 constexpr const char *URL = ZENIT_SITE_URL;
 constexpr const char *MANIFEST_PATH = "firmware/update.json";
+constexpr const char *WEB_MANIFEST_PATH = "web/update.json";
 // The manifest and firmware URLs are built into buffers of MAX_URL characters: a longer address is a build error.
 // The site's origin is the address without its path, so it fits the same number of characters, and a NUL.
 constexpr size_t ORIGIN_SIZE = zenit::update::MAX_SITE_URL + 1;

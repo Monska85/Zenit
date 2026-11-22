@@ -1,0 +1,119 @@
+{
+  "description": "A board whose web app is missing installs it by itself as soon as it is connected and synced, whatever the mode and the window: the check finds the published web app, the first download fails and a repair waits (retry_in), update_install with target web installs it without a restart. force is for the firmware only, and the target is firmware or web.",
+  "steps": [
+    {
+      "advance_ms": 1100
+    },
+    {
+      "control": "!www erase"
+    },
+    {
+      "control": "!update web publish 1.1.0 1 1"
+    },
+    {
+      "control": "!update web download unreachable"
+    },
+    {
+      "control": "!net state=connected ssid=HomeNet rssi=-50 ip=10.0.0.5 synced=1 epoch=1790000000"
+    },
+    {
+      "advance_ms": 1000
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "update_install",
+        "target": "web"
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "update": {
+          "mode": "automatic",
+          "state": "downloading",
+          "available": null,
+          "last_check": {
+            "$any": "integer"
+          },
+          "last_result": "unreachable",
+          "progress": 0,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null,
+          "target": "web",
+          "web": {
+            "state": "missing",
+            "version": null,
+            "available": "1.1.0",
+            "last_result": "unreachable",
+            "retry_in": {
+              "$any": "integer"
+            }
+          }
+        }
+      }
+    },
+    {
+      "control": "!update web download ok"
+    },
+    {
+      "advance_ms": 1000
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": true,
+        "update": {
+          "mode": "automatic",
+          "state": "checking",
+          "available": null,
+          "last_check": {
+            "$any": "integer"
+          },
+          "last_result": "unreachable",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null,
+          "target": "firmware",
+          "web": {
+            "state": "ok",
+            "version": "1.1.0",
+            "available": null,
+            "last_result": "installed",
+            "retry_in": null
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "update_install",
+        "target": "web",
+        "force": true
+      },
+      "expect": {
+        "seq": 3,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "update_install",
+        "target": "all"
+      },
+      "expect": {
+        "seq": 4,
+        "ok": false,
+        "error": "bad_request"
+      }
+    }
+  ]
+}

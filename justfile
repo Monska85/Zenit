@@ -20,21 +20,29 @@ sim := ".pio/build/native/program"
 default:
     @just --list
 
-# Build the firmware (the web app is built first: the firmware serves it)
-build: web-build
+# Build the firmware (the web app is not in it: `just web-image` builds the image of its own partition)
+build:
     nice -n {{nice}} pio run -j {{jobs}} -e {{board}}
 
 # Build the update test firmware: like the firmware, but it reads updates from a plain http:// test server (SITE_URL=http://192.168.1.5:8000/, see `just update-server`). Never released
-build-update-test site_url: web-build
+build-update-test site_url:
     ZENIT_SITE_URL={{site_url}} nice -n {{nice}} pio run -j {{jobs}} -e esp32c3_test_http
 
-# Serve a firmware file and its update manifest for the update test firmware (e.g. just update-server 1.2.0 .pio/build/esp32c3/firmware.bin)
-update-server version firmware *args:
-    {{python}} tools/update_server.py --version {{version}} --firmware {{firmware}} {{args}}
+# Serve update files for the update test firmware (e.g. just update-server --version 1.2.0 --firmware .pio/build/esp32c3/firmware.bin, or --web .pio/web/zenit-web.bin)
+update-server *args:
+    {{python}} tools/update_server.py {{args}}
 
 # Flash the firmware (PORT=/dev/ttyACM0 to choose the port). Never with the panel socket powered
-upload: web-build
+upload:
     nice -n {{nice}} pio run -j {{jobs}} -e {{board}} -t upload {{upload_port}}
+
+# Build the web app and its image for the board's www partition, .pio/web/zenit-web.bin (version of web/package.json)
+web-image: web-build
+    {{python}} tools/web_image.py --dist web/dist --out .pio/web/zenit-web.bin
+
+# Write the web image to the board's www partition (PORT=/dev/ttyACM0 to choose the port)
+upload-web: web-image
+    pio run -e {{board}} -t upload_web {{upload_port}}
 
 # Open the serial monitor
 monitor:
@@ -77,7 +85,7 @@ notices:
     {{python}} tools/firmware_notices.py --version check --out .pio/build/{{board}}/THIRD_PARTY_NOTICES.txt
 
 # Build the files of a release in release/ (e.g. just release-assets 1.2.3): factory image, firmware, notices, checksums
-release-assets version: web-build
+release-assets version:
     ZENIT_VERSION={{version}} nice -n {{nice}} pio run -j {{jobs}} -e {{board}}
     {{python}} tools/firmware_notices.py --version {{version}} --out .pio/build/{{board}}/THIRD_PARTY_NOTICES.txt
     {{python}} tools/release_assets.py --version {{version}} --out release --notices .pio/build/{{board}}/THIRD_PARTY_NOTICES.txt
@@ -91,7 +99,7 @@ format-check:
     find src include test lib \( -name '*.cpp' -o -name '*.h' \) -exec nice -n {{nice}} clang-format --dry-run --Werror {} +
 
 # Check formatting, run every test suite, build the firmware and the simulator, build the notices
-check: format-check web-build
+check: format-check
     nice -n {{nice}} pio test -e native_test
     nice -n {{nice}} pio run -j {{jobs}} -e native -e {{board}}
     nice -n {{nice}} {{python}} -m unittest discover -s tools

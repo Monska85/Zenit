@@ -8,10 +8,13 @@ import { isBadFrameReply, isInt, isSeq, validBody } from "./schema";
 import type { JsonObject } from "./strict-json";
 import { toInfo, type BoardInfo } from "./types";
 import { ConnectionClosed, type LineTransport } from "./transport";
+import speaks from "./speaks.json";
 
 export const REPLY_TIMEOUT_MS = 2000;
 export const ATTEMPTS = 5;
-export const SUPPORTED_PROTOCOL = 1;
+/** The protocol versions this app speaks: the same file states them in the web image the board installs. */
+export const PROTOCOL_MIN: number = speaks.protocol_min;
+export const PROTOCOL_MAX: number = speaks.protocol_max;
 /** Lines that arrive while no request waits (events, late replies) are kept up to this many, then the oldest go. */
 const QUEUE_LIMIT = 64;
 
@@ -158,10 +161,11 @@ export class Client {
   /** `info` first, as the protocol asks, and a check of the protocol version. */
   async handshake(): Promise<BoardInfo> {
     const reply = await this.call("info");
-    if (reply["protocol"] !== SUPPORTED_PROTOCOL) {
+    const protocol = reply["protocol"];
+    if (typeof protocol !== "number" || protocol < PROTOCOL_MIN || protocol > PROTOCOL_MAX) {
       throw new ClientError(
         "protocol",
-        `the board speaks protocol ${String(reply["protocol"])}, this app protocol ${SUPPORTED_PROTOCOL}`,
+        `the board speaks protocol ${String(protocol)}, this app protocols ${PROTOCOL_MIN} to ${PROTOCOL_MAX}`,
       );
     }
     this.info = toInfo(reply);

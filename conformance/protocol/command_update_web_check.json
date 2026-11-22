@@ -1,0 +1,227 @@
+{
+  "description": "The web side of a check, each read in the reply of the next update_check (which reports the last finished check): the web app the simulator starts with is up to date; a newer one that does not speak protocol 1 is incompatible and not offered; a newer one that does is available and, in notify mode, not installed; a manifest that breaks its rules is bad_manifest and the offer is gone. The firmware manifest is unreachable throughout.",
+  "steps": [
+    {
+      "advance_ms": 1100
+    },
+    {
+      "control": "!net state=connected ssid=HomeNet rssi=-50 ip=10.0.0.5 synced=1 epoch=1790000000"
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "settings_set",
+        "update_mode": "notify"
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "notify",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null,
+          "target": "firmware",
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": "never",
+            "retry_in": null
+          }
+        }
+      }
+    },
+    {
+      "advance_ms": 100
+    },
+    {
+      "control": "!update web publish 2.0.0 2 2"
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": {
+            "$any": "integer"
+          },
+          "last_result": "unreachable",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null,
+          "target": "firmware",
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": "up_to_date",
+            "retry_in": null
+          }
+        }
+      }
+    },
+    {
+      "advance_ms": 100
+    },
+    {
+      "control": "!update web publish 1.2.0 1 2"
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": {
+            "$any": "integer"
+          },
+          "last_result": "unreachable",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null,
+          "target": "firmware",
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": "incompatible",
+            "retry_in": null
+          }
+        }
+      }
+    },
+    {
+      "advance_ms": 100
+    },
+    {
+      "control": "!update web manifest {\"schema\":2}"
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 5,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": {
+            "$any": "integer"
+          },
+          "last_result": "unreachable",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null,
+          "target": "firmware",
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": "1.2.0",
+            "last_result": "available",
+            "retry_in": null
+          }
+        }
+      }
+    },
+    {
+      "advance_ms": 100
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 6,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": {
+            "$any": "integer"
+          },
+          "last_result": "unreachable",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null,
+          "target": "firmware",
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": "bad_manifest",
+            "retry_in": null
+          }
+        }
+      }
+    }
+  ]
+}

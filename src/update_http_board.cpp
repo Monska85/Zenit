@@ -14,7 +14,7 @@
 
 #include <cstring>
 
-#include "firmware.h"
+#include "install_target.h"
 #include "platform.h"
 
 namespace update_http
@@ -142,8 +142,11 @@ Outcome fetch_manifest(const char *url, char *body, size_t capacity, size_t &siz
   return outcome;
 }
 
-Outcome download_firmware(const char *url, uint32_t size, const char *sha256, Progress progress)
+Outcome download(install_target::Target target, const char *url, const zenit::update::Manifest &manifest,
+                 Progress progress)
 {
+  const uint32_t size = manifest.size;
+  const char *sha256 = manifest.sha256;
   esp_http_client_handle_t client;
   int64_t length = 0;
   Outcome outcome = open_url(url, client, length);
@@ -158,7 +161,7 @@ Outcome download_firmware(const char *url, uint32_t size, const char *sha256, Pr
     close_url(client);
     return Outcome::BadDownload;
   }
-  if (!firmware::begin_install(size))
+  if (!install_target::begin(target, manifest))
   {
     close_url(client);
     return Outcome::FlashError;
@@ -188,9 +191,11 @@ Outcome download_firmware(const char *url, uint32_t size, const char *sha256, Pr
       outcome = Outcome::BadDownload;
       break;
     }
-    if (!firmware::write(chunk, static_cast<size_t>(read)))
+    if (!install_target::write(target, chunk, static_cast<size_t>(read)))
     {
-      outcome = Outcome::FlashError;
+      // An image whose header is not the one offered is a bad download: nothing was erased.
+      outcome =
+          target == install_target::Target::Web && www::install_refused() ? Outcome::BadDownload : Outcome::FlashError;
       break;
     }
     hash.update(chunk, static_cast<size_t>(read));
@@ -212,7 +217,7 @@ Outcome download_firmware(const char *url, uint32_t size, const char *sha256, Pr
   close_url(client);
   if (outcome != Outcome::Ok)
   {
-    firmware::abort_install();
+    install_target::abort(target);
     return outcome;
   }
   uint8_t digest[zenit::net::SHA256_SIZE];
@@ -221,10 +226,10 @@ Outcome download_firmware(const char *url, uint32_t size, const char *sha256, Pr
   zenit::net::to_hex(digest, hex);
   if (std::strcmp(hex, sha256) != 0)
   {
-    firmware::abort_install();
+    install_target::abort(target);
     return Outcome::BadDownload;
   }
-  return firmware::end_install() ? Outcome::Ok : Outcome::FlashError;
+  return install_target::end(target) ? Outcome::Ok : Outcome::FlashError;
 }
 
 } // namespace update_http

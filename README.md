@@ -27,10 +27,12 @@ The `justfile` and the `Makefile` have the same commands: `just <name>` or `make
 
 | Command           | What it does                                                                                |
 | ----------------- | ------------------------------------------------------------------------------------------- |
-| `just build`      | Build the web app, then the firmware for the ESP32-C3 SuperMini (the firmware serves the app) |
+| `just build`      | Build the firmware for the ESP32-C3 SuperMini                                               |
 | `just build-update-test http://192.168.1.5:8000/` | Build the update test firmware, which reads updates from a plain `http://` test server. Never released |
-| `just update-server 1.2.0 .pio/build/esp32c3/firmware.bin` | Serve a firmware file and its update manifest for the update test firmware |
+| `just update-server --version 1.2.0 --firmware .pio/build/esp32c3/firmware.bin` | Serve a firmware file (or `--web` a web image) and its update manifest for the update test firmware |
 | `just upload`     | Flash the firmware (`PORT=/dev/ttyACM0 just upload` to choose the port)                     |
+| `just web-image`  | Build the web app and its image for the board's `www` partition                             |
+| `just upload-web` | Write the web image to the board over USB                                                   |
 | `just monitor`    | Open the serial monitor (115200 baud)                                                       |
 | `just flash`      | Flash, then open the serial monitor                                                         |
 | `just sim`        | Run the simulator and write `sim-out/trace.csv` and `sim-out/viewer.html`                   |
@@ -123,7 +125,7 @@ Open `http://localhost:5173`, type `ws://127.0.0.1:8765` in the address field an
 | ----------------------- | ----------------------------------------------------------------------------------------------- |
 | `lib/ZenitLight/`       | The light engine: curve, power limit, effects, transitions and timer. Plain C++, no hardware    |
 | `lib/ZenitProto/`       | The protocol: CRC-32, framing, strict JSON, request checks, settings as JSON, reply cache, WebSocket messages |
-| `lib/ZenitNet/`         | WiFi decisions, origin check, login, SHA-256 and HMAC, board settings and their record, the served app's answers |
+| `lib/ZenitNet/`         | WiFi decisions, origin check, login, SHA-256 and HMAC, board settings and their record, the served app's answers, the web image and its writer |
 | `lib/ZenitImprov/`      | Improv Wi-Fi Serial: frame codec and the splitter that tells frames from protocol lines         |
 | `lib/ZenitUpdate/`      | Semantic versions, the update manifest, the schedule and window, the update record and boot decisions |
 | `src/protocol.cpp`      | The commands, and the dispatch to the light and the settings                                    |
@@ -148,20 +150,21 @@ Open `http://localhost:5173`, type `ws://127.0.0.1:8765` in the address field an
 
 [release-please](https://github.com/googleapis/release-please) manages two packages, each with its own release pull request on `main`, its version and its changelog worked out from the commits: the firmware (tags `vX.Y.Z`, `CHANGELOG.md`) and the web app (tags `web-vX.Y.Z`, `web/CHANGELOG.md`). Merging the firmware pull request tags `vX.Y.Z` and creates the GitHub Release, and `.github/workflows/release.yml` then attaches:
 
-- `zenit-esp32c3-factory.bin`: the whole flash in one image, to write at address 0 on a blank or old board (`esptool.py write_flash 0x0 zenit-esp32c3-factory.bin`). It erases the settings.
+- `zenit-esp32c3-factory.bin`: the firmware's flash in one image, to write at address 0 on a blank or old board (`esptool.py write_flash 0x0 zenit-esp32c3-factory.bin`). It erases the settings. The web app is not in it: write the image of a web release (`zenit-web-X.Y.Z.bin`) at 0x370000 as well, or let the board fetch the app by itself once it is on WiFi.
 - `zenit-esp32c3-firmware.bin`: the application alone, for an over-the-air update.
 - `zenit-esp32c3-bootloader.bin`, `zenit-esp32c3-partitions.bin` and `zenit-esp32c3-boot_app0.bin`: the other parts of the factory image, which the web app's installer writes at 0x0, 0x8000 and 0xE000 with the firmware at 0x10000, so an update keeps the settings.
+- `zenit-esp32c3-protocol.txt`: the protocol version the firmware speaks, which the site checks against the web app it pairs with.
 - `THIRD_PARTY_NOTICES.txt` and `SHA256SUMS`.
 
 Once the repository is public, each file carries a signed build provenance attestation, made by the release workflow with `actions/attest-build-provenance` (a private repository needs a paid plan for it, so the step runs only when the repository is public). Check a download with `gh attestation verify zenit-esp32c3-factory.bin --repo Monska85/Zenit`: it proves the file was built by that workflow from the tagged commit.
 
-A web release attaches `zenit-web-X.Y.Z.tar.gz` (the built app, with its third-party notices) and its `SHA256SUMS`. After either release the workflow assembles one GitHub Pages site from the latest of each (`tools/pages_site.py`): the web app at the root, and the latest firmware under `firmware/` (the ESP Web Tools manifest and the firmware parts the Device page installs, which keep the settings, and `update.json`, the manifest boards on WiFi read to update themselves). GitHub Pages on a private repository needs a paid plan, so the deploy job runs only when the repository is public; turn Pages on (Settings, Pages, source GitHub Actions) at that point.
+A web release attaches `zenit-web-X.Y.Z.tar.gz` (the built app, with its third-party notices), `zenit-web-X.Y.Z.bin` (the image of the board's `www` partition) and their `SHA256SUMS`. After either release the workflow assembles one GitHub Pages site from the latest of each (`tools/pages_site.py`): the web app at the root, the web image and its `update.json` under `web/`, and the latest firmware under `firmware/` (the ESP Web Tools manifest and the parts the Device page installs, the web image included, which keep the settings, and `update.json`). Boards on WiFi read both `update.json` files to update the firmware and the web app on their own. GitHub Pages on a private repository needs a paid plan, so the deploy job runs only when the repository is public; turn Pages on (Settings, Pages, source GitHub Actions) at that point.
 
 `just release-assets 1.2.3` builds the firmware files in `release/`. The repository needs the setting "Allow GitHub Actions to create and approve pull requests". A release pull request opened with the default token does not start the other workflows; a `RELEASE_PLEASE_TOKEN` secret (a fine-grained token with Contents, Pull requests and Issues read and write) makes the workflow use that token instead.
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on every pull request and every push to `main`: `actionlint` checks the workflows, `check` builds the web app, then runs `make check` (tests, builds with the web app inside the firmware, tool tests and the notices), checks that the firmware leaves 64 KiB of its slot free and attaches a simulator trace of every effect, and `web` runs the web gate (types, lint, formatting, unit and conformance tests, the build with its size budget, the end-to-end tests against the simulator and the reference screenshots). On a pull request that changes only documentation (`docs/` and Markdown files), `check` and `web` are skipped and report success.
+`.github/workflows/ci.yml` runs on every pull request and every push to `main`: `actionlint` checks the workflows, `check` runs `make check` (tests, the firmware and simulator builds, tool tests and the notices), checks that the firmware leaves 64 KiB of its slot free and attaches a simulator trace of every effect, and `web` runs the web gate (types, lint, formatting, unit and conformance tests, the build with its size budget, the end-to-end tests against the simulator and the reference screenshots). On a pull request that changes only documentation (`docs/` and Markdown files), `check` and `web` are skipped and report success.
 
 ## Contributing
 

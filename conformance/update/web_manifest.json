@@ -1,0 +1,130 @@
+{
+  "description": "The web manifest (docs/board/wifi-and-updates-v1.md#web-updates): exactly seven fields, strict JSON (one line break at its end is allowed), at most 1,024 bytes, a size that fits the www partition and a protocol range.",
+  "cases": [
+    {
+      "note": "the example of the specification",
+      "text": "{\"schema\":1,\"version\":\"1.3.0\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":171520,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":1,\"protocol_max\":1}",
+      "valid": true,
+      "version": "1.3.0",
+      "file": "zenit-web-1.3.0.bin",
+      "size": 171520,
+      "protocol_min": 1,
+      "protocol_max": 1
+    },
+    {
+      "note": "the smallest image and the widest range",
+      "text": "{\"schema\":1,\"version\":\"1.3.0\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":4097,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":1,\"protocol_max\":255}",
+      "valid": true,
+      "version": "1.3.0",
+      "file": "zenit-web-1.3.0.bin",
+      "size": 4097,
+      "protocol_min": 1,
+      "protocol_max": 255
+    },
+    {
+      "note": "an image that fills the partition",
+      "text": "{\"schema\":1,\"version\":\"1.3.0\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":524288,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":3,\"protocol_max\":3}",
+      "valid": true,
+      "version": "1.3.0",
+      "file": "zenit-web-1.3.0.bin",
+      "size": 524288,
+      "protocol_min": 3,
+      "protocol_max": 3
+    },
+    {
+      "note": "a version of 16 characters, the most a web image holds",
+      "text": "{\"schema\":1,\"version\":\"1234.12345.12345\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":171520,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":1,\"protocol_max\":1}",
+      "valid": true,
+      "version": "1234.12345.12345",
+      "file": "zenit-web-1.3.0.bin",
+      "size": 171520,
+      "protocol_min": 1,
+      "protocol_max": 1
+    },
+    {
+      "note": "a version of 17 characters",
+      "text": "{\"schema\":1,\"version\":\"12345.12345.12345\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":171520,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":1,\"protocol_max\":1}",
+      "valid": false
+    },
+    {
+      "note": "a header and no body",
+      "text": "{\"schema\":1,\"version\":\"1.3.0\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":4096,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":1,\"protocol_max\":1}",
+      "valid": false
+    },
+    {
+      "note": "larger than the partition",
+      "text": "{\"schema\":1,\"version\":\"1.3.0\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":524289,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":1,\"protocol_max\":1}",
+      "valid": false
+    },
+    {
+      "note": "protocol 0",
+      "text": "{\"schema\":1,\"version\":\"1.3.0\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":171520,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":0,\"protocol_max\":1}",
+      "valid": false
+    },
+    {
+      "note": "protocol_min above protocol_max",
+      "text": "{\"schema\":1,\"version\":\"1.3.0\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":171520,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":2,\"protocol_max\":1}",
+      "valid": false
+    },
+    {
+      "note": "protocol_max above 255",
+      "text": "{\"schema\":1,\"version\":\"1.3.0\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":171520,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":1,\"protocol_max\":256}",
+      "valid": false
+    },
+    {
+      "note": "protocol_min as text",
+      "text": "{\"schema\":1,\"version\":\"1.3.0\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":171520,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":\"1\",\"protocol_max\":1}",
+      "valid": false
+    },
+    {
+      "note": "version not X.Y.Z",
+      "text": "{\"schema\":1,\"version\":\"1.3\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":171520,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":1,\"protocol_max\":1}",
+      "valid": false
+    },
+    {
+      "note": "file starting with a dot",
+      "text": "{\"schema\":1,\"version\":\"1.3.0\",\"file\":\".hidden.bin\",\"size\":171520,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":1,\"protocol_max\":1}",
+      "valid": false
+    },
+    {
+      "note": "six fields",
+      "text": "{\"schema\":1,\"version\":\"1.3.0\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":171520,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":1}",
+      "valid": false
+    },
+    {
+      "note": "eight fields: board is not a web field",
+      "text": "{\"schema\":1,\"version\":\"1.3.0\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":171520,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":1,\"protocol_max\":1,\"board\":\"esp32c3\"}",
+      "valid": false
+    },
+    {
+      "note": "not JSON",
+      "text": "{\"schema\":1,\"version\":\"1.3.0\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":171520,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":1,\"protocol_max\":1",
+      "valid": false
+    },
+    {
+      "note": "one line feed at the end, as a file has",
+      "text": "{\"schema\":1,\"version\":\"1.3.0\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":171520,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":1,\"protocol_max\":1}\n",
+      "valid": true,
+      "version": "1.3.0",
+      "file": "zenit-web-1.3.0.bin",
+      "size": 171520,
+      "protocol_min": 1,
+      "protocol_max": 1
+    },
+    {
+      "note": "one CRLF at the end",
+      "text": "{\"schema\":1,\"version\":\"1.3.0\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":171520,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":1,\"protocol_max\":1}\r\n",
+      "valid": true,
+      "version": "1.3.0",
+      "file": "zenit-web-1.3.0.bin",
+      "size": 171520,
+      "protocol_min": 1,
+      "protocol_max": 1
+    },
+    {
+      "note": "two line feeds at the end",
+      "text": "{\"schema\":1,\"version\":\"1.3.0\",\"file\":\"zenit-web-1.3.0.bin\",\"size\":171520,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"protocol_min\":1,\"protocol_max\":1}\n\n",
+      "valid": false
+    }
+  ]
+}

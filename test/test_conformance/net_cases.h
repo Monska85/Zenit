@@ -10,6 +10,8 @@ void test_wifi_cases();
 void test_board_record_cases();
 void test_semver_cases();
 void test_manifest_cases();
+void test_web_manifest_cases();
+void test_web_image_cases();
 void test_schedule_cases();
 void test_boot_cases();
 void test_http_cases();

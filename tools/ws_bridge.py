@@ -18,7 +18,8 @@ One difference: the WebSocket library closes the connection of a request that ha
 its own origin. Without it only the WebSocket is served.
 
 The simulator's line `!close-client` (a failed login, a new token) makes the bridge close the open connection with 1008
-after the replies that came before it.
+after the replies that came before it; `!close-client CODE` closes it with CODE (1012 after a web app install, so the
+page reloads).
 
 The first line the bridge prints on standard output is `listening ws://127.0.0.1:PORT`. It stops when the simulator
 stops, or on Ctrl-C.
@@ -67,7 +68,24 @@ MEDIA_TYPES = {
     ".ico": "image/x-icon",
     ".woff2": "font/woff2",
 }
-CLOSE_CLIENT = object()
+
+
+class CloseClient:
+    """A request of the simulator to close the open connection with `code`."""
+
+    def __init__(self, code):
+        self.code = code
+
+
+def close_request(text):
+    """The close code a simulator line asks for: 1008 for `!close-client`, CODE for `!close-client CODE`, else None."""
+    if text == "!close-client":
+        return 1008
+    code = text[14:]
+    if text.startswith("!close-client ") and code.isascii() and code.isdigit() and 1000 <= int(code) <= 4999:
+        return int(code)
+    return None
+
 
 
 def _is_port(text):
@@ -213,8 +231,8 @@ class Bridge:
     async def send_replies(self, connection, replies):
         while True:
             line = await replies.get()
-            if line is CLOSE_CLIENT:
-                await connection.close(1008)
+            if isinstance(line, CloseClient):
+                await connection.close(line.code)
                 return
             await connection.send(line)
 
@@ -233,8 +251,8 @@ class Bridge:
             text = raw.decode("utf-8", "replace").rstrip("\r\n")
             if text == "!wifi-closed":
                 self.closed.set()
-            elif text == "!close-client":
-                self.reply(CLOSE_CLIENT)
+            elif close_request(text) is not None:
+                self.reply(CloseClient(close_request(text)))
             elif text.startswith(MARKER):
                 self.reply(text)
 

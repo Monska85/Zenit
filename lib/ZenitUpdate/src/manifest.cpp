@@ -5,6 +5,7 @@
 #include <ArduinoJson.h>
 #include <proto_limits.h>
 #include <strict_json.h>
+#include <web_image.h>
 
 #include <cstring>
 
@@ -42,13 +43,26 @@ bool valid_sha256(const char *text)
 }
 } // namespace
 
-bool parse_manifest(const char *json, size_t size, Manifest &out, const char *&why)
+namespace
+{
+struct Rules
+{
+  bool web;
+  size_t fields;
+  int64_t min_size;
+  int64_t max_size;
+};
+
+bool parse(const char *json, size_t size, const Rules &rules, Manifest &out, const char *&why)
 {
   if (size > MAX_MANIFEST)
   {
     why = "the manifest is too long";
     return false;
   }
+  // A file ends with a line break: one, LF or CRLF, is not part of the JSON.
+  if (size > 0 && json[size - 1] == '\n')
+    size -= size > 1 && json[size - 2] == '\r' ? 2 : 1;
   const char *reason = nullptr;
   size_t offset = 0;
   if (!proto::check_strict_object(json, size, proto::MAX_NESTING, reason, offset))
@@ -63,9 +77,9 @@ bool parse_manifest(const char *json, size_t size, Manifest &out, const char *&w
     return false;
   }
   JsonObjectConst object = doc.as<JsonObjectConst>();
-  if (object.size() != 6)
+  if (object.size() != rules.fields)
   {
-    why = "the manifest needs exactly six fields";
+    why = rules.web ? "the manifest needs exactly seven fields" : "the manifest needs exactly six fields";
     return false;
   }
   JsonVariantConst schema = object["schema"];
@@ -74,16 +88,24 @@ bool parse_manifest(const char *json, size_t size, Manifest &out, const char *&w
     why = "schema is not 1";
     return false;
   }
-  JsonVariantConst board = object["board"], version = object["version"], file = object["file"], length = object["size"],
-                   sha = object["sha256"];
-  if (!board.is<const char *>() || std::strcmp(board.as<const char *>(), BOARD_ID) != 0)
+  JsonVariantConst version = object["version"], file = object["file"], length = object["size"], sha = object["sha256"];
+  if (!rules.web)
   {
-    why = "board is not esp32c3";
-    return false;
+    JsonVariantConst board = object["board"];
+    if (!board.is<const char *>() || std::strcmp(board.as<const char *>(), BOARD_ID) != 0)
+    {
+      why = "board is not esp32c3";
+      return false;
+    }
   }
   if (!version.is<const char *>() || !is_release(version.as<const char *>()))
   {
     why = "version is not X.Y.Z";
+    return false;
+  }
+  if (rules.web && std::strlen(version.as<const char *>()) > net::WEB_VERSION_FIELD)
+  {
+    why = "version is longer than a web image holds";
     return false;
   }
   if (!file.is<const char *>() || !valid_file_name(file.as<const char *>()))
@@ -91,7 +113,7 @@ bool parse_manifest(const char *json, size_t size, Manifest &out, const char *&w
     why = "file is not a plain file name";
     return false;
   }
-  if (!length.is<int64_t>() || length.as<int64_t>() < MIN_FIRMWARE_SIZE || length.as<int64_t>() > SLOT_SIZE)
+  if (!length.is<int64_t>() || length.as<int64_t>() < rules.min_size || length.as<int64_t>() > rules.max_size)
   {
     why = "size is out of range";
     return false;
@@ -102,12 +124,35 @@ bool parse_manifest(const char *json, size_t size, Manifest &out, const char *&w
     return false;
   }
   Manifest m;
+  if (rules.web)
+  {
+    JsonVariantConst low = object["protocol_min"], high = object["protocol_max"];
+    if (!low.is<int64_t>() || !high.is<int64_t>() || low.as<int64_t>() < 1 || high.as<int64_t>() > 255 ||
+        low.as<int64_t>() > high.as<int64_t>())
+    {
+      why = "the protocol range is not valid";
+      return false;
+    }
+    m.protocol_min = static_cast<uint8_t>(low.as<int64_t>());
+    m.protocol_max = static_cast<uint8_t>(high.as<int64_t>());
+  }
   std::strcpy(m.version, version.as<const char *>());
   std::strcpy(m.file, file.as<const char *>());
   m.size = static_cast<uint32_t>(length.as<int64_t>());
   std::strcpy(m.sha256, sha.as<const char *>());
   out = m;
   return true;
+}
+} // namespace
+
+bool parse_manifest(const char *json, size_t size, Manifest &out, const char *&why)
+{
+  return parse(json, size, {false, 6, MIN_FIRMWARE_SIZE, SLOT_SIZE}, out, why);
+}
+
+bool parse_web_manifest(const char *json, size_t size, Manifest &out, const char *&why)
+{
+  return parse(json, size, {true, 7, net::MIN_WEB_IMAGE, net::WEB_PARTITION_SIZE}, out, why);
 }
 
 bool firmware_url(const char *manifest_url, const Manifest &manifest, char *out, size_t size)

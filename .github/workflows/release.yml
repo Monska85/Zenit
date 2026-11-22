@@ -4,8 +4,10 @@ name: Release
 # (tags web-vX.Y.Z). Merging one tags the release and creates its GitHub Release with the notes from the changelog; the
 # jobs below then build that tag and attach its files: for the firmware the factory image, the firmware, its parts
 # (bootloader, partition table, boot_app0) that the web installer writes, the third-party notices and their checksums;
-# for the web app `zenit-web-X.Y.Z.tar.gz`. After either release, one GitHub Pages site is assembled from the latest of
-# each: the web app at the root, the firmware parts, the installer manifest and the update manifest (the one boards on WiFi read) under firmware/. A manual run
+# for the web app `zenit-web-X.Y.Z.tar.gz` and `zenit-web-X.Y.Z.bin`, the image of the board's www partition. After
+# either release, one GitHub Pages site is assembled from the latest of each: the web app at the root, the web image
+# and its update manifest under web/, the firmware parts, the installer manifest (which writes the web image too) and
+# the firmware update manifest under firmware/. Boards on WiFi read both update manifests. A manual run
 # with dry_run builds the same files from the branch it runs on, publishes nothing and keeps them as workflow
 # artifacts for 14 days.
 #
@@ -39,16 +41,6 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup
-
-      # The firmware embeds the built web app, so the web app is built first (make does it)
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version-file: web/package.json
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Install the web app's dependencies from the lockfile
-        run: make web-install
 
       - name: Check
         run: make check
@@ -101,16 +93,6 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup
-
-      # The firmware embeds the built web app, so the web app is built first (make does it)
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
-        with:
-          node-version-file: web/package.json
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Install the web app's dependencies from the lockfile
-        run: make web-install
 
       # Builds the firmware with the release version, then writes the notices from its link map and the files to attach
       - name: Build the release files
@@ -193,7 +175,11 @@ jobs:
           mkdir -p "$RUNNER_TEMP/web-release"
           tar --sort=name --owner=0 --group=0 --numeric-owner --mtime='1970-01-01 00:00:00' -C web/dist -cf - . \
             | gzip -n -9 > "$RUNNER_TEMP/web-release/zenit-web-$VERSION.tar.gz"
-          (cd "$RUNNER_TEMP/web-release" && sha256sum "zenit-web-$VERSION.tar.gz" > SHA256SUMS)
+          # The image of the board's www partition (a dry run builds it as 0.0.0): the tool refuses an app that does
+          # not speak the protocol of the firmware in this commit
+          python3 tools/web_image.py --dist web/dist --version "${VERSION%%-*}" \
+            --out "$RUNNER_TEMP/web-release/zenit-web-$VERSION.bin"
+          (cd "$RUNNER_TEMP/web-release" && sha256sum "zenit-web-$VERSION.tar.gz" "zenit-web-$VERSION.bin" > SHA256SUMS)
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -276,13 +262,14 @@ jobs:
             exit 0
           fi
           mkdir -p "$RUNNER_TEMP/web" "$RUNNER_TEMP/firmware"
-          gh release download "$web_tag" --dir "$RUNNER_TEMP/web" --pattern 'zenit-web-*.tar.gz' --pattern SHA256SUMS
+          gh release download "$web_tag" --dir "$RUNNER_TEMP/web" --pattern 'zenit-web-*.tar.gz' \
+            --pattern 'zenit-web-*.bin' --pattern SHA256SUMS
           (cd "$RUNNER_TEMP/web" && sha256sum -c SHA256SUMS)
-          args=(--web "$(ls "$RUNNER_TEMP"/web/zenit-web-*.tar.gz)")
+          args=(--web "$(ls "$RUNNER_TEMP"/web/zenit-web-*.tar.gz)" --web-image "$(ls "$RUNNER_TEMP"/web/zenit-web-*.bin)")
           if [ -n "$firmware_tag" ]; then
             gh release download "$firmware_tag" --dir "$RUNNER_TEMP/firmware" --pattern 'zenit-esp32c3-bootloader.bin' \
               --pattern 'zenit-esp32c3-partitions.bin' --pattern 'zenit-esp32c3-boot_app0.bin' \
-              --pattern 'zenit-esp32c3-firmware.bin' --pattern SHA256SUMS
+              --pattern 'zenit-esp32c3-firmware.bin' --pattern 'zenit-esp32c3-protocol.txt' --pattern SHA256SUMS
             args+=(--firmware "$RUNNER_TEMP/firmware" --firmware-version "${firmware_tag#v}")
           else
             echo "::notice::No firmware release yet: the site has the web app alone."

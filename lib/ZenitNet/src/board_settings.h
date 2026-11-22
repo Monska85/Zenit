@@ -47,6 +47,7 @@ struct BoardSettings
   WifiPower wifi_power = WifiPower::Auto;
   UpdateMode update_mode = UpdateMode::Automatic;
   bool update_firmware = true;
+  bool update_web = true;
   uint8_t check_hours = 6;
   uint16_t install_start = 0;
   uint16_t install_end = 0;

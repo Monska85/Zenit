@@ -33,6 +33,8 @@
 #include "settings.h"
 #include "sim_control.h"
 #include "updates.h"
+#include "update_http.h"
+#include "www.h"
 
 namespace
 {
@@ -619,6 +621,9 @@ int main(int argc, char **argv)
     return 2;
 
   settings::sim_store(options.stored);
+  // The update source and the `www` partition start as a board with a web app installed, which the source offers.
+  update_http::sim_reset();
+  www::sim_reset();
   settings::begin();
   output::begin();
   platform::sim_set_now_ms(0);

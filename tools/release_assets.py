@@ -6,14 +6,18 @@
 
 Takes the build of the `esp32c3` environment and writes, into the output folder:
 
-  zenit-esp32c3-factory.bin   the whole flash in one image, to write at address 0 on a blank or old board:
+  zenit-esp32c3-factory.bin   the firmware's flash in one image, to write at address 0 on a blank or old board:
                               bootloader, partition table, boot_app0 and the application, 0xFF between them. It is
-                              what esptool's merge_bin makes with `--flash_size keep`, without the tool.
+                              what esptool's merge_bin makes with `--flash_size keep`, without the tool. The web app
+                              is not in it: it is a web release's image, written at the `www` offset (0x370000) as a
+                              second step, or fetched by the board itself once it is on WiFi.
   zenit-esp32c3-firmware.bin  the application alone, for an over-the-air update and, at 0x10000, for a USB update.
   zenit-esp32c3-bootloader.bin, zenit-esp32c3-partitions.bin, zenit-esp32c3-boot_app0.bin
                               the other parts of the factory image, each to write at its own address (0x0, 0x8000,
                               0xE000): the web app's installer writes them with the application, so an update leaves
                               the settings in place, which the factory image's 0xFF padding would erase.
+  zenit-esp32c3-protocol.txt  the protocol version the firmware speaks, so the site pairs it with a web app that
+                              speaks it too.
   THIRD_PARTY_NOTICES.txt     the notices, when --notices is given.
   SHA256SUMS                  the checksum of each file above.
 
@@ -40,7 +44,17 @@ FIRMWARE_NAME = f"zenit-{BOARD}-firmware.bin"
 BOOTLOADER_NAME = f"zenit-{BOARD}-bootloader.bin"
 PARTITIONS_NAME = f"zenit-{BOARD}-partitions.bin"
 BOOT_APP0_NAME = f"zenit-{BOARD}-boot_app0.bin"
+PROTOCOL_NAME = f"zenit-{BOARD}-protocol.txt"
 NOTICES_NAME = "THIRD_PARTY_NOTICES.txt"
+# The protocol the firmware speaks
+PROTOCOL_HEADER = ROOT / "lib" / "ZenitProto" / "src" / "proto_limits.h"
+
+
+def firmware_protocol(header=PROTOCOL_HEADER):
+    found = re.search(r"constexpr uint8_t PROTOCOL_VERSION = (\d+);", Path(header).read_text(encoding="utf-8"))
+    if not found:
+        raise ReleaseError(f"{header}: no PROTOCOL_VERSION")
+    return int(found.group(1))
 
 
 class ReleaseError(Exception):
@@ -98,7 +112,8 @@ def make_assets(version, build_dir, boot_app0, out_dir, partitions_csv, notices=
     (out_dir / BOOTLOADER_NAME).write_bytes(bootloader)
     (out_dir / PARTITIONS_NAME).write_bytes(table)
     (out_dir / BOOT_APP0_NAME).write_bytes(otadata)
-    names = [FACTORY_NAME, FIRMWARE_NAME, BOOTLOADER_NAME, PARTITIONS_NAME, BOOT_APP0_NAME]
+    (out_dir / PROTOCOL_NAME).write_text(f"{firmware_protocol()}\n", encoding="ascii")
+    names = [FACTORY_NAME, FIRMWARE_NAME, BOOTLOADER_NAME, PARTITIONS_NAME, BOOT_APP0_NAME, PROTOCOL_NAME]
     if notices is not None:
         shutil.copyfile(notices, out_dir / NOTICES_NAME)
         names.append(NOTICES_NAME)

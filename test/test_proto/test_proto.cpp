@@ -467,14 +467,15 @@ void test_write_settings_defaults()
   proto::write_settings(doc.to<JsonObject>(), zenit::LightSettings(), zenit::net::BoardSettings(), false);
   std::string out;
   serializeJson(doc, out);
-  TEST_ASSERT_EQUAL_STRING("{\"brightness\":60,\"effect\":\"static\",\"color\":\"white\","
-                           "\"colors\":[\"red\",\"green\",\"blue\",\"white\"],\"color_set\":\"christmas\","
-                           "\"hold_seconds\":30,\"period_seconds\":8,\"floor\":20,\"twinkle_strength\":20,"
-                           "\"timer_minutes\":0,\"wifi_power\":\"auto\",\"update_mode\":\"automatic\","
-                           "\"update_firmware\":true,\"check_hours\":6,\"install_start\":0,\"install_end\":0,"
-                           "\"timezone\":\"UTC0\",\"time_sync_hours\":6,\"ntp_server\":\"pool.ntp.org\","
-                           "\"network_login\":false}",
-                           out.c_str());
+  TEST_ASSERT_EQUAL_STRING(
+      "{\"brightness\":60,\"effect\":\"static\",\"color\":\"white\","
+      "\"colors\":[\"red\",\"green\",\"blue\",\"white\"],\"color_set\":\"christmas\","
+      "\"hold_seconds\":30,\"period_seconds\":8,\"floor\":20,\"twinkle_strength\":20,"
+      "\"timer_minutes\":0,\"wifi_power\":\"auto\",\"update_mode\":\"automatic\","
+      "\"update_firmware\":true,\"update_web\":true,\"check_hours\":6,\"install_start\":0,\"install_end\":0,"
+      "\"timezone\":\"UTC0\",\"time_sync_hours\":6,\"ntp_server\":\"pool.ntp.org\","
+      "\"network_login\":false}",
+      out.c_str());
 }
 
 // ---- The protocol core ----
@@ -816,7 +817,7 @@ void test_core_longest_reply_fits()
               "\"hold_seconds\":600,\"period_seconds\":20,\"floor\":80,\"twinkle_strength\":50,"
               "\"timer_minutes\":360}"));
   TEST_ASSERT_TRUE(reply(0)["ok"].as<bool>());
-  TEST_ASSERT_TRUE(written[0].size() < 512);
+  TEST_ASSERT_TRUE(written[0].size() < zenit::proto::MAX_REPLY_LINE);
   send(framed("{\"seq\":1,\"cmd\":\"info\"}"));
   TEST_ASSERT_TRUE(written[1].size() < 900);
 }
