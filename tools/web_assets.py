@@ -7,11 +7,16 @@ Gzips every file of the built web app, in a fixed order and without timestamps, 
 each, its path, its media type and whether its name carries a content hash. The output is the same for the same input.
 Fails when the folder holds no index.html, which means the web app was not built.
 
+The firmware installer is left out: a page the board serves is plain http, where a browser gives no USB port, so that
+page never loads it. Vite's build manifest (.vite/manifest.json) names the files only the installer uses; the build
+fails when the manifest or the installer's entry is missing, so the installer is never embedded by mistake.
+
 Standard library only.
 """
 
 import argparse
 import gzip
+import json
 import sys
 from pathlib import Path
 
@@ -30,6 +35,10 @@ TYPES = {
 }
 # What a web app of ours does not need on a board: maps and anything else not served.
 SKIPPED_SUFFIXES = (".map",)
+# Vite's build manifest, which is not served either.
+MANIFEST = ".vite/manifest.json"
+# The module that loads the firmware installer (ESP Web Tools), as the build manifest names it.
+INSTALLER_ENTRY = "src/ui/views/installer.tsx"
 MAX_PATH = 127
 
 
@@ -37,15 +46,49 @@ class AssetsError(Exception):
     pass
 
 
+def reachable(chunks, start, skip=()):
+    """The files of the chunk `start` and of every chunk it imports, statically or on demand, except the chunks `skip`."""
+    seen, files, todo = set(), set(), [start]
+    while todo:
+        key = todo.pop()
+        if key in seen or key in skip:
+            continue
+        seen.add(key)
+        chunk = chunks.get(key)
+        if chunk is None:
+            raise AssetsError(f"{MANIFEST}: no chunk '{key}'")
+        files.add(chunk["file"])
+        files.update(chunk.get("css", []))
+        files.update(chunk.get("assets", []))
+        todo += chunk.get("imports", []) + chunk.get("dynamicImports", [])
+    return files
+
+
+def installer_only(root):
+    """The files that only the firmware installer uses, which the board does not serve."""
+    path = root / MANIFEST
+    if not path.is_file():
+        raise AssetsError(f"{path} is missing: the web app must be built with its manifest (build.manifest)")
+    chunks = json.loads(path.read_text(encoding="utf-8"))
+    if INSTALLER_ENTRY not in chunks:
+        raise AssetsError(f"{MANIFEST}: no '{INSTALLER_ENTRY}', so the installer cannot be left out")
+    app = set()
+    for key, chunk in chunks.items():
+        if chunk.get("isEntry"):
+            app |= reachable(chunks, key, skip=(INSTALLER_ENTRY,))
+    return reachable(chunks, INSTALLER_ENTRY) - app
+
+
 def collect(dist):
     """(path, media type, gzipped bytes, immutable) of each file, sorted by path."""
     root = Path(dist)
     if not (root / "index.html").is_file():
         raise AssetsError(f"{root}/index.html is missing: build the web app first (just web-build)")
+    left_out = installer_only(root)
     files = []
     for path in sorted(p for p in root.rglob("*") if p.is_file() and not p.is_symlink()):
         relative = path.relative_to(root).as_posix()
-        if relative.endswith(SKIPPED_SUFFIXES):
+        if relative.endswith(SKIPPED_SUFFIXES) or relative == MANIFEST or relative in left_out:
             continue
         if len(relative) > MAX_PATH or any(ord(c) < 0x21 or ord(c) > 0x7E or c == "\\" for c in relative):
             raise AssetsError(f"{relative}: the path is not one the board can serve")

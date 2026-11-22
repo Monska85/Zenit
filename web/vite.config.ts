@@ -25,7 +25,8 @@ export default defineConfig({
     __REPOSITORY_URL__: JSON.stringify(repository),
   },
   plugins: [react(), tailwindcss(), cspOnlyInBuilds(), ...thirdPartyNotices(repository), licenseFiles()],
-  build: { outDir: "dist", sourcemap: false },
+  // The manifest tells the firmware build which files only the installer uses (tools/web_assets.py)
+  build: { outDir: "dist", sourcemap: false, manifest: true },
   test: {
     include: ["test/**/*.test.ts"],
     environment: "node",

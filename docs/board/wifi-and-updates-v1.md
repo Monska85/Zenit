@@ -110,7 +110,7 @@ The token is 16 characters from `a-z` and `0-9`, drawn with the hardware random 
 
 ## The served web app
 
-The firmware embeds the built web app (`web/dist`), gzipped, in its flash image: a pre-build script (`scripts/web_assets.py`) compresses every file, writes `web_assets.cpp` with the bytes, the path, the media type and the SHA-256 of each file into the build folder, and fails when `web/dist` is missing (build the web app first: `just build` does it). The bytes are served from flash, so a request allocates nothing.
+The firmware embeds the built web app (`web/dist`), gzipped, in its flash image: a pre-build script (`scripts/web_assets.py`) compresses every file, writes `web_assets.cpp` with the bytes, the path, the media type and the SHA-256 of each file into the build folder, and fails when `web/dist` is missing (build the web app first: `just build` does it). The firmware installer (ESP Web Tools) is left out: the board serves plain http, where a browser gives no USB port, so the served page shows a note instead of the installer and never loads it. Vite's build manifest (`.vite/manifest.json`, not served) names the files only the installer uses, and the build fails when the manifest or the installer's entry is missing. The bytes are served from flash, so a request allocates nothing.
 
 The board answers on HTTP port 80:
 
@@ -289,7 +289,7 @@ What needs a real WiFi network, a phone and a real release. Over USB alone the f
 
 On the bare ESP32-C3 SuperMini over USB, with no WiFi network (2026-11-22), with the milestone 4 firmware:
 
-- The firmware is 1,693,648 bytes, 83.4 % of its 2,031,616-byte slot, which leaves 337,968 bytes (the web app inside is about 356 KB gzipped).
+- The firmware is 1,485,232 bytes, 73.1 % of its 2,031,616-byte slot, which leaves 546,384 bytes (the web app inside is about 163 KB gzipped, without the installer).
 - The loop task's lowest free stack is 5,080 bytes of 8,192 after `info`, `settings_get` and `status` (the milestone 2 firmware had 5,044 after every command).
 - The network task's lowest free stack is 8,256 bytes of 12,288 after a scan with the radio on. A TLS connection (check, download) and the HTTP server's own task are not measured: they need a network, see the [test plan](#board-test-plan).
 - The heap has about 214,000 bytes free with the radio off (largest block 114,676); during a scan its lowest was 148,812 bytes.
