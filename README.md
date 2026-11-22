@@ -2,7 +2,7 @@
 
 Firmware for Zenit, a star projector: one RGBW power LED under a perforated dome projects a starry sky or Christmas shapes on the ceiling. An ESP32-C3 SuperMini drives the four colors through MOSFET modules with a perceptual brightness curve, a power limit, effects, smooth transitions and a switch-off timer. A simulator runs the same code on your computer, without any hardware.
 
-The project is under construction. This version holds the light engine, the command protocol over USB, the simulator, a command line client, and releases; the web app, WiFi and over-the-air updates follow.
+The project is under construction. This version holds the light engine, the command protocol over USB, the simulator, a command line client, the web app, and releases; WiFi and over-the-air updates follow.
 
 ## Documentation
 
@@ -13,6 +13,7 @@ The project is under construction. This version holds the light engine, the comm
 | [`docs/adr/`](docs/adr/)                                             | Architecture decision records                                 |
 | [`docs/board/light-v1.md`](docs/board/light-v1.md)                   | The light: curve, power limit, effects, transitions and timer |
 | [`docs/protocol/protocol-v1.md`](docs/protocol/protocol-v1.md)       | The command protocol over USB and WiFi                        |
+| [`docs/web/web-app-v1.md`](docs/web/web-app-v1.md)                   | The web app: views, connection, wording, privacy, tests       |
 | [`conformance/README.md`](conformance/README.md)                     | Test cases every implementation must pass                     |
 
 ## Safety
@@ -39,6 +40,14 @@ The `justfile` and the `Makefile` have the same commands: `just <name>` or `make
 | `just release-assets 1.2.3` | Build the files of a release in `release/`                                        |
 | `just format`     | Format the C++ sources                                                                      |
 | `just check`      | Check formatting, run every test suite, build the firmware, the simulator and the notices   |
+| `just web-install` | Install the web app's dependencies from the lockfile                                       |
+| `just web-dev`    | Start the web app with live reload on `http://localhost:5173`                               |
+| `just web-test`   | Type check, lint, check the formatting and run the web app's unit and conformance tests     |
+| `just web-build`  | Build the web app into `web/dist`                                                           |
+| `just web-size`   | Build, then check the JavaScript loaded at start against its 150 KB gzip budget             |
+| `just web-e2e`    | Run the end-to-end tests and layout checks against the simulator                            |
+| `just web-screenshots` | Compare the reference screenshots, inside the Playwright container (needs Docker)      |
+| `just web-check`  | The whole web gate: the five steps above                                                    |
 | `just clean`      | Remove build outputs and simulator output                                                   |
 
 ### Resource limits
@@ -82,6 +91,19 @@ just cli --port /dev/ttyACM0 raw '{"cmd":"settings_get"}'
 
 `settings-set` takes `KEY=VALUE` pairs: numbers, `true`, `false` and `null` as such, `colors=red,blue` as a list, anything else as text. Only one program can open the serial port at a time, and the `just monitor` window must be closed first.
 
+## Web app
+
+The web app in [`web/`](web/) controls a Zenit from a phone or a laptop: a big on/off button, brightness, the six effects with only the settings each one reads, a sleep timer and the live state, over USB (Web Serial, in Chrome and Edge) or over a WebSocket. Its Device page shows the firmware version against the latest published one and installs or updates the firmware with [ESP Web Tools](https://esphome.github.io/esp-web-tools/). It is a static site that sends nothing anywhere but to the board. The specification is [`docs/web/web-app-v1.md`](docs/web/web-app-v1.md).
+
+To try it without a board, run it against the simulator:
+
+```sh
+just serve                 # the simulator on ws://127.0.0.1:8765 (needs the websockets package)
+just web-dev               # in a second terminal: the app on http://localhost:5173
+```
+
+Open `http://localhost:5173`, type `ws://127.0.0.1:8765` in the address field and press Connect. A browser lets a page on `localhost` reach the simulator; a page loaded over `https://` cannot open an unencrypted WebSocket to a board on the network, so the published site connects over USB (WiFi arrives with the WiFi milestone). The commands, the test suites (Vitest, Playwright, reference screenshots) and the layout of `web/` are described in [`web/README.md`](web/README.md).
+
 ## Project layout
 
 | Path                    | Content                                                                                         |
@@ -98,24 +120,28 @@ just cli --port /dev/ttyACM0 raw '{"cmd":"settings_get"}'
 | `src/sim_main.cpp`      | Entry point of the simulator                                                                    |
 | `test/`                 | Native tests, run on the simulator                                                              |
 | `conformance/`          | Test cases worked out by hand from the specifications                                           |
-| `tools/`, `scripts/`    | The command line client, the WebSocket bridge, the release and notices tools, the version rules, the PlatformIO build scripts |
+| `tools/`, `scripts/`    | The command line client, the WebSocket bridge, the release, notices and Pages tools, the version rules, the PlatformIO build scripts |
+| `web/`                  | The web app: React, TypeScript and Vite, its tests, screenshots and build scripts               |
 | `docs/`                 | Requirements, hardware reference, decisions and specifications                                  |
 
 ## Releases
 
-[release-please](https://github.com/googleapis/release-please) keeps a release pull request open on `main`, with the version and the changelog worked out from the commits. Merging it tags `vX.Y.Z` and creates the GitHub Release, and `.github/workflows/release.yml` then attaches:
+[release-please](https://github.com/googleapis/release-please) manages two packages, each with its own release pull request on `main`, its version and its changelog worked out from the commits: the firmware (tags `vX.Y.Z`, `CHANGELOG.md`) and the web app (tags `web-vX.Y.Z`, `web/CHANGELOG.md`). Merging the firmware pull request tags `vX.Y.Z` and creates the GitHub Release, and `.github/workflows/release.yml` then attaches:
 
 - `zenit-esp32c3-factory.bin`: the whole flash in one image, to write at address 0 on a blank or old board (`esptool.py write_flash 0x0 zenit-esp32c3-factory.bin`). It erases the settings.
 - `zenit-esp32c3-firmware.bin`: the application alone, for an over-the-air update.
+- `zenit-esp32c3-bootloader.bin`, `zenit-esp32c3-partitions.bin` and `zenit-esp32c3-boot_app0.bin`: the other parts of the factory image, which the web app's installer writes at 0x0, 0x8000 and 0xE000 with the firmware at 0x10000, so an update keeps the settings.
 - `THIRD_PARTY_NOTICES.txt` and `SHA256SUMS`.
 
 Once the repository is public, each file carries a signed build provenance attestation, made by the release workflow with `actions/attest-build-provenance` (a private repository needs a paid plan for it, so the step runs only when the repository is public). Check a download with `gh attestation verify zenit-esp32c3-factory.bin --repo Monska85/Zenit`: it proves the file was built by that workflow from the tagged commit.
 
-`just release-assets 1.2.3` builds the same files in `release/`. The repository needs the setting "Allow GitHub Actions to create and approve pull requests". A release pull request opened with the default token does not start the other workflows; a `RELEASE_PLEASE_TOKEN` secret (a fine-grained token with Contents, Pull requests and Issues read and write) makes the workflow use that token instead.
+A web release attaches `zenit-web-X.Y.Z.tar.gz` (the built app, with its third-party notices) and its `SHA256SUMS`. After either release the workflow assembles one GitHub Pages site from the latest of each (`tools/pages_site.py`): the web app at the root, and the latest firmware under `firmware/` (the ESP Web Tools manifest and the firmware parts the Device page installs, which keep the settings). GitHub Pages on a private repository needs a paid plan, so the deploy job runs only when the repository is public; turn Pages on (Settings, Pages, source GitHub Actions) at that point.
+
+`just release-assets 1.2.3` builds the firmware files in `release/`. The repository needs the setting "Allow GitHub Actions to create and approve pull requests". A release pull request opened with the default token does not start the other workflows; a `RELEASE_PLEASE_TOKEN` secret (a fine-grained token with Contents, Pull requests and Issues read and write) makes the workflow use that token instead.
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on every pull request and every push to `main`: `actionlint` checks the workflows, and `check` runs `make check` (tests, builds, tool tests and the notices), checks that the firmware leaves 64 KiB of its slot free and attaches a simulator trace of every effect. On a pull request that changes only documentation (`docs/` and Markdown files), `check` is skipped and reports success.
+`.github/workflows/ci.yml` runs on every pull request and every push to `main`: `actionlint` checks the workflows, `check` runs `make check` (tests, builds, tool tests and the notices), checks that the firmware leaves 64 KiB of its slot free and attaches a simulator trace of every effect, and `web` runs the web gate (types, lint, formatting, unit and conformance tests, the build with its size budget, the end-to-end tests against the simulator and the reference screenshots). On a pull request that changes only documentation (`docs/` and Markdown files), `check` and `web` are skipped and report success.
 
 ## Contributing
 

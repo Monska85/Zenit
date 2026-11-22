@@ -9,7 +9,11 @@ Takes the build of the `esp32c3` environment and writes, into the output folder:
   zenit-esp32c3-factory.bin   the whole flash in one image, to write at address 0 on a blank or old board:
                               bootloader, partition table, boot_app0 and the application, 0xFF between them. It is
                               what esptool's merge_bin makes with `--flash_size keep`, without the tool.
-  zenit-esp32c3-firmware.bin  the application alone, for an over-the-air update.
+  zenit-esp32c3-firmware.bin  the application alone, for an over-the-air update and, at 0x10000, for a USB update.
+  zenit-esp32c3-bootloader.bin, zenit-esp32c3-partitions.bin, zenit-esp32c3-boot_app0.bin
+                              the other parts of the factory image, each to write at its own address (0x0, 0x8000,
+                              0xE000): the web app's installer writes them with the application, so an update leaves
+                              the settings in place, which the factory image's 0xFF padding would erase.
   THIRD_PARTY_NOTICES.txt     the notices, when --notices is given.
   SHA256SUMS                  the checksum of each file above.
 
@@ -33,6 +37,9 @@ BOOT_APP0_OFFSET = 0xE000
 DEFAULT_BOOT_APP0 = Path.home() / ".platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin"
 FACTORY_NAME = f"zenit-{BOARD}-factory.bin"
 FIRMWARE_NAME = f"zenit-{BOARD}-firmware.bin"
+BOOTLOADER_NAME = f"zenit-{BOARD}-bootloader.bin"
+PARTITIONS_NAME = f"zenit-{BOARD}-partitions.bin"
+BOOT_APP0_NAME = f"zenit-{BOARD}-boot_app0.bin"
 NOTICES_NAME = "THIRD_PARTY_NOTICES.txt"
 
 
@@ -79,18 +86,19 @@ def make_assets(version, build_dir, boot_app0, out_dir, partitions_csv, notices=
     # The version is a string in the application: a build with another one would publish the wrong number
     if version.encode("ascii") not in app:
         raise ReleaseError(f"the application does not carry the version {version}: build it with ZENIT_VERSION={version}")
+    bootloader = read(build_dir / "bootloader.bin", "the bootloader")
+    table = read(build_dir / "partitions.bin", "the partition table")
+    otadata = read(boot_app0, "boot_app0.bin")
     factory = merge_factory(
-        [
-            (BOOTLOADER_OFFSET, read(build_dir / "bootloader.bin", "the bootloader")),
-            (PARTITION_TABLE_OFFSET, read(build_dir / "partitions.bin", "the partition table")),
-            (BOOT_APP0_OFFSET, read(boot_app0, "boot_app0.bin")),
-            (offset, app),
-        ]
+        [(BOOTLOADER_OFFSET, bootloader), (PARTITION_TABLE_OFFSET, table), (BOOT_APP0_OFFSET, otadata), (offset, app)]
     )
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / FACTORY_NAME).write_bytes(factory)
     (out_dir / FIRMWARE_NAME).write_bytes(app)
-    names = [FACTORY_NAME, FIRMWARE_NAME]
+    (out_dir / BOOTLOADER_NAME).write_bytes(bootloader)
+    (out_dir / PARTITIONS_NAME).write_bytes(table)
+    (out_dir / BOOT_APP0_NAME).write_bytes(otadata)
+    names = [FACTORY_NAME, FIRMWARE_NAME, BOOTLOADER_NAME, PARTITIONS_NAME, BOOT_APP0_NAME]
     if notices is not None:
         shutil.copyfile(notices, out_dir / NOTICES_NAME)
         names.append(NOTICES_NAME)

@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Warm tones: a lamp-lit room by day, an ember glow at night. Contrast meets WCAG AA in both. */
+:root {
+  --background: #fbf6ee;
+  --foreground: #2b2118;
+  --card: #fffdf9;
+  --muted: #f3eadc;
+  --muted-foreground: #66584a;
+  --border: #dccfbc;
+  --primary: #b45309;
+  --primary-foreground: #ffffff;
+  --accent: #fdebcc;
+  --accent-foreground: #5a2d05;
+  --danger: #b91c1c;
+  --danger-soft: #fdeaea;
+  --warning-soft: #fff1d6;
+  --warning-border: #d9a441;
+  --ring: #b45309;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --background: #17120d;
+  --foreground: #f5ecdf;
+  --card: #211a13;
+  --muted: #2c2319;
+  --muted-foreground: #bcad98;
+  --border: #43372a;
+  --primary: #f59e0b;
+  --primary-foreground: #1a1208;
+  --accent: #3a2a14;
+  --accent-foreground: #fde3b0;
+  --danger: #fca5a5;
+  --danger-soft: #3a1c1c;
+  --warning-soft: #3a2b10;
+  --warning-border: #8a6a22;
+  --ring: #f59e0b;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-border: var(--warning-border);
+  --color-ring: var(--ring);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+html {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+}
+
+*:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+  }
+}

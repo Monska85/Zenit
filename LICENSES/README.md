@@ -22,6 +22,18 @@ The texts in `firmware/`, taken on 2026-11-22:
 | `mbedtls.LICENSE`            | `LICENSE` of espressif/mbedtls at the commit of ESP-IDF v5.5.5 (9d669eadb195)                           |
 | `tlsf.LICENSE`               | the BSD-3-Clause text (SPDX) with the copyright line of `tlsf.c`, espressif/tlsf at the commit of ESP-IDF v5.5.5 (2867f6883a12) |
 
+## Web app
+
+The build of the web app (`just web-build`) writes `THIRD_PARTY_NOTICES.txt` at the root of the app (`web/scripts/notices.ts`). It lists every package the bundler links, read by `rollup-plugin-license` with its license and license text, the packages ESP Web Tools carries inside its own bundle (read from the installed tree), and two fixed entries. The license files are in [`web/`](web/) in this folder:
+
+| File                                     | From                                                                                              |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `shadcn-ui.LICENSE.md`                   | the MIT license of shadcn/ui, whose component pattern `web/src/ui/components` follows             |
+| `esptool-legacy-flasher-stub.LICENSE`    | the GPL-2.0-or-later license of the flasher stubs that esptool-js bundles and ESP Web Tools loads into the board |
+| `lit.LICENSE`, `react-remove-scroll-bar.LICENSE` | the license texts of two bundled packages that ship none, for the versions named in `MISSING_TEXTS` |
+
+The build fails on a bundled package whose license is not in the allowed list (permissive licenses and those compatible with GPL-3.0-or-later) and on one with no license text; a package with no text gets its file here and an entry in `MISSING_TEXTS`, for that version only. The published site also carries `LICENSE.txt` and `LICENSE-EXCEPTION.txt`.
+
 ## Updating
 
 When the framework moves to another ESP-IDF or Arduino-ESP32 release, or a managed component to another version, the build of the notices stops with the name and both versions. Take each text in `firmware/` again from the new version, as the table says, update `pins` in `firmware.json` and the table above. When the build links an archive that no section names, add it to the section of the component it comes from, or a new section with its license and text. A new PlatformIO library goes into `libraries` in `firmware.json` with its license and the names of its license files.

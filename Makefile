@@ -23,10 +23,10 @@ endif
 UPLOAD_PORT := $(if $(PORT),--upload-port $(PORT),)
 MONITOR_PORT := $(if $(PORT),--port $(PORT),)
 
-.PHONY: help build upload monitor flash sim-build sim sim-live serve cli test tools-test notices release-assets format format-check check clean
+.PHONY: help build upload monitor flash sim-build sim sim-live serve cli test tools-test notices release-assets format format-check check clean web-install web-dev web-format web-test web-build web-size web-e2e web-screenshots web-screenshots-update web-check
 
 help: ## List the targets
-	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/' | expand -t 16
+	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/' | expand -t 16
 
 build: ## Build the firmware
 	nice -n $(NICE) pio run -j $(JOBS) -e $(BOARD)
@@ -82,6 +82,42 @@ check: format-check ## Check formatting, run every test suite, build the firmwar
 	nice -n $(NICE) $(PYTHON) -m unittest discover -s tools
 	$(PYTHON) tools/firmware_notices.py --version check --out .pio/build/$(BOARD)/THIRD_PARTY_NOTICES.txt
 
+web/node_modules: web/package-lock.json
+	cd web && npm ci
+	touch web/node_modules
+
+web-install: ## Install the web app's dependencies from the lockfile
+	cd web && npm ci
+
+web-dev: web/node_modules ## Start the web app on http://localhost:5173 with live reload (`make serve` runs the simulator it can connect to)
+	cd web && npm run dev
+
+web-format: web/node_modules ## Format the web app with Prettier
+	cd web && nice -n $(NICE) npm run format
+
+web-test: web/node_modules ## Type check, lint, check the formatting and run the web app's unit tests and the conformance cases
+	cd web && nice -n $(NICE) npm run typecheck
+	cd web && nice -n $(NICE) npm run lint
+	cd web && nice -n $(NICE) npm run format:check
+	cd web && nice -n $(NICE) npm test
+
+web-build: web/node_modules ## Build the web app into web/dist
+	cd web && nice -n $(NICE) npm run build
+
+web-size: web-build ## Fail when the JavaScript the web app loads at start is over its budget (150 KB gzip)
+	cd web && npm run size
+
+web-e2e: sim-build web-build ## Run the end-to-end tests and layout checks against the built app and the simulator (first: cd web && npx playwright install chromium)
+	cd web && ZENIT_JOBS=$(JOBS) nice -n $(NICE) npm run e2e
+
+web-screenshots: web-build ## Compare the reference screenshots, drawn inside the Playwright container (needs Docker)
+	ZENIT_JOBS=$(JOBS) nice -n $(NICE) web/scripts/run-screenshots.sh compare
+
+web-screenshots-update: web-build ## Draw the reference screenshots again, inside the Playwright container (needs Docker)
+	ZENIT_JOBS=$(JOBS) nice -n $(NICE) web/scripts/run-screenshots.sh update
+
+web-check: web-test web-size web-e2e web-screenshots ## The whole web gate: checks, build, size budget, end-to-end tests and screenshots
+
 clean: ## Remove build outputs and simulator output
 	pio run -t clean -e native -e native_test -e $(BOARD)
-	rm -rf $(OUT) release
+	rm -rf $(OUT) release web/dist web/test-results* web/playwright-report*

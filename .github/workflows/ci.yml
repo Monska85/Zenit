@@ -99,3 +99,58 @@ jobs:
           name: simulator-traces
           path: sim-out/
           retention-days: 14
+
+  # The web app: types, lint, formatting, unit tests with the conformance cases, the build and its size budget, the
+  # end-to-end tests against the simulator, and the reference screenshots (drawn inside the Playwright container)
+  web:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # The Playwright image of the pinned @playwright/test version, by digest. Change both together.
+      PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.65.0-noble@sha256:6e3fb709361521eb27161606e6da6d2674e5e89fa16516cb37d6fdd91372273d
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Python, PlatformIO (the simulator the end-to-end tests run) and the bridge's websockets package
+      - uses: ./.github/actions/setup
+
+      # The Node version is the one of `engines` in web/package.json
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: web/package.json
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install the dependencies from the lockfile
+        run: make web-install
+
+      - name: Type check, lint, check the formatting, run the unit and conformance tests
+        run: make web-test
+
+      - name: Build, and check the size of the JavaScript loaded at start
+        run: make web-size
+
+      - name: Install the browser
+        run: cd web && npx playwright install --with-deps chromium
+
+      - name: End-to-end tests and layout checks against the simulator
+        run: make web-e2e
+
+      - name: Reference screenshots
+        run: make web-screenshots
+
+      - name: Keep the Playwright reports of a failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-reports
+          path: |
+            web/playwright-report*/
+            web/test-results*/
+          if-no-files-found: ignore
+          retention-days: 14

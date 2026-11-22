@@ -27,3 +27,16 @@ updates:
     commit-message:
       prefix: "ci"
       include: "scope"
+
+  # The web app, pinned in web/package.json and web/package-lock.json
+  - package-ecosystem: npm
+    directory: "/web"
+    schedule:
+      interval: weekly
+    groups:
+      web:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "build"
+      include: "scope"

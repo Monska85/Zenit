@@ -89,7 +89,59 @@ check: format-check
     nice -n {{nice}} {{python}} -m unittest discover -s tools
     {{python}} tools/firmware_notices.py --version check --out .pio/build/{{board}}/THIRD_PARTY_NOTICES.txt
 
+# Install the web app's dependencies from the lockfile
+web-install:
+    cd web && npm ci
+
+# Run npm ci in web/ only when node_modules is missing or older than the lockfile, like make's web/node_modules
+[private]
+node-modules:
+    #!/usr/bin/env sh
+    set -eu
+    if [ ! -d web/node_modules ] || [ web/package-lock.json -nt web/node_modules ]; then
+        (cd web && npm ci)
+        touch web/node_modules
+    fi
+
+# Start the web app on http://localhost:5173 with live reload (`just serve` runs the simulator it can connect to)
+web-dev: node-modules
+    cd web && npm run dev
+
+# Format the web app with Prettier
+web-format: node-modules
+    cd web && nice -n {{nice}} npm run format
+
+# Type check, lint, check the formatting and run the web app's unit tests and the conformance cases
+web-test: node-modules
+    cd web && nice -n {{nice}} npm run typecheck
+    cd web && nice -n {{nice}} npm run lint
+    cd web && nice -n {{nice}} npm run format:check
+    cd web && nice -n {{nice}} npm test
+
+# Build the web app into web/dist
+web-build: node-modules
+    cd web && nice -n {{nice}} npm run build
+
+# Fail when the JavaScript the web app loads at start is over its budget (150 KB gzip)
+web-size: web-build
+    cd web && npm run size
+
+# Run the end-to-end tests and the layout checks against the built app and the simulator (first: cd web && npx playwright install chromium)
+web-e2e: sim-build web-build
+    cd web && ZENIT_JOBS={{jobs}} nice -n {{nice}} npm run e2e
+
+# Compare the reference screenshots, drawn inside the Playwright container (needs Docker)
+web-screenshots: web-build
+    ZENIT_JOBS={{jobs}} nice -n {{nice}} web/scripts/run-screenshots.sh compare
+
+# Draw the reference screenshots again, inside the Playwright container (needs Docker)
+web-screenshots-update: web-build
+    ZENIT_JOBS={{jobs}} nice -n {{nice}} web/scripts/run-screenshots.sh update
+
+# The whole web gate: checks, build, size budget, end-to-end tests and screenshots
+web-check: web-test web-size web-e2e web-screenshots
+
 # Remove build outputs and simulator output
 clean:
     pio run -t clean -e native -e native_test -e {{board}}
-    rm -rf {{out}} release
+    rm -rf {{out}} release web/dist web/test-results* web/playwright-report*

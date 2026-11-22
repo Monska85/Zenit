@@ -8,12 +8,12 @@ Zenit is ESP32 firmware that drives LEDs through MOSFET outputs, with WiFi contr
 
 **Process:** full rigor from the first release (specifications, ADRs, simulator, native and web tests, end-to-end tests, screenshots, release-please, full CI). Deadline for the first units: 2026-12-25.
 
-**Status:** milestone 2 (command protocol over USB, simulator transport and WebSocket bridge, command line client, releases). Read these before any work:
+**Status:** milestone 3 (web app: views, protocol client, Web Serial and WebSocket, firmware install, tests, screenshots, Pages release). Read these before any work:
 
 1. The local planning notes, when present (excluded from Git): the current state, the order of the phases and the next step. Update them at the end of every session.
 2. `docs/requirements/firmware-v1.md`: what the firmware must do, the decisions taken and the proposals still open.
 3. `docs/reference/hardware.md`: the board, the LED, the MOSFET modules, the pins, the electrical and thermal limits.
-4. `docs/adr/` and the specifications in `docs/`, once they exist.
+4. `docs/adr/` and the specifications in `docs/`: [`docs/protocol/protocol-v1.md`](docs/protocol/protocol-v1.md), [`docs/board/light-v1.md`](docs/board/light-v1.md) and [`docs/web/web-app-v1.md`](docs/web/web-app-v1.md).
 
 ## Language
 
@@ -47,6 +47,20 @@ These apply as soon as the matching code exists. The reasons are in `docs/adr/`.
 - **Limits are `constexpr`.** When a size, count or timing limit changes, check every place that enforces, advertises or tests it (firmware, simulator, web app, schemas, tools, specifications, conformance cases) and keep them equal where they describe the same contract.
 - **Compatible formats.** Readers of protocol replies and published files ignore unknown optional fields but validate every known one. A request field the command does not define is an error.
 
+## Web app
+
+These apply to everything in `web/`. The reasons are in [ADR 0003](docs/adr/0003-web-app.md) and the rules in [`docs/web/web-app-v1.md`](docs/web/web-app-v1.md).
+
+- **The client follows `tools/zenit.py` rule by rule** (framing, CRC, strict reply JSON, reply table, 2 s by 5 retries, one request in flight, `info` first, immediate resend on `bad_frame`). A change to a reply field changes `web/src/protocol/schema.ts` and `REPLIES` in the Python client together, and the conformance cases run in Vitest.
+- **Web Serial never touches the control lines** (no `setSignals`): clearing DTR or RTS first restarts the ESP32-C3. Opening a port uses 115,200 baud and a buffer of 8,192 bytes.
+- **Settings are sent when the user chooses them,** never while a slider moves. The limits in `web/src/light/model.ts` equal the protocol's and the light specification's; a test reads both documents.
+- **The UI shows only what the board reports** (effects, colors, color sets from `info`) and, for an effect, only the settings it reads.
+- **Text from the board is rendered as React text,** never as HTML, and the board's own error messages are never shown: each error code has a sentence.
+- **No outside request,** no analytics, fonts or scripts from other sites; the content security policy and an end-to-end test enforce it. A change that breaks this is called out for approval and updates the privacy page and `docs/web/web-app-v1.md`.
+- **Wording is plain and warm,** with no protocol terms on the Light view; the UI is English.
+- **A new dependency of the web app** follows the dependency rules below, gets its license notice (the build fails on a bundled package that has no license text or a license GPL-3.0-or-later cannot include) and keeps the initial JavaScript under its size budget.
+- **Reference screenshots are drawn inside the Playwright container** (`just web-screenshots-update`); look at the new images before committing them.
+
 ## Specifications and conformance
 
 - Every change to a file format or to the command protocol updates its specification in `docs/` and adds conformance cases in `conformance/` in the same change.
@@ -56,7 +70,7 @@ These apply as soon as the matching code exists. The reasons are in `docs/adr/`.
 ## Code Style
 
 - **C++:** `.clang-format` with the LLVM base style, 2-space indent, 120 columns, Allman braces, includes not sorted. Built with `-Os -std=gnu++17 -fno-exceptions -fno-unwind-tables -fno-asynchronous-unwind-tables`.
-- **TypeScript (later):** ESLint and Prettier in `web/`.
+- **TypeScript:** `web/` is strict TypeScript, linted with ESLint (typescript-eslint, react-hooks) and formatted with Prettier (120 columns, trailing commas).
 - **Documentation:** plain prose, without em dashes.
 
 ## Builds and tests
@@ -68,11 +82,12 @@ Run builds, tests and checks only through the `justfile` or `Makefile` recipes (
 - A new third-party library of the firmware needs its entry in `LICENSES/firmware.json` and its license text, or the notices step of `just check` fails.
 - When the light engine changes, compare the simulator's traces (`just sim`, every effect) before and after; a change meant to alter the output says which outputs change and why.
 - When a change adds, moves or renames a top-level folder that CI reads, check the path filter of the `changes` job in `.github/workflows/ci.yml`.
-- Every C, C++, Python and later TypeScript source file starts with `SPDX-License-Identifier: GPL-3.0-or-later` in a comment; build, configuration, markup, style and shell files carry none.
+- `just web-check` is the gate of the web app, and the web part of a change that touches `web/`: types, lint, formatting, unit and conformance tests, the build, the size budget, the end-to-end tests against the simulator and the reference screenshots (Docker). `just check` stays the firmware gate; CI runs both.
+- Every C, C++, Python and TypeScript source file starts with `SPDX-License-Identifier: GPL-3.0-or-later` in a comment; build, configuration, markup, style and shell files carry none.
 
 ## Package Management
 
-PlatformIO for the firmware (platforms and libraries pinned to exact versions in `platformio.ini`), pip with exact versions in `requirements-ci.txt` for the CI tools, and later npm with a lockfile in `web/`.
+PlatformIO for the firmware (platforms and libraries pinned to exact versions in `platformio.ini`), pip with exact versions in `requirements-ci.txt` for the CI tools, and npm with a committed lockfile in `web/` (`ignore-scripts=true`, exact versions, Node from `engines`).
 
 ### Dependency Safety
 

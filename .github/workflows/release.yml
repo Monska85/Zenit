@@ -1,9 +1,13 @@
 name: Release
 
-# release-please keeps a release pull request open on main. Merging it tags the release (vX.Y.Z) and creates its GitHub
-# Release with the notes from the changelog; the jobs below then build that tag and attach the factory image, the
-# firmware, the third-party notices and their checksums. A manual run with dry_run builds the same files from the
-# branch it runs on, publishes nothing and keeps them as a workflow artifact for 14 days.
+# release-please keeps a release pull request open on main for each package: the firmware (tags vX.Y.Z) and the web app
+# (tags web-vX.Y.Z). Merging one tags the release and creates its GitHub Release with the notes from the changelog; the
+# jobs below then build that tag and attach its files: for the firmware the factory image, the firmware, its parts
+# (bootloader, partition table, boot_app0) that the web installer writes, the third-party notices and their checksums;
+# for the web app `zenit-web-X.Y.Z.tar.gz`. After either release, one GitHub Pages site is assembled from the latest of
+# each: the web app at the root, the firmware parts and manifest under firmware/. A manual run
+# with dry_run builds the same files from the branch it runs on, publishes nothing and keeps them as workflow
+# artifacts for 14 days.
 #
 # The repository setting "Allow GitHub Actions to create and approve pull requests" must be on, or release-please
 # cannot open the release pull request. A pull request opened with the default token does not start the other
@@ -55,6 +59,10 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
       version: ${{ steps.release.outputs.version }}
+      # The outputs of a package that is not the root carry its path: `web--`
+      web_release_created: ${{ steps.release.outputs['web--release_created'] }}
+      web_tag_name: ${{ steps.release.outputs['web--tag_name'] }}
+      web_version: ${{ steps.release.outputs['web--version'] }}
     steps:
       - id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
@@ -124,3 +132,152 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
         run: gh release upload "$TAG" "$RUNNER_TEMP"/release/* --clobber
+
+  web-build:
+    needs: release-please
+    if: >-
+      ${{ !cancelled() && needs.release-please.result != 'failure' &&
+      (needs.release-please.outputs.web_release_created == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs.dry_run == true)) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VERSION: ${{ needs.release-please.outputs.web_release_created == 'true' && needs.release-please.outputs.web_version || format('0.0.0-dry-run.{0}', github.run_number) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release-please.outputs.web_release_created == 'true' && needs.release-please.outputs.web_tag_name || github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: web/package.json
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install the dependencies from the lockfile
+        run: make web-install
+
+      - name: Type check, lint, check the formatting, run the unit and conformance tests
+        run: make web-test
+
+      # The build links the source of this repository, and carries the version of web/package.json
+      - name: Build
+        run: make web-size
+
+      # One archive of the built app, the same bytes whenever it is built from the same files: sorted names, no owner,
+      # no dates, gzip without a name or a time
+      - name: Pack the web app
+        run: |
+          set -eu
+          mkdir -p "$RUNNER_TEMP/web-release"
+          tar --sort=name --owner=0 --group=0 --numeric-owner --mtime='1970-01-01 00:00:00' -C web/dist -cf - . \
+            | gzip -n -9 > "$RUNNER_TEMP/web-release/zenit-web-$VERSION.tar.gz"
+          (cd "$RUNNER_TEMP/web-release" && sha256sum "zenit-web-$VERSION.tar.gz" > SHA256SUMS)
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-release-files
+          path: ${{ runner.temp }}/web-release/
+          retention-days: 14
+
+  publish-web:
+    needs: [release-please, web-build]
+    if: needs.release-please.outputs.web_release_created == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: web-release-files
+          path: ${{ runner.temp }}/web-release
+
+      # A private repository needs a paid plan for attestations, so they start once the repository is public.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        if: github.event.repository.visibility == 'public'
+        with:
+          subject-path: ${{ runner.temp }}/web-release/*
+
+      - name: Attach the files to the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release-please.outputs.web_tag_name }}
+        run: gh release upload "$TAG" "$RUNNER_TEMP"/web-release/* --clobber
+
+  # One site from the latest of each release, whichever was made last: the web app at the root, the firmware under
+  # firmware/. GitHub Pages on a private repository needs a paid plan, so this job runs only when the repository is
+  # public; until then the releases carry the files and the owner turns Pages on (Settings, Pages, source GitHub
+  # Actions) when the repository goes public.
+  pages:
+    needs: [release-please, publish, publish-web]
+    if: >-
+      ${{ !cancelled() && github.event.repository.visibility == 'public' &&
+      needs.release-please.result == 'success' && !contains(needs.*.result, 'failure') &&
+      (needs.release-please.outputs.release_created == 'true' || needs.release-please.outputs.web_release_created == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download the latest web release and the latest firmware release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          # The newest release whose tag matches, by version; drafts and pre-releases do not count
+          latest() {
+            gh release list --limit 200 --json tagName,isDraft,isPrerelease \
+              --jq ".[] | select(.isDraft | not) | select(.isPrerelease | not) | .tagName | select(test(\"$1\"))" \
+              | sort -V | tail -n 1
+          }
+          web_tag=$(latest '^web-v[0-9]+\.[0-9]+\.[0-9]+$')
+          firmware_tag=$(latest '^v[0-9]+\.[0-9]+\.[0-9]+$')
+          if [ -z "$web_tag" ]; then
+            echo "::notice::No web release yet: there is no site to publish."
+            echo "publish=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/web" "$RUNNER_TEMP/firmware"
+          gh release download "$web_tag" --dir "$RUNNER_TEMP/web" --pattern 'zenit-web-*.tar.gz' --pattern SHA256SUMS
+          (cd "$RUNNER_TEMP/web" && sha256sum -c SHA256SUMS)
+          args=(--web "$(ls "$RUNNER_TEMP"/web/zenit-web-*.tar.gz)")
+          if [ -n "$firmware_tag" ]; then
+            gh release download "$firmware_tag" --dir "$RUNNER_TEMP/firmware" --pattern 'zenit-esp32c3-bootloader.bin' \
+              --pattern 'zenit-esp32c3-partitions.bin' --pattern 'zenit-esp32c3-boot_app0.bin' \
+              --pattern 'zenit-esp32c3-firmware.bin' --pattern SHA256SUMS
+            args+=(--firmware "$RUNNER_TEMP/firmware" --firmware-version "${firmware_tag#v}")
+          else
+            echo "::notice::No firmware release yet: the site has the web app alone."
+          fi
+          echo "publish=true" >> "$GITHUB_ENV"
+          python3 tools/pages_site.py "${args[@]}" --out "$RUNNER_TEMP/site"
+
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+        if: env.publish == 'true'
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: env.publish == 'true'
+        with:
+          path: ${{ runner.temp }}/site
+
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        if: env.publish == 'true'

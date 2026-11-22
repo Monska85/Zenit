@@ -1,0 +1,9 @@
+# release-please writes this file
+CHANGELOG.md
+dist
+node_modules
+test-results*
+playwright-report*
+package-lock.json
+coverage
+screenshots/baselines

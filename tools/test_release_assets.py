@@ -91,7 +91,15 @@ class AssetsTest(unittest.TestCase):
         names = self.make()
         self.assertEqual(
             names,
-            ["zenit-esp32c3-factory.bin", "zenit-esp32c3-firmware.bin", "THIRD_PARTY_NOTICES.txt", "SHA256SUMS"],
+            [
+                "zenit-esp32c3-factory.bin",
+                "zenit-esp32c3-firmware.bin",
+                "zenit-esp32c3-bootloader.bin",
+                "zenit-esp32c3-partitions.bin",
+                "zenit-esp32c3-boot_app0.bin",
+                "THIRD_PARTY_NOTICES.txt",
+                "SHA256SUMS",
+            ],
         )
         factory = (self.out / "zenit-esp32c3-factory.bin").read_bytes()
         self.assertEqual(factory[0:4], b"BOOT")
@@ -101,17 +109,30 @@ class AssetsTest(unittest.TestCase):
         self.assertEqual(set(factory[4:0x8000]), {0xFF})
         self.assertEqual((self.out / "zenit-esp32c3-firmware.bin").read_bytes(), b"APP-1.2.3-APP")
         self.assertEqual((self.out / "THIRD_PARTY_NOTICES.txt").read_text(), "NOTICES")
+        # The parts of the factory image, each to be written at its own offset by the web app's installer
+        self.assertEqual((self.out / "zenit-esp32c3-bootloader.bin").read_bytes(), b"BOOT")
+        self.assertEqual((self.out / "zenit-esp32c3-partitions.bin").read_bytes(), b"TABLE")
+        self.assertEqual((self.out / "zenit-esp32c3-boot_app0.bin").read_bytes(), b"OTADATA")
+
+    def test_the_offsets_of_the_parts_leave_the_settings_memory_alone(self):
+        # nvs is 0x9000 to 0xDFFF: no part written at its offset reaches it
+        parts = {"bootloader": (0x0, 4), "partitions": (0x8000, 5), "boot_app0": (0xE000, 7)}
+        self.assertEqual(
+            parts["bootloader"][0], assets.BOOTLOADER_OFFSET
+        )
+        self.assertLessEqual(parts["partitions"][0] + 0x1000, 0x9000)
+        self.assertGreaterEqual(parts["boot_app0"][0], 0xE000)
 
     def test_the_checksums_match_the_files(self):
         self.make()
         lines = (self.out / "SHA256SUMS").read_text().splitlines()
-        self.assertEqual(len(lines), 3)
+        self.assertEqual(len(lines), 6)
         for line in lines:
             digest, name = line.split("  ")
             self.assertEqual(digest, hashlib.sha256((self.out / name).read_bytes()).hexdigest())
 
     def test_without_notices_there_is_no_notices_file(self):
-        self.assertEqual(self.make(notices=False)[-2:], ["zenit-esp32c3-firmware.bin", "SHA256SUMS"])
+        self.assertEqual(self.make(notices=False)[-2:], ["zenit-esp32c3-boot_app0.bin", "SHA256SUMS"])
         self.assertFalse((self.out / "THIRD_PARTY_NOTICES.txt").exists())
 
     def test_an_application_without_the_version_fails(self):
