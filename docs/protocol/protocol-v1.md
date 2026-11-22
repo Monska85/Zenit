@@ -110,7 +110,7 @@ The light, and from the WiFi and updates milestone the WiFi, time and update sta
 | `light.lightness`         | The lightness `L` sent to the curve now, from 0 to 100, always written with one decimal (`60.0`).                                 |
 | `light.power_scale`       | The percentage the [power limit](../board/light-v1.md#power-limit) leaves of the duties now, from 1 to 100.                       |
 | `light.timer`             | `null` with no timer, otherwise `minutes` (the setting) and `remaining`, the whole seconds until the fade-out starts, 0 after it. |
-| `wifi`                    | From the WiFi and updates milestone: `state` (`not_configured`, `connecting`, `connected`, `not_found`, `wrong_password`, `no_address`), `ssid` (the stored network, or `null`), `rssi` (dBm, or `null` when not connected), `ip` (or `null`) and `hostname` (`zenit-XXXX`). |
+| `wifi`                    | From the WiFi and updates milestone: `state` (`not_configured`, `connecting`, `connected`, `not_found`, `wrong_password`, `no_address`), `ssid` (the stored network, or `null`), `rssi` (dBm, a whole number from -128 to 127, since a very strong signal can read slightly above 0; or `null` when not connected), `ip` (or `null`) and `hostname` (`zenit-XXXX`). |
 | `time`                    | `synced`, `epoch` (Unix seconds, or `null` until synced) and `local_minute` (minutes after midnight in `timezone`, or `null`).    |
 | `update`                  | `mode`, `state`, `available`, `last_check`, `last_result`, `progress`, `trial`, `skipped` and `rolled_back`, as [WiFi and updates](../board/wifi-and-updates-v1.md#status) defines them. |
 

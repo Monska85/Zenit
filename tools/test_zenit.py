@@ -502,12 +502,14 @@ class WifiAndUpdatesRepliesTest(unittest.TestCase):
         self.assertTrue(self.accepted("status", light=LIGHT))
         self.assertTrue(self.accepted("status", light=LIGHT, wifi=WIFI, time=TIME, update=UPDATE))
         self.assertFalse(self.accepted("status", light=LIGHT, wifi={**WIFI, "state": 3}))
+        # A very strong signal can read slightly above 0 dBm
+        self.assertTrue(self.accepted("status", light=LIGHT, wifi={**WIFI, "rssi": 3}))
         self.assertFalse(self.accepted("status", light=LIGHT, time={**TIME, "synced": 1}))
         self.assertFalse(self.accepted("status", light=LIGHT, update={**UPDATE, "progress": 1.5}))
 
     def test_status_parts_with_a_value_the_specification_does_not_allow_are_refused(self):
         bad_wifi = [
-            {"hostname": "zenit"}, {"rssi": 5}, {"rssi": -200}, {"ssid": ""}, {"ssid": "x" * 33},
+            {"hostname": "zenit"}, {"rssi": 128}, {"rssi": -200}, {"ssid": ""}, {"ssid": "x" * 33},
             {"ip": "300.1.1.1"}, {"state": "connected", "ip": None}, {"state": "connecting", "ip": "192.168.1.5"},
             {"state": "wrong_password", "rssi": -60, "ip": None},
             {"state": "not_configured", "ip": None, "rssi": None, "ssid": "HomeNet"},

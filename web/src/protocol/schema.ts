@@ -103,7 +103,7 @@ const WIFI = and(
   shape({
     state: isText,
     ssid: anyOf(networkName, isNull),
-    rssi: anyOf(intIn(-127, 0), isNull),
+    rssi: anyOf(intIn(-128, 127), isNull),
     ip: anyOf(IPV4, isNull),
     hostname: matching(/^zenit-[0-9a-f]{4}$/),
   }),

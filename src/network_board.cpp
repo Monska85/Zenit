@@ -399,7 +399,12 @@ void scan_networks()
   scan_state_value = ScanState::Running;
   const bool was_off = WiFi.getMode() == WIFI_OFF;
   radio_on();
+  // The scan waits here, at most SCAN_TIMEOUT_MS (the library waits 60 s by default); one that runs longer is stopped
+  // and finds nothing.
+  WiFi.setScanTimeout(SCAN_TIMEOUT_MS);
   const int found = WiFi.scanNetworks(false, false);
+  if (found == WIFI_SCAN_FAILED)
+    esp_wifi_scan_stop();
   size_t count = 0;
   Network results[MAX_SCAN];
   // Every access point of the scan counts: one entry per name, the strongest, and the best MAX_SCAN names

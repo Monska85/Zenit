@@ -134,6 +134,8 @@ describe("the replies of the WiFi and updates milestone", () => {
   it("accepts the words a newer firmware may add: states, modes, results and the settings that name them", () => {
     for (const ok of [
       { wifi: { ...WIFI_STATUS, state: "roaming", ip: "10.0.0.2", rssi: -50 } },
+      // A very strong signal can read slightly above 0 dBm
+      { wifi: { ...WIFI_STATUS, rssi: 3 } },
       { wifi: { ...WIFI_STATUS, state: "roaming", ip: null, rssi: null } },
       { update: { ...UPDATE_STATUS, state: "paused" } },
       { update: { ...UPDATE_STATUS, state: "paused", progress: 40 } },
@@ -163,7 +165,7 @@ describe("the replies of the WiFi and updates milestone", () => {
       { update: null },
       // Out of range, an unknown word, or a null-when rule broken (docs/board/wifi-and-updates-v1.md#status)
       { wifi: { ...WIFI_STATUS, hostname: "zenit" } },
-      { wifi: { ...WIFI_STATUS, rssi: 5 } },
+      { wifi: { ...WIFI_STATUS, rssi: 128 } },
       { wifi: { ...WIFI_STATUS, rssi: -200 } },
       { wifi: { ...WIFI_STATUS, ssid: "" } },
       { wifi: { ...WIFI_STATUS, ssid: "x".repeat(33) } },

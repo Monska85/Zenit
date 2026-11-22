@@ -300,7 +300,7 @@ WIFI = where(
     {
         "state": is_text,
         "ssid": (is_network_name, is_null),
-        "rssi": (int_in(-127, 0), is_null),
+        "rssi": (int_in(-128, 127), is_null),
         "ip": (is_ipv4, is_null),
         "hostname": matching(r"zenit-[0-9a-f]{4}"),
     },

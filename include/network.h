@@ -47,6 +47,8 @@ struct Snapshot
 
 using Network = zenit::net::ScanEntry;
 constexpr size_t MAX_SCAN = zenit::net::MAX_SCAN_RESULTS;
+// The longest a scan of the WiFi networks may take before it is stopped.
+constexpr uint32_t SCAN_TIMEOUT_MS = 15000;
 
 enum class ScanState : uint8_t
 {
