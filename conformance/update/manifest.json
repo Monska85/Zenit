@@ -1,0 +1,157 @@
+{
+  "description": "The update manifest: exactly six fields, strict JSON, at most 1,024 bytes, each with its rule.",
+  "cases": [
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": true,
+      "version": "1.2.0",
+      "file": "zenit-esp32c3-firmware.bin",
+      "size": 412160,
+      "sha256": "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"a.bin\",\"size\":65536,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": true,
+      "version": "1.2.0",
+      "file": "a.bin",
+      "size": 65536,
+      "sha256": "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"10.0.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":2031616,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": true,
+      "version": "10.0.0",
+      "file": "zenit-esp32c3-firmware.bin",
+      "size": 2031616,
+      "sha256": "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+    },
+    {
+      "text": " \t{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}\t ",
+      "valid": true,
+      "version": "1.2.0",
+      "file": "zenit-esp32c3-firmware.bin",
+      "size": 412160,
+      "sha256": "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\",\"extra\":1}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":2,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":\"1\",\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32\",\"version\":\"1.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0-rc.1\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0+b\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"../a.bin\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"a/b.bin\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\".a\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"A.bin\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65535,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":2031617,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":1.5,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":412160,\"sha256\":\"2D711642B726B04401627CA9FBAC32F5C8530FB1903CC4DB02258717921A4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a488\"}",
+      "valid": false
+    },
+    {
+      "text": "",
+      "valid": false
+    },
+    {
+      "text": "{",
+      "valid": false
+    },
+    {
+      "text": "[]",
+      "valid": false
+    },
+    {
+      "text": "null",
+      "valid": false
+    },
+    {
+      "text": "{}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}x",
+      "valid": false
+    },
+    {
+      "text": "                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":412160,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    },
+    {
+      "text": "{\"schema\":1,\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.2.0\",\"file\":\"a.bin\",\"size\":65536,\"sha256\":\"2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881\"}",
+      "valid": false
+    }
+  ],
+  "firmware_url": [
+    {
+      "manifest_url": "https://monska85.github.io/Zenit/firmware/update.json",
+      "file": "zenit-esp32c3-firmware.bin",
+      "url": "https://monska85.github.io/Zenit/firmware/zenit-esp32c3-firmware.bin"
+    },
+    {
+      "manifest_url": "http://127.0.0.1:8000/update.json",
+      "file": "a.bin",
+      "url": "http://127.0.0.1:8000/a.bin"
+    }
+  ]
+}

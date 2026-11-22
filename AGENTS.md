@@ -8,7 +8,7 @@ Zenit is ESP32 firmware that drives LEDs through MOSFET outputs, with WiFi contr
 
 **Process:** full rigor from the first release (specifications, ADRs, simulator, native and web tests, end-to-end tests, screenshots, release-please, full CI). Deadline for the first units: 2026-12-25.
 
-**Status:** milestone 3 (web app: views, protocol client, Web Serial and WebSocket, firmware install, tests, screenshots, Pages release). Read these before any work:
+**Status:** milestone 4 done (WiFi, the protocol over WiFi, Improv, the board serving the web app, updates with rollback); real-network and over-the-air tests with the owner follow. Read these before any work:
 
 1. The local planning notes, when present (excluded from Git): the current state, the order of the phases and the next step. Update them at the end of every session.
 2. `docs/requirements/firmware-v1.md`: what the firmware must do, the decisions taken and the proposals still open.
@@ -78,6 +78,7 @@ These apply to everything in `web/`. The reasons are in [ADR 0003](docs/adr/0003
 Run builds, tests and checks only through the `justfile` or `Makefile` recipes (`just --list`, `make help`), with their default limits (`JOBS` and `NICE`) unless the user asks for others. Never use hand-made `pio` commands with other parallelism. Run one build or test at a time, never two in parallel.
 
 - `just check` is the gate before a change is done: formatting, the native tests with the conformance cases, the firmware and simulator builds, the tool tests (some run against the simulator program, so they follow its build) and the third-party notices of the firmware.
+- The firmware embeds the built web app (`web/dist`), so `just build`, `just check` and `just release-assets` build the web app first. The update test firmware (`just build-update-test`, environment `esp32c3_test_http`) reads updates from a plain `http://` test server and is never released; a release build accepts an `https://` site address only (`tools/site_url.py`).
 - `just serve` serves the simulator on a local WebSocket and `just cli` runs `tools/zenit.py` against a board or the simulator; the board test plan of a phase uses the client.
 - A new third-party library of the firmware needs its entry in `LICENSES/firmware.json` and its license text, or the notices step of `just check` fails.
 - When the light engine changes, compare the simulator's traces (`just sim`, every effect) before and after; a change meant to alter the output says which outputs change and why.

@@ -19,11 +19,12 @@ Preferences preferences;
 bool opened = false;
 } // namespace
 
-void begin()
+bool begin()
 {
   opened = preferences.begin("zenit", false);
   if (!opened)
     platform::log("cannot open the settings memory");
+  return opened;
 }
 
 size_t read(const char *key, uint8_t *out, size_t capacity)

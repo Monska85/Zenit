@@ -14,6 +14,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pages_site  # noqa: E402
 
 PARTS = {name: name.encode() + b" bytes" for name, _ in pages_site.parts()}
+# The application is large enough for a board to install it (the update manifest refuses less)
+FIRMWARE = pages_site.assets.FIRMWARE_NAME
+PARTS[FIRMWARE] = b"zenit firmware " * 5000
 
 
 def make_archive(path, files, extra=None):
@@ -76,6 +79,31 @@ class SiteTest(unittest.TestCase):
                 ],
             },
         )
+
+    def test_the_update_manifest_describes_the_application_file(self):
+        self.build()
+        text = (self.out / "firmware" / "update.json").read_text(encoding="utf-8")
+        self.assertEqual(text.count("\n"), 1)
+        self.assertLessEqual(len(text), pages_site.MAX_UPDATE_MANIFEST)
+        self.assertEqual(
+            json.loads(text),
+            {
+                "schema": 1,
+                "board": "esp32c3",
+                "version": "1.2.3",
+                "file": FIRMWARE,
+                "size": len(PARTS[FIRMWARE]),
+                "sha256": hashlib.sha256(PARTS[FIRMWARE]).hexdigest(),
+            },
+        )
+        # Compact, as the board's strict reader and the conformance cases have it
+        self.assertNotIn(" ", text.strip())
+
+    def test_a_firmware_the_board_would_refuse_is_not_published(self):
+        (self.release / FIRMWARE).write_bytes(b"small")
+        (self.release / "SHA256SUMS").unlink()
+        with self.assertRaises(pages_site.SiteError):
+            self.build()
 
     def test_the_manifest_is_the_one_the_web_app_accepts(self):
         # The same rules as web/src/release/manifest.ts, readManifest

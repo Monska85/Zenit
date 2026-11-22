@@ -1,0 +1,491 @@
+{
+  "description": "With network_login on a WiFi client can send only info, auth_challenge and auth until it logs in. The HMAC-SHA256 of the 32 hexadecimal characters of the nonce under the 16 token characters (computed with an independent implementation) logs in; a nonce serves one attempt; three failures ask to close the connection; USB needs no login.",
+  "steps": [
+    {
+      "advance_ms": 1100
+    },
+    {
+      "control": "!token abcdefghij012345"
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "settings_set",
+        "network_login": true
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": true,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      },
+      "transport": "usb",
+      "close": true
+    },
+    {
+      "event": "wifi_open"
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": false,
+        "error": "unauthorized"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": false,
+        "error": "unauthorized"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "light",
+        "on": false
+      },
+      "expect": {
+        "seq": 4,
+        "ok": false,
+        "error": "unauthorized"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "bogus"
+      },
+      "expect": {
+        "seq": 5,
+        "ok": false,
+        "error": "unknown_command"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "info"
+      },
+      "expect": {
+        "seq": 6,
+        "ok": true,
+        "protocol": 1,
+        "firmware": {
+          "$any": "string"
+        },
+        "board": "simulator",
+        "boot_id": 4242,
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      },
+      "transport": "wifi"
+    },
+    {
+      "control": "!random 000102030405060708090a0b0c0d0e0f"
+    },
+    {
+      "send": {
+        "seq": 7,
+        "cmd": "auth_challenge"
+      },
+      "expect": {
+        "seq": 7,
+        "ok": true,
+        "nonce": "000102030405060708090a0b0c0d0e0f"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 8,
+        "cmd": "auth",
+        "hmac": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "expect": {
+        "seq": 8,
+        "ok": false,
+        "error": "unauthorized"
+      },
+      "transport": "wifi",
+      "close": false
+    },
+    {
+      "send": {
+        "seq": 9,
+        "cmd": "auth",
+        "hmac": "50af259ca3365bd47a06351859c29719ca602ff5c0084d42fed05fd5da380a67"
+      },
+      "expect": {
+        "seq": 9,
+        "ok": false,
+        "error": "unauthorized"
+      },
+      "transport": "wifi",
+      "close": false
+    },
+    {
+      "control": "!random ffeeddccbbaa99887766554433221100"
+    },
+    {
+      "send": {
+        "seq": 10,
+        "cmd": "auth_challenge"
+      },
+      "expect": {
+        "seq": 10,
+        "ok": true,
+        "nonce": "ffeeddccbbaa99887766554433221100"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 11,
+        "cmd": "auth",
+        "hmac": "b447900eef2763115d1c10add754ed0542d884a5a7b5d0eb895ea497e9c827f4"
+      },
+      "expect": {
+        "seq": 11,
+        "ok": true
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 12,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 12,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "not_configured",
+          "ssid": null,
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "event": "wifi_close"
+    },
+    {
+      "event": "wifi_open"
+    },
+    {
+      "send": {
+        "seq": 13,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 13,
+        "ok": false,
+        "error": "unauthorized"
+      },
+      "transport": "wifi"
+    },
+    {
+      "control": "!random 0123456789abcdef0123456789abcdef"
+    },
+    {
+      "send": {
+        "seq": 14,
+        "cmd": "auth_challenge"
+      },
+      "expect": {
+        "seq": 14,
+        "ok": true,
+        "nonce": "0123456789abcdef0123456789abcdef"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 15,
+        "cmd": "auth",
+        "hmac": "7D230EF0DB85D968FD1BFE242CCE6F2209D9B002FCA42FFC5B596741B9DA17FD"
+      },
+      "expect": {
+        "seq": 15,
+        "ok": false,
+        "error": "bad_request"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 16,
+        "cmd": "auth",
+        "hmac": "abc"
+      },
+      "expect": {
+        "seq": 16,
+        "ok": false,
+        "error": "bad_request"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 17,
+        "cmd": "auth"
+      },
+      "expect": {
+        "seq": 17,
+        "ok": false,
+        "error": "bad_request"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 18,
+        "cmd": "auth",
+        "hmac": "7d230ef0db85d968fd1bfe242cce6f2209d9b002fca42ffc5b596741b9da17fd",
+        "extra": 1
+      },
+      "expect": {
+        "seq": 18,
+        "ok": false,
+        "error": "bad_request"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 19,
+        "cmd": "auth",
+        "hmac": "7d230ef0db85d968fd1bfe242cce6f2209d9b002fca42ffc5b596741b9da17fd"
+      },
+      "expect": {
+        "seq": 19,
+        "ok": true
+      },
+      "transport": "wifi"
+    },
+    {
+      "event": "wifi_close"
+    },
+    {
+      "event": "wifi_open"
+    },
+    {
+      "control": "!random a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5"
+    },
+    {
+      "send": {
+        "seq": 20,
+        "cmd": "auth_challenge"
+      },
+      "expect": {
+        "seq": 20,
+        "ok": true,
+        "nonce": "a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 21,
+        "cmd": "auth",
+        "hmac": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "expect": {
+        "seq": 21,
+        "ok": false,
+        "error": "unauthorized"
+      },
+      "transport": "wifi",
+      "close": false
+    },
+    {
+      "send": {
+        "seq": 22,
+        "cmd": "auth",
+        "hmac": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "expect": {
+        "seq": 22,
+        "ok": false,
+        "error": "unauthorized"
+      },
+      "transport": "wifi",
+      "close": false
+    },
+    {
+      "send": {
+        "seq": 23,
+        "cmd": "auth",
+        "hmac": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "expect": {
+        "seq": 23,
+        "ok": false,
+        "error": "unauthorized"
+      },
+      "transport": "wifi",
+      "close": true
+    },
+    {
+      "send": {
+        "seq": 24,
+        "cmd": "auth_challenge"
+      },
+      "expect": {
+        "seq": 24,
+        "ok": false,
+        "error": "bad_request"
+      },
+      "transport": "usb"
+    },
+    {
+      "send": {
+        "seq": 25,
+        "cmd": "auth",
+        "hmac": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "expect": {
+        "seq": 25,
+        "ok": false,
+        "error": "bad_request"
+      },
+      "transport": "usb"
+    },
+    {
+      "send": {
+        "seq": 26,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 26,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "not_configured",
+          "ssid": null,
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      },
+      "transport": "usb"
+    }
+  ]
+}

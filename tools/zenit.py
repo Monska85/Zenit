@@ -7,6 +7,8 @@
     zenit.py --port /dev/ttyACM0 settings-set brightness=40 effect=breathing
     zenit.py --port /dev/ttyACM0 light off
     zenit.py --port /dev/ttyACM0 raw '{"cmd":"settings_get"}'
+    zenit.py --port /dev/ttyACM0 update-check
+    zenit.py --ws ws://zenit-a1b2.local/ws --token <token> status
 
 The reply is printed as JSON. The exit status is 0 for a successful reply, 1 for an error reply and 2 when the board
 cannot be reached or answers nothing. The client sends `info` first and waits for its reply, as the protocol asks, and
@@ -17,6 +19,8 @@ for --ws.
 """
 
 import argparse
+import hashlib
+import hmac
 import json
 import math
 import random
@@ -210,18 +214,61 @@ def is_null(value):
     return value is None
 
 
+class Maybe:
+    """A field a reply may leave out (a board from before the WiFi and updates milestone does)."""
+
+    def __init__(self, schema):
+        self.schema = schema
+
+
 def conforms(value, schema):
-    """Whether `value` fits `schema`: a predicate, a dict (an object with at least these fields), a one-item list (an
-    array of that), or a tuple (any of these)."""
+    """Whether `value` fits `schema`: a predicate, a dict (an object with at least these fields; a Maybe field may be
+    missing), a one-item list (an array of that), or a tuple (any of these)."""
     if callable(schema):
         return schema(value)
     if isinstance(schema, dict):
-        return isinstance(value, dict) and all(key in value and conforms(value[key], item) for key, item in schema.items())
+        return isinstance(value, dict) and all(
+            (key not in value) if isinstance(item, Maybe) and key not in value else
+            (key in value and conforms(value[key], item.schema if isinstance(item, Maybe) else item))
+            for key, item in schema.items()
+        )
     if isinstance(schema, list):
         return isinstance(value, list) and all(conforms(item, schema[0]) for item in value)
     return any(conforms(value, option) for option in schema)
 
 
+def int_in(low, high):
+    return lambda value: is_int(value) and low <= value <= high
+
+
+def one_of(*words):
+    return lambda value: is_text(value) and value in words
+
+
+def matching(pattern):
+    compiled = re.compile(pattern)
+    return lambda value: is_text(value) and compiled.fullmatch(value) is not None
+
+
+def where(schema, rule):
+    """`schema`, and `rule(value)` of the whole object: the null-when and only-when rules of the specification."""
+    return lambda value: conforms(value, schema) and rule(value)
+
+
+def is_ipv4(value):
+    return (
+        is_text(value)
+        and re.fullmatch(r"(0|[1-9][0-9]{0,2})(\.(0|[1-9][0-9]{0,2})){3}", value) is not None
+        and all(int(part) <= 255 for part in value.split("."))
+    )
+
+
+def is_network_name(value):
+    return is_text(value) and 1 <= len(value.encode("utf-8")) <= 32
+
+
+RELEASE = matching(r"(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})")
+TOKEN = matching(r"[a-z0-9]{16}")
 SETTINGS = {
     "brightness": is_int,
     "effect": is_text,
@@ -233,7 +280,66 @@ SETTINGS = {
     "floor": is_int,
     "twinkle_strength": is_int,
     "timer_minutes": is_int,
+    # Words a newer firmware may extend are any text (docs/protocol/protocol-v1.md#versions)
+    "wifi_power": Maybe(is_text),
+    "update_mode": Maybe(is_text),
+    "update_firmware": Maybe(is_bool),
+    "check_hours": Maybe(int_in(1, 168)),
+    "install_start": Maybe(int_in(0, 1439)),
+    "install_end": Maybe(int_in(0, 1439)),
+    "timezone": Maybe(matching(r"[\x21-\x7e]{1,64}")),
+    "time_sync_hours": Maybe(int_in(1, 168)),
+    "ntp_server": Maybe(matching(r"[A-Za-z0-9.-]{1,64}")),
+    "network_login": Maybe(is_bool),
+    "token": Maybe(TOKEN),
 }
+# The states of this version that are not connected, and the update states that are not downloading
+WIFI_STATES_WITHOUT_ADDRESS = ("not_configured", "connecting", "not_found", "wrong_password", "no_address")
+UPDATE_STATES_WITHOUT_PROGRESS = ("idle", "checking", "verifying", "restarting")
+WIFI = where(
+    {
+        "state": is_text,
+        "ssid": (is_network_name, is_null),
+        "rssi": (int_in(-127, 0), is_null),
+        "ip": (is_ipv4, is_null),
+        "hostname": matching(r"zenit-[0-9a-f]{4}"),
+    },
+    # An address and a signal only while connected; no network stored, no name. A state this client does not know has
+    # no rule.
+    lambda wifi: (
+        wifi["ip"] is not None
+        if wifi["state"] == "connected"
+        else wifi["state"] not in WIFI_STATES_WITHOUT_ADDRESS or (wifi["ip"] is None and wifi["rssi"] is None)
+    )
+    and (wifi["state"] != "not_configured" or wifi["ssid"] is None),
+)
+# `synced`, the time and the minute of the day come together
+TIME = where(
+    {"synced": is_bool, "epoch": (int_in(0, 2**53), is_null), "local_minute": (int_in(0, 1439), is_null)},
+    lambda time: (time["synced"] is True) == (time["epoch"] is not None)
+    and (time["synced"] is True) == (time["local_minute"] is not None),
+)
+UPDATE = where(
+    {
+        "mode": is_text,
+        "state": is_text,
+        "available": (RELEASE, is_null),
+        "last_check": (int_in(0, 2**53), is_null),
+        "last_result": is_text,
+        "progress": (int_in(0, 100), is_null),
+        "trial": is_bool,
+        "skipped": (RELEASE, is_null),
+        "rolled_back": (RELEASE, is_null),
+    },
+    # A percentage only while downloading; a version offered after a check that found one
+    lambda update: (
+        update["progress"] is not None
+        if update["state"] == "downloading"
+        else update["state"] not in UPDATE_STATES_WITHOUT_PROGRESS or update["progress"] is None
+    )
+    and (update["last_result"] not in ("available", "skipped") or update["available"] is not None)
+    and (update["last_result"] != "up_to_date" or update["available"] is None),
+)
 LIGHT = {
     "on": is_bool,
     "effect": is_text,
@@ -257,11 +363,15 @@ REPLIES = {
         "nvs": {"used": is_int, "free": is_int},
         "limits": {"line": is_int},
     },
-    "status": {"light": LIGHT},
+    "status": {"light": LIGHT, "wifi": Maybe(WIFI), "time": Maybe(TIME), "update": Maybe(UPDATE)},
     "light": {"light": LIGHT},
     "settings_get": {"settings": SETTINGS},
     "settings_set": {"settings": SETTINGS},
     "settings_reset": {"settings": SETTINGS},
+    "token_regenerate": {"token": TOKEN},
+    "auth_challenge": {"nonce": matching(r"[0-9a-f]{32}")},
+    "update_check": {"update": UPDATE},
+    "update_install": {"update": UPDATE},
 }
 
 
@@ -331,6 +441,15 @@ class Client:
                     break  # the board did not understand the line: send it again at once
         raise ClientError(f"no reply to {command} after {self.attempts} tries" + (" that was well formed" if malformed else ""))
 
+    def login(self, token):
+        """The network login of a WiFi client: auth_challenge, then auth with the HMAC-SHA256 of the nonce under the
+        token. Returns the reply of `auth`."""
+        challenge = self.request("auth_challenge")
+        if not challenge.get("ok"):
+            return challenge
+        digest = hmac.new(token.encode("ascii"), challenge["nonce"].encode("ascii"), hashlib.sha256).hexdigest()
+        return self.request("auth", hmac=digest)
+
     def handshake(self):
         """`info` first, as the protocol asks, and a check of the protocol version."""
         reply = self.request("info")
@@ -372,6 +491,7 @@ def build_parser():
     where.add_argument("--port", help="USB serial port of the board, e.g. /dev/ttyACM0")
     where.add_argument("--ws", metavar="URL", help="WebSocket of the simulator or the board, e.g. ws://127.0.0.1:8765")
     parser.add_argument("--origin", help="Origin header to send with --ws (none by default, as command line clients do)")
+    parser.add_argument("--token", help="the board's token, to log in over --ws when network login is on")
     parser.add_argument("--timeout", type=float, default=REPLY_TIMEOUT, help="seconds to wait for a reply (default 2)")
     parser.add_argument("--attempts", type=int, default=ATTEMPTS, help="tries in all for a request (default 5)")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -381,6 +501,11 @@ def build_parser():
     commands.add_parser("settings-reset", help="every setting back to its default (USB only)")
     settings = commands.add_parser("settings-set", help="change settings, e.g. brightness=40 colors=red,blue")
     settings.add_argument("settings", nargs="+", metavar="KEY=VALUE")
+    commands.add_parser("wifi-forget", help="forget the stored WiFi network (USB only)")
+    commands.add_parser("token-regenerate", help="make a new token (USB only)")
+    commands.add_parser("update-check", help="check for a firmware update now")
+    install = commands.add_parser("update-install", help="install the firmware version the last check found")
+    install.add_argument("--force", action="store_true", help="install a version on the skip list")
     light = commands.add_parser("light", help="turn the light on or off, without saving")
     light.add_argument("state", choices=["on", "off"])
     raw = commands.add_parser("raw", help="send a request object as it is; `seq` is added unless given")
@@ -394,6 +519,8 @@ def request_of(args):
         return "settings_set", parse_settings(args.settings)
     if args.command == "light":
         return "light", {"on": args.state == "on"}
+    if args.command == "update-install":
+        return "update_install", {"target": "firmware", **({"force": True} if args.force else {})}
     if args.command == "raw":
         fields = json.loads(args.json)
         if not isinstance(fields, dict) or not isinstance(fields.get("cmd"), str):
@@ -416,6 +543,11 @@ def main(argv=None, out=None):
         link = SerialLink(args.port) if args.port else WebSocketLink(args.ws, args.origin)
         client = Client(link, args.timeout, args.attempts)
         client.handshake()
+        if args.token and args.ws:
+            login = client.login(args.token)
+            if not login.get("ok"):
+                print(f"zenit: the login failed: {login.get('error')}", file=sys.stderr)
+                return 2
         seq = fields.pop("seq", None) if args.command == "raw" else None
         # raw sends what it is given, even `info`
         reply = client.info if args.command == "info" else client.send(command, fields, seq)

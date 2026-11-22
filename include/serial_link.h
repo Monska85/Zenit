@@ -10,6 +10,9 @@
 namespace serial_link
 {
 
+// Connects Improv's frames to the serial port. Call once, before the first poll.
+void begin();
+
 // Reads the bytes that have arrived, without waiting, and handles at most one complete line. Call it on every pass of
 // loop().
 void poll(uint64_t now);

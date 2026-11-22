@@ -6,9 +6,16 @@ The WebSocket rules are tested against the real simulator, so they need its prog
 
 from socket import create_connection
 import asyncio
+import hashlib
+import hmac
+import json
+import re
 import subprocess
 import sys
+import tempfile
 import unittest
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -72,38 +79,24 @@ class ControlLineOrderTest(unittest.IsolatedAsyncioTestCase):
 
 
 class OriginTest(unittest.TestCase):
-    def test_allowed_origins(self):
-        for origin in (
-            None,
-            "http://localhost",
-            "http://localhost:5173",
-            "http://127.0.0.1",
-            "http://127.0.0.1:4173",
-            "http://localhost:1",
-            "http://localhost:65535",
-            "http://localhost:8080",
-            "https://monska85.github.io",
-        ):
+    def test_the_conformance_cases_of_the_boards_origin_check(self):
+        cases = json.loads((ROOT / "conformance" / "net" / "origin.json").read_text(encoding="utf-8"))
+        self.assertEqual(cases["site_origin"], ws_bridge.SITE_ORIGIN)
+        for case in cases["cases"]:
+            self.assertEqual(ws_bridge.origin_allowed(case["origin"]), case["allowed"], str(case["origin"]))
+
+    def test_the_origins_of_the_development_server_and_the_end_to_end_tests(self):
+        for origin in ("http://localhost:5173", "http://127.0.0.1:4173", "http://localhost:65535", "https://monska85.github.io"):
             self.assertTrue(ws_bridge.origin_allowed(origin), origin)
 
-    def test_refused_origins(self):
-        for origin in (
-            "https://example.com",
-            "http://localhost.example.com",
-            "http://localhost:99999x",
-            "http://localhost:0",
-            "http://localhost:65536",
-            "http://localhost:99999",
-            "http://localhost:080",
-            "http://localhost:",
-            "http://127.0.0.1:123456",
-            "https://localhost",
-            "http://127.0.0.1.example.com",
-            "https://monska85.github.io.evil.example",
-            "http://monska85.github.io",
-            "null",
-            "",
-        ):
+    def test_private_and_local_origins_are_allowed_as_on_the_board(self):
+        for origin in ("http://192.168.1.20", "https://192.168.1.20:8443", "http://10.0.0.1", "http://zenit-a1b2.local",
+                       "http://zenit-a1b2.local:80", "http://169.254.1.1"):
+            self.assertTrue(ws_bridge.origin_allowed(origin), origin)
+
+    def test_public_origins_are_refused(self):
+        for origin in ("http://8.8.8.8", "http://example.com", "https://example.com", "http://172.32.0.1", "http://evil.local.com",
+                       "http://localhost.example.com", "null", "", "http://localhost:99999", "https://monska85.github.io.evil.example"):
             self.assertFalse(ws_bridge.origin_allowed(origin), origin)
 
     def test_added_origins_are_exact(self):
@@ -297,6 +290,167 @@ class BridgeTest(unittest.TestCase):
     def test_the_bridge_stops_with_the_simulator(self):
         self.process.terminate()
         self.assertIn(self.process.wait(timeout=5), (0, -15))
+
+
+@unittest.skipUnless(SIMULATOR.exists() and HAVE_WEBSOCKETS, "needs the simulator program and the websockets package")
+class ServedAppTest(unittest.TestCase):
+    """The bridge with --app answers page requests as a board does."""
+
+    def setUp(self):
+        self.dist = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dist.cleanup)
+        root = Path(self.dist.name)
+        (root / "assets").mkdir()
+        (root / "index.html").write_text("<!doctype html><title>Zenit</title>", encoding="utf-8")
+        (root / "assets" / "app-abc.js").write_text("console.log(1)", encoding="utf-8")
+        self.process = subprocess.Popen(
+            [sys.executable, str(BRIDGE), "--sim", str(SIMULATOR), "--port", "0", "--app", self.dist.name, "--hostname", "zenit-a1b2"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        self.addCleanup(self.stop)
+        first = self.process.stdout.readline().strip()
+        self.assertRegex(first, r"^listening ws://127\.0\.0\.1:[0-9]+$")
+        self.base = "http://" + first.split("://", 1)[1]
+
+    def stop(self):
+        self.process.terminate()
+        try:
+            self.process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+            self.process.wait()
+        self.process.stdout.close()
+        self.process.stderr.close()
+
+    def get(self, path):
+        try:
+            with urllib.request.urlopen(self.base + path, timeout=5) as response:
+                return response.status, response.headers, response.read()
+        except urllib.error.HTTPError as error:
+            return error.code, error.headers, error.read()
+
+    def test_the_page_and_its_files(self):
+        status, headers, body = self.get("/")
+        self.assertEqual((status, headers["Content-Type"], headers["Cache-Control"]), (200, "text/html; charset=utf-8", "no-cache"))
+        self.assertIn(b"<title>Zenit</title>", body)
+        status, headers, _ = self.get("/assets/app-abc.js")
+        self.assertEqual((status, headers["Cache-Control"]), (200, "public, max-age=31536000, immutable"))
+
+    def test_every_answer_has_the_security_headers(self):
+        for path in ("/", "/board.json", "/missing"):
+            _, headers, _ = self.get(path)
+            for name, value in ws_bridge.SECURITY_HEADERS.items():
+                self.assertEqual(headers[name], value, f"{path} {name}")
+
+    def test_the_headers_are_the_boards(self):
+        source = (ROOT / "lib" / "ZenitNet" / "src" / "net_http.cpp").read_text(encoding="utf-8")
+        block = source[source.index("COMMON_HEADERS[] = {") : source.index("};", source.index("COMMON_HEADERS[] = {"))]
+        board = {}
+        for name, value in re.findall(r'\{"([A-Za-z-]+)",\s*((?:"(?:[^"\\]|\\.)*"\s*)+)\}', block):
+            board[name] = "".join(re.findall(r'"((?:[^"\\]|\\.)*)"', value))
+        self.assertEqual(board, ws_bridge.SECURITY_HEADERS)
+
+    def test_other_methods_are_405_with_allow_get(self):
+        import http.client
+
+        host, port = self.base[len("http://") :].split(":")
+        for method in ("POST", "HEAD", "PUT", "DELETE"):
+            for path in ("/", "/board.json", "/assets/app-abc.js"):
+                connection = http.client.HTTPConnection(host, int(port), timeout=5)
+                # No body: the WebSocket library closes a connection whose handshake request has one, which the bridge
+                # documents as its difference from a board (the board answers 405 to a request with a body too)
+                connection.request(method, path)
+                response = connection.getresponse()
+                response.read()
+                self.assertEqual(response.status, 405, f"{method} {path}")
+                self.assertEqual(response.getheader("Allow"), "GET", f"{method} {path}")
+                self.assertEqual(response.getheader("Content-Security-Policy"), ws_bridge.SECURITY_HEADERS["Content-Security-Policy"])
+                connection.close()
+
+    def test_board_json(self):
+        status, headers, body = self.get("/board.json")
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body), {"zenit": True, "hostname": "zenit-a1b2", "ws": "/ws"})
+
+    def test_what_is_not_served_is_404(self):
+        for path in ("/missing", "/assets/", "/../index.html", "/assets/../index.html", "/%2e%2e/index.html", "/assets%5capp-abc.js"):
+            self.assertEqual(self.get(path)[0], 404, path)
+
+    def test_the_websocket_works_beside_the_page(self):
+        with connect(self.base.replace("http://", "ws://") + "/ws", compression=None) as socket:
+            socket.send(zenit.frame({"seq": 1, "cmd": "info"}).decode("utf-8"))
+            reply = zenit.parse_line(socket.recv(timeout=5).encode("utf-8"))
+            self.assertTrue(reply["ok"])
+            # A page request does not need the WebSocket slot
+            self.assertEqual(self.get("/")[0], 200)
+
+
+@unittest.skipUnless(SIMULATOR.exists(), "needs the simulator program")
+class SimulatorWifiTest(unittest.TestCase):
+    """The simulator as a board on WiFi, driven through its standard input: login, the close request and the token."""
+
+    TOKEN = "abcdefghij012345"
+
+    def setUp(self):
+        self.process = subprocess.Popen(
+            [str(SIMULATOR), "--protocol", "--transport", "wifi"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True
+        )
+        self.addCleanup(self.stop)
+        self.send_raw("!token " + self.TOKEN)
+        self.send_raw("!wifi-open")
+        self.seq = 0
+
+    def stop(self):
+        self.process.stdin.close()
+        self.process.wait(timeout=5)
+        self.process.stdout.close()
+
+    def send_raw(self, line):
+        self.process.stdin.write(line + "\n")
+        self.process.stdin.flush()
+
+    def ask(self, command, **fields):
+        """The reply and whether the simulator asked to close the connection after it."""
+        self.seq += 1
+        self.send_raw(zenit.frame({"seq": self.seq, "cmd": command, **fields}).decode())
+        # A control line that answers at once marks the end of what this request wrote
+        self.send_raw("!update firmware 1 0")
+        reply, closed = None, False
+        for line in self.process.stdout:
+            if line.startswith("!sha256"):
+                break
+            closed = closed or line.startswith("!close-client")
+            parsed = zenit.parse_line(line.encode())
+            if parsed is not None:
+                reply = parsed
+        return reply, closed
+
+    def test_the_login_works_and_three_failures_ask_to_close(self):
+        reply, _ = self.ask("settings_set", network_login=True)
+        self.assertTrue(reply["ok"])
+        self.assertNotIn("token", reply["settings"])
+        reply, _ = self.ask("status")
+        self.assertEqual(reply["error"], "unauthorized")
+        reply, _ = self.ask("auth_challenge")
+        digest = hmac.new(self.TOKEN.encode(), reply["nonce"].encode(), hashlib.sha256).hexdigest()
+        reply, closed = self.ask("auth", hmac=digest)
+        self.assertEqual((reply["ok"], closed), (True, False))
+        self.assertTrue(self.ask("status")[0]["ok"])
+
+    def test_three_failed_logins_ask_to_close(self):
+        self.ask("settings_set", network_login=True)
+        results = []
+        for _ in range(3):
+            self.ask("auth_challenge")
+            results.append(self.ask("auth", hmac="0" * 64))
+        self.assertEqual([(r["error"], closed) for r, closed in results], [("unauthorized", False)] * 2 + [("unauthorized", True)])
+
+    def test_settings_reset_and_the_token_are_usb_only(self):
+        for command in ("settings_reset", "wifi_forget", "token_regenerate"):
+            self.assertEqual(self.ask(command)[0]["error"], "usb_only", command)
+        self.assertNotIn("token", self.ask("settings_get")[0]["settings"])
 
 
 if __name__ == "__main__":

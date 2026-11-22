@@ -21,6 +21,10 @@ export function PrivacyView() {
             The browser keeps two things on this device: your theme choice, and the last address you connected to.
           </li>
           <li>
+            Your WiFi password goes from this page to your Zenit over the USB cable, and nowhere else. The page does not
+            keep it. The access token, if you use one, stays in the page's memory until you close it.
+          </li>
+          <li>
             Installing firmware downloads the firmware file from this same site and writes it to your Zenit over the USB
             cable.
           </li>

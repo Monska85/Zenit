@@ -1,0 +1,398 @@
+{
+  "description": "The WiFi decisions: the wait after each failed try, the state a disconnect reason leaves, the power fallback of auto, the hostname, and the checks of the network name and password.",
+  "backoff_ms": [
+    [
+      0,
+      1000
+    ],
+    [
+      1,
+      1000
+    ],
+    [
+      2,
+      2000
+    ],
+    [
+      3,
+      4000
+    ],
+    [
+      4,
+      8000
+    ],
+    [
+      5,
+      16000
+    ],
+    [
+      6,
+      32000
+    ],
+    [
+      7,
+      60000
+    ],
+    [
+      8,
+      60000
+    ],
+    [
+      100,
+      60000
+    ]
+  ],
+  "disconnect": [
+    [
+      201,
+      "not_found"
+    ],
+    [
+      202,
+      "wrong_password"
+    ],
+    [
+      204,
+      "wrong_password"
+    ],
+    [
+      15,
+      "wrong_password"
+    ],
+    [
+      14,
+      "wrong_password"
+    ],
+    [
+      23,
+      "wrong_password"
+    ],
+    [
+      2,
+      "connecting"
+    ],
+    [
+      8,
+      "connecting"
+    ],
+    [
+      200,
+      "connecting"
+    ],
+    [
+      205,
+      "connecting"
+    ],
+    [
+      0,
+      "connecting"
+    ]
+  ],
+  "power": [
+    {
+      "setting": "auto",
+      "failures": 0,
+      "fell_back": false,
+      "quarter_dbm": 78
+    },
+    {
+      "setting": "auto",
+      "failures": 2,
+      "fell_back": false,
+      "quarter_dbm": 78
+    },
+    {
+      "setting": "auto",
+      "failures": 3,
+      "fell_back": false,
+      "quarter_dbm": 34
+    },
+    {
+      "setting": "auto",
+      "failures": 0,
+      "fell_back": true,
+      "quarter_dbm": 34
+    },
+    {
+      "setting": "8.5",
+      "failures": 9,
+      "fell_back": false,
+      "quarter_dbm": 34
+    },
+    {
+      "setting": "11",
+      "failures": 0,
+      "fell_back": false,
+      "quarter_dbm": 44
+    },
+    {
+      "setting": "13",
+      "failures": 0,
+      "fell_back": false,
+      "quarter_dbm": 52
+    },
+    {
+      "setting": "15",
+      "failures": 0,
+      "fell_back": false,
+      "quarter_dbm": 60
+    },
+    {
+      "setting": "17",
+      "failures": 0,
+      "fell_back": false,
+      "quarter_dbm": 68
+    },
+    {
+      "setting": "18.5",
+      "failures": 0,
+      "fell_back": false,
+      "quarter_dbm": 74
+    },
+    {
+      "setting": "19.5",
+      "failures": 5,
+      "fell_back": true,
+      "quarter_dbm": 78
+    }
+  ],
+  "hostname": [
+    {
+      "mac": [
+        36,
+        111,
+        40,
+        161,
+        178,
+        195
+      ],
+      "name": "zenit-b2c3"
+    },
+    {
+      "mac": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "name": "zenit-0000"
+    },
+    {
+      "mac": [
+        1,
+        2,
+        3,
+        4,
+        10,
+        255
+      ],
+      "name": "zenit-0aff"
+    }
+  ],
+  "ssid": [
+    {
+      "text": "a",
+      "valid": true
+    },
+    {
+      "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "valid": true
+    },
+    {
+      "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "valid": false
+    },
+    {
+      "text": "",
+      "valid": false
+    }
+  ],
+  "password": [
+    {
+      "text": "",
+      "valid": true
+    },
+    {
+      "text": "1234567",
+      "valid": false
+    },
+    {
+      "text": "12345678",
+      "valid": true
+    },
+    {
+      "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "valid": true
+    },
+    {
+      "text": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "valid": false
+    },
+    {
+      "text": "0123456789abcdefABCDEF000000000000000000000000000000000000000000",
+      "valid": true
+    }
+  ],
+  "server_retry": {
+    "description": "A service that failed to start (the HTTP server, mDNS, SNTP: each has its own timer) may be tried again: due at once before any failure, then after the waits of a reconnection counted from each failure, and due at once again after a success.",
+    "steps": [
+      {
+        "at": 0,
+        "due": true,
+        "then": "fail"
+      },
+      {
+        "at": 999,
+        "due": false
+      },
+      {
+        "at": 1000,
+        "due": true,
+        "then": "fail"
+      },
+      {
+        "at": 2999,
+        "due": false
+      },
+      {
+        "at": 3000,
+        "due": true,
+        "then": "fail"
+      },
+      {
+        "at": 6999,
+        "due": false
+      },
+      {
+        "at": 7000,
+        "due": true,
+        "then": "reset"
+      },
+      {
+        "at": 7001,
+        "due": true
+      }
+    ]
+  },
+  "ssid_bytes": [
+    {
+      "hex": "c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9",
+      "valid": true,
+      "note": "16 two-byte characters: exactly 32 bytes"
+    },
+    {
+      "hex": "c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a961",
+      "valid": false,
+      "note": "33 bytes"
+    },
+    {
+      "hex": "616161616161616161616161616161616161616161616161616161616161c3a9",
+      "valid": true,
+      "note": "a two-byte character ending at byte 32"
+    },
+    {
+      "hex": "61616161616161616161616161616161616161616161616161616161616161c3a9",
+      "valid": false,
+      "note": "a two-byte character crossing byte 32"
+    },
+    {
+      "hex": "f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880f09f9880",
+      "valid": true,
+      "note": "eight four-byte characters: 32 bytes"
+    },
+    {
+      "hex": "ff",
+      "valid": false,
+      "note": "an invalid byte"
+    },
+    {
+      "hex": "61c3",
+      "valid": false,
+      "note": "a truncated sequence"
+    },
+    {
+      "hex": "c080",
+      "valid": false,
+      "note": "an overlong form"
+    },
+    {
+      "hex": "eda080",
+      "valid": false,
+      "note": "an encoded surrogate"
+    },
+    {
+      "hex": "f4908080",
+      "valid": false,
+      "note": "above U+10FFFF"
+    },
+    {
+      "hex": "610162",
+      "valid": false,
+      "note": "a control byte"
+    },
+    {
+      "hex": "611f62",
+      "valid": false,
+      "note": "the last C0 control"
+    },
+    {
+      "hex": "610962",
+      "valid": false,
+      "note": "a tab"
+    },
+    {
+      "hex": "617f62",
+      "valid": false,
+      "note": "DEL"
+    },
+    {
+      "hex": "61622063",
+      "valid": true,
+      "note": "a space is a character"
+    },
+    {
+      "hex": "2271756f7465645c",
+      "valid": true,
+      "note": "a quote and a backslash are text"
+    }
+  ],
+  "scan_ssid_field": [
+    {
+      "field_hex": "486f6d650000000000000000000000000000000000000000000000000000000000",
+      "length": 4,
+      "note": "a plain name, zeros after it"
+    },
+    {
+      "field_hex": "616161616161616161616161616161616161616161616161616161616161616100",
+      "length": 32,
+      "note": "32 bytes of name, the terminating zero is the 33rd byte"
+    },
+    {
+      "field_hex": "486f6d65004576696c000000000000000000000000000000000000000000000000",
+      "length": null,
+      "note": "bytes after the first zero: refused, not read as Home"
+    },
+    {
+      "field_hex": "000000000000000000000000000000000000000000000000000000000000000000",
+      "length": 0,
+      "note": "an empty field is a hidden network of length 0"
+    },
+    {
+      "field_hex": "616161616161616161616161616161616161616161616161616161616161616178",
+      "length": null,
+      "note": "no zero at all in 33 bytes: refused"
+    },
+    {
+      "field_hex": "416200000000000000000000000000000000000000000000000000000000000000",
+      "length": 2,
+      "note": "a zero then only zeros"
+    },
+    {
+      "field_hex": "616263000000000000000000000000000000000000000000000000000000000001",
+      "length": null,
+      "note": "a nonzero byte in the last place after a zero"
+    }
+  ]
+}

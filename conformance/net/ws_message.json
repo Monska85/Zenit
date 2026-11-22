@@ -1,0 +1,193 @@
+{
+  "description": "The reassembly of WebSocket data frames into one protocol line: fragments, the limits, binary, newlines and UTF-8. kind is text, binary or continuation; the result of each frame is more, line or close with a status.",
+  "cases": [
+    {
+      "name": "one text frame",
+      "frames": [
+        {
+          "kind": "text",
+          "final": true,
+          "hex": "686921",
+          "begin": "more",
+          "end": "line"
+        }
+      ],
+      "line": "hi!"
+    },
+    {
+      "name": "three fragments",
+      "frames": [
+        {
+          "kind": "text",
+          "final": false,
+          "hex": "6162",
+          "begin": "more",
+          "end": "more"
+        },
+        {
+          "kind": "continuation",
+          "final": false,
+          "hex": "63",
+          "begin": "more",
+          "end": "more"
+        },
+        {
+          "kind": "continuation",
+          "final": true,
+          "hex": "6465",
+          "begin": "more",
+          "end": "line"
+        }
+      ],
+      "line": "abcde"
+    },
+    {
+      "name": "a continuation with no message",
+      "frames": [
+        {
+          "kind": "continuation",
+          "final": true,
+          "hex": "61",
+          "begin": "close:1002"
+        }
+      ]
+    },
+    {
+      "name": "a new message inside a message",
+      "frames": [
+        {
+          "kind": "text",
+          "final": false,
+          "hex": "61",
+          "begin": "more",
+          "end": "more"
+        },
+        {
+          "kind": "text",
+          "final": true,
+          "hex": "62",
+          "begin": "close:1002"
+        }
+      ]
+    },
+    {
+      "name": "binary",
+      "frames": [
+        {
+          "kind": "binary",
+          "final": true,
+          "hex": "00",
+          "begin": "more",
+          "end": "close:1003"
+        }
+      ]
+    },
+    {
+      "name": "newline inside",
+      "frames": [
+        {
+          "kind": "text",
+          "final": true,
+          "hex": "610a62",
+          "begin": "more",
+          "end": "close:1008"
+        }
+      ]
+    },
+    {
+      "name": "invalid UTF-8",
+      "frames": [
+        {
+          "kind": "text",
+          "final": true,
+          "hex": "c328",
+          "begin": "more",
+          "end": "close:1007"
+        }
+      ]
+    },
+    {
+      "name": "a lone surrogate encoded in UTF-8",
+      "frames": [
+        {
+          "kind": "text",
+          "final": true,
+          "hex": "eda080",
+          "begin": "more",
+          "end": "close:1007"
+        }
+      ]
+    },
+    {
+      "name": "valid UTF-8",
+      "frames": [
+        {
+          "kind": "text",
+          "final": true,
+          "hex": "c3a9e282ac",
+          "begin": "more",
+          "end": "line"
+        }
+      ],
+      "line_hex": "c3a9e282ac"
+    },
+    {
+      "name": "the limit",
+      "frames": [
+        {
+          "kind": "text",
+          "final": true,
+          "size": 1024,
+          "fill": "61",
+          "begin": "more",
+          "end": "line"
+        }
+      ]
+    },
+    {
+      "name": "over the limit",
+      "frames": [
+        {
+          "kind": "text",
+          "final": true,
+          "size": 1025,
+          "fill": "61",
+          "begin": "close:1009"
+        }
+      ]
+    },
+    {
+      "name": "over the limit in fragments",
+      "frames": [
+        {
+          "kind": "text",
+          "final": false,
+          "size": 1000,
+          "fill": "61",
+          "begin": "more",
+          "end": "more"
+        },
+        {
+          "kind": "continuation",
+          "final": true,
+          "size": 25,
+          "fill": "61",
+          "begin": "close:1009"
+        }
+      ]
+    },
+    {
+      "name": "an empty text message is an empty line",
+      "frames": [
+        {
+          "kind": "text",
+          "final": true,
+          "hex": "",
+          "begin": "more",
+          "end": "line"
+        }
+      ],
+      "line": ""
+    }
+  ]
+}

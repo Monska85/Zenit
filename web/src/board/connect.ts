@@ -25,7 +25,7 @@ export const MIXED_CONTENT_MESSAGE =
  */
 export function usbOpener(): Opener {
   let last: SerialPortLike | null = null;
-  return async () => {
+  return async (interactive) => {
     const serial = serialApi();
     if (!serial) throw new OpenFailed("This browser cannot use a USB cable. Use Chrome or Edge.");
     if (last) {
@@ -35,6 +35,8 @@ export function usbOpener(): Opener {
         last = null; // gone or in use: ask again
       }
     }
+    // The chooser needs a click: a try the page makes by itself can only reuse the port it had
+    if (!interactive) throw new OpenFailed("The USB port is not there yet.");
     let port: SerialPortLike;
     try {
       port = await serial.requestPort({ filters: [{ usbVendorId: ESPRESSIF_VENDOR_ID }] });

@@ -41,6 +41,29 @@
           "lightness": 30.0,
           "power_scale": 100,
           "timer": null
+        },
+        "wifi": {
+          "state": "not_configured",
+          "ssid": null,
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
         }
       }
     },
@@ -62,6 +85,29 @@
           "lightness": 0.0,
           "power_scale": 100,
           "timer": null
+        },
+        "wifi": {
+          "state": "not_configured",
+          "ssid": null,
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
         }
       }
     },
@@ -102,6 +148,29 @@
           "lightness": 30.0,
           "power_scale": 100,
           "timer": null
+        },
+        "wifi": {
+          "state": "not_configured",
+          "ssid": null,
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
         }
       }
     },
@@ -143,6 +212,29 @@
           "lightness": 60.0,
           "power_scale": 100,
           "timer": null
+        },
+        "wifi": {
+          "state": "not_configured",
+          "ssid": null,
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
         }
       }
     },
@@ -169,7 +261,20 @@
           "period_seconds": 8,
           "floor": 20,
           "twinkle_strength": 20,
-          "timer_minutes": 0
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
         }
       },
       "note": "light does not save"

@@ -458,6 +458,11 @@ class ArgumentsTest(unittest.TestCase):
         self.assertEqual(self.request("light", "on"), ("light", {"on": True}))
         self.assertEqual(self.request("light", "off"), ("light", {"on": False}))
         self.assertEqual(self.request("raw", '{"cmd":"light","on":true}'), ("light", {"on": True}))
+        self.assertEqual(self.request("wifi-forget"), ("wifi_forget", {}))
+        self.assertEqual(self.request("token-regenerate"), ("token_regenerate", {}))
+        self.assertEqual(self.request("update-check"), ("update_check", {}))
+        self.assertEqual(self.request("update-install"), ("update_install", {"target": "firmware"}))
+        self.assertEqual(self.request("update-install", "--force"), ("update_install", {"target": "firmware", "force": True}))
         with self.assertRaises(ValueError):
             self.request("raw", "[1]")
         with self.assertRaises(ValueError):
@@ -470,6 +475,137 @@ class ArgumentsTest(unittest.TestCase):
         for argv in (["info"], ["--port", "a", "--ws", "ws://x", "info"]):
             with self.assertRaises(SystemExit), mock.patch("sys.stderr", io.StringIO()):
                 parser.parse_args(argv)
+
+
+WIFI = {"state": "connected", "ssid": "HomeNet", "rssi": -61, "ip": "192.168.1.20", "hostname": "zenit-a1b2"}
+TIME = {"synced": True, "epoch": 1790000000, "local_minute": 853}
+UPDATE = {
+    "mode": "automatic",
+    "state": "idle",
+    "available": None,
+    "last_check": None,
+    "last_result": "never",
+    "progress": None,
+    "trial": False,
+    "skipped": None,
+    "rolled_back": None,
+}
+
+
+class WifiAndUpdatesRepliesTest(unittest.TestCase):
+    """The replies of milestone 4: new parts a board of before it leaves out, and the new commands."""
+
+    def accepted(self, command, **fields):
+        return zenit.valid_body(command, {"ok": True, **fields})
+
+    def test_the_new_parts_of_status_are_optional_but_checked(self):
+        self.assertTrue(self.accepted("status", light=LIGHT))
+        self.assertTrue(self.accepted("status", light=LIGHT, wifi=WIFI, time=TIME, update=UPDATE))
+        self.assertFalse(self.accepted("status", light=LIGHT, wifi={**WIFI, "state": 3}))
+        self.assertFalse(self.accepted("status", light=LIGHT, time={**TIME, "synced": 1}))
+        self.assertFalse(self.accepted("status", light=LIGHT, update={**UPDATE, "progress": 1.5}))
+
+    def test_status_parts_with_a_value_the_specification_does_not_allow_are_refused(self):
+        bad_wifi = [
+            {"hostname": "zenit"}, {"rssi": 5}, {"rssi": -200}, {"ssid": ""}, {"ssid": "x" * 33},
+            {"ip": "300.1.1.1"}, {"state": "connected", "ip": None}, {"state": "connecting", "ip": "192.168.1.5"},
+            {"state": "wrong_password", "rssi": -60, "ip": None},
+            {"state": "not_configured", "ip": None, "rssi": None, "ssid": "HomeNet"},
+        ]  # fmt: skip
+        for change in bad_wifi:
+            self.assertFalse(self.accepted("status", light=LIGHT, wifi={**WIFI, **change}), str(change))
+        bad_time = [
+            {"synced": True, "epoch": None, "local_minute": None}, {"synced": False, "epoch": 5, "local_minute": None},
+            {"synced": True, "epoch": 5, "local_minute": 1440}, {"synced": True, "epoch": -1, "local_minute": 3},
+        ]  # fmt: skip
+        for time in bad_time:
+            self.assertFalse(self.accepted("status", light=LIGHT, time=time), str(time))
+        bad_update = [
+            {"state": "downloading", "progress": 500}, {"state": "downloading", "progress": -1},
+            {"state": "downloading", "progress": None}, {"state": "idle", "progress": 5},             {"available": "1.2"}, {"available": "1.2.0-rc.1"},
+            {"skipped": "latest"}, {"rolled_back": 3}, {"last_check": -5},
+            {"last_result": "available", "available": None}, {"last_result": "skipped", "available": None},
+            {"last_result": "up_to_date", "available": "1.2.0"},
+        ]  # fmt: skip
+        for change in bad_update:
+            self.assertFalse(self.accepted("status", light=LIGHT, update={**UPDATE, **change}), str(change))
+        good = {**UPDATE, "state": "downloading", "progress": 100, "available": "1.2.0", "last_result": "available"}
+        self.assertTrue(self.accepted("status", light=LIGHT, update=good))
+
+    def test_the_words_a_newer_firmware_may_add_are_accepted(self):
+        accepted = [
+            {"wifi": {**WIFI, "state": "roaming"}},
+            {"wifi": {**WIFI, "state": "roaming", "ip": None, "rssi": None}},
+            {"update": {**UPDATE, "state": "paused"}},
+            {"update": {**UPDATE, "state": "paused", "progress": 40}},
+            {"update": {**UPDATE, "mode": "smart"}},
+            {"update": {**UPDATE, "last_result": "rate_limited"}},
+        ]
+        for part in accepted:
+            self.assertTrue(self.accepted("status", light=LIGHT, **part), str(part))
+        board = {"wifi_power": "21", "update_mode": "smart"}
+        self.assertTrue(self.accepted("settings_get", settings={**SETTINGS, **board}))
+        self.assertTrue(self.accepted("update_check", update={**UPDATE, "last_result": "rate_limited"}))
+
+    def test_board_settings_outside_the_specified_ranges_are_refused(self):
+        board = {"wifi_power": "auto", "update_mode": "off", "update_firmware": True, "check_hours": 6, "install_start": 0,
+                 "install_end": 0, "timezone": "UTC0", "time_sync_hours": 6, "ntp_server": "pool.ntp.org", "network_login": False}  # fmt: skip
+        bad = [
+            {"check_hours": 0}, {"check_hours": 169},
+            {"install_start": 1440}, {"install_end": -1}, {"time_sync_hours": 0}, {"time_sync_hours": 169},
+            {"timezone": ""}, {"timezone": "A B"}, {"timezone": "x" * 65}, {"ntp_server": ""},
+            {"ntp_server": "bad host"}, {"ntp_server": "h" * 65}, {"token": "ABCDEFGHIJ012345"}, {"token": "abc"},
+        ]  # fmt: skip
+        for change in bad:
+            settings = {**SETTINGS, **board, **change}
+            self.assertFalse(self.accepted("settings_get", settings=settings), str(change))
+
+    def test_the_token_and_the_nonce_have_their_shapes(self):
+        for token in ("abc", "ABCDEFGHIJ012345", "abcdefghij01234!"):
+            self.assertFalse(self.accepted("token_regenerate", token=token), token)
+        for nonce in ("00", "0" * 31, "0" * 33, "G" * 32, "A" * 32):
+            self.assertFalse(self.accepted("auth_challenge", nonce=nonce), nonce)
+
+    def test_board_settings_are_optional_but_checked(self):
+        board = {"wifi_power": "auto", "update_mode": "off", "update_firmware": True, "check_hours": 6, "install_start": 0,
+                 "install_end": 0, "timezone": "UTC0", "time_sync_hours": 6, "ntp_server": "pool.ntp.org", "network_login": False}
+        self.assertTrue(self.accepted("settings_get", settings=SETTINGS))
+        self.assertTrue(self.accepted("settings_get", settings={**SETTINGS, **board, "token": "abcdefghij012345"}))
+        self.assertFalse(self.accepted("settings_get", settings={**SETTINGS, **board, "check_hours": "6"}))
+        self.assertFalse(self.accepted("settings_get", settings={**SETTINGS, **board, "network_login": 0}))
+
+    def test_the_replies_of_the_new_commands(self):
+        self.assertTrue(self.accepted("token_regenerate", token="abcdefghij012345"))
+        self.assertFalse(self.accepted("token_regenerate"))
+        self.assertTrue(self.accepted("auth_challenge", nonce="00" * 16))
+        self.assertTrue(self.accepted("auth"))
+        self.assertTrue(self.accepted("wifi_forget"))
+        self.assertTrue(self.accepted("update_check", update=UPDATE))
+        self.assertFalse(self.accepted("update_install", update={**UPDATE, "trial": "no"}))
+
+    def test_login_answers_the_challenge_with_the_hmac_of_the_nonce_under_the_token(self):
+        import hashlib
+        import hmac
+
+        nonce = "000102030405060708090a0b0c0d0e0f"
+        sent = []
+
+        def respond(line, count):
+            request = zenit.parse_line(line)
+            sent.append(request)
+            if request["cmd"] == "auth_challenge":
+                return [reply_line(seq=request["seq"], ok=True, nonce=nonce)]
+            return [reply_line(seq=request["seq"], ok=True)]
+
+        client = zenit.Client(ScriptedLink(respond), timeout=2, seq=1)
+        self.assertTrue(client.login("abcdefghij012345")["ok"])
+        expected = hmac.new(b"abcdefghij012345", nonce.encode(), hashlib.sha256).hexdigest()
+        self.assertEqual([r["cmd"] for r in sent], ["auth_challenge", "auth"])
+        self.assertEqual(sent[1]["hmac"], expected)
+
+    def test_a_refused_challenge_is_returned_as_it_is(self):
+        link = ScriptedLink(lambda line, count: [reply_line(seq=seq_of(line), ok=False, error="bad_request", message="x")])
+        self.assertFalse(zenit.Client(link, timeout=2, seq=1).login("abcdefghij012345")["ok"])
 
 
 class MainTest(unittest.TestCase):
@@ -654,6 +790,39 @@ class SimulatorControlLinesTest(unittest.TestCase):
         replies = [zenit.parse_line(line.encode()) for line in out.splitlines() if line.startswith("@ZN ")]
         self.assertEqual([r["light"]["lightness"] for r in replies], [0.0, 60.0])
         self.assertEqual(err, "")
+
+    def test_a_scan_ranks_every_access_point_and_keeps_the_best_sixteen_names(self):
+        # 16 names at -80, a late stronger access point of one of them, a late stronger new name, a late weak one
+        entries = [f"N{i}:-80:YES" for i in range(16)] + ["N3:-30:YES", "Late:-20:NO", "Weak:-90:YES"]
+        out, err = self.run_simulator([], "!scan " + " ".join(entries) + "\n!scan-list\n")
+        self.assertEqual(err, "")
+        lines = [line for line in out.splitlines() if line.startswith("!scan-list")]
+        self.assertEqual(lines[-1], "!scan-list end")
+        names = [line.split()[1] for line in lines[:-1]]
+        self.assertEqual(len(names), 16)
+        self.assertEqual(names[:3], ["Late", "N3", "N1"])
+        self.assertNotIn("N0", names)
+        self.assertNotIn("Weak", names)
+        self.assertEqual(lines[0], "!scan-list Late -20 NO")
+
+    def test_names_that_cannot_be_reported_never_rank_in_a_scan(self):
+        # 16 strong names with a control byte or invalid UTF-8, then one valid weak name
+        bad = [f"bad\x01N{i}:-10:YES".encode() for i in range(8)] + [f"\xffN{i}:-10:YES".encode("latin-1") for i in range(8)]
+        entries = b" ".join(bad + [b"Valid:-80:YES"])
+        done = subprocess.run([str(SIMULATOR), "--protocol"], input=b"!scan " + entries + b"\n!scan-list\n", capture_output=True, timeout=20)
+        self.assertEqual(done.returncode, 0)
+        lines = [line for line in done.stdout.decode("utf-8", "replace").splitlines() if line.startswith("!scan-list")]
+        self.assertEqual(lines, ["!scan-list Valid -80 YES", "!scan-list end"])
+
+    def test_a_name_that_is_too_long_is_refused_whole_not_cut_to_fit(self):
+        # 33 bytes strong (the first 32 would be a valid name), then a valid weak one
+        out, err = self.run_simulator([], "!scan " + "a" * 33 + ":-10:YES " + "a" * 32 + ":-60:YES\n!scan-list\n")
+        lines = [line for line in out.splitlines() if line.startswith("!scan-list")]
+        self.assertEqual(lines, ["!scan-list " + "a" * 32 + " -60 YES", "!scan-list end"])
+
+    def test_control_lines_with_a_name_or_token_that_does_not_fit_are_refused_not_cut(self):
+        _, err = self.run_simulator([], "!token " + "a" * 17 + "\n!store-wifi ssid=" + "b" * 33 + "\n!net ssid=" + "c" * 33 + "\n")
+        self.assertEqual(err.count("refused"), 3)
 
     def test_advance_is_refused_in_live_mode_and_reported(self):
         _, err = self.run_simulator(["--live"], "!advance 1000\n")

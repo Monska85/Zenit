@@ -1,0 +1,226 @@
+{
+  "description": "wifi_forget erases the stored network over USB only, changes nothing when the settings memory fails, and takes no field.",
+  "steps": [
+    {
+      "advance_ms": 1100
+    },
+    {
+      "control": "!store-wifi ssid=HomeNet password=correct-horse"
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connecting",
+          "ssid": "HomeNet",
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "wifi_forget"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": false,
+        "error": "usb_only"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connecting",
+          "ssid": "HomeNet",
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "wifi_forget",
+        "now": true
+      },
+      "expect": {
+        "seq": 4,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "event": "storage_fail"
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "wifi_forget"
+      },
+      "expect": {
+        "seq": 5,
+        "ok": false,
+        "error": "storage_error"
+      }
+    },
+    {
+      "event": "storage_ok"
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 6,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connecting",
+          "ssid": "HomeNet",
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 7,
+        "cmd": "wifi_forget"
+      },
+      "expect": {
+        "seq": 7,
+        "ok": true
+      }
+    },
+    {
+      "send": {
+        "seq": 8,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 8,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "not_configured",
+          "ssid": null,
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    }
+  ]
+}

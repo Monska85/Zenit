@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { ConnectionClosed } from "../src/protocol/transport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { openWebSocket, type SocketLike } from "../src/protocol/websocket";
 import { text } from "./helpers";
@@ -112,6 +113,26 @@ describe("the transport", () => {
     socket.onclose?.({ code: 1008, reason: "origin" });
     expect(closed).toHaveBeenCalledTimes(1);
     expect((closed.mock.calls[0]?.[0] as Error).message).toBe("origin");
+  });
+
+  it("carries the close status the board used, so the app can explain it", async () => {
+    const { socket, transport } = await connected();
+    const closed = vi.fn();
+    transport.onClose = closed;
+    socket.onclose?.({ code: 1013, reason: "" });
+    const cause = closed.mock.calls[0]?.[0] as ConnectionClosed;
+    expect(cause).toBeInstanceOf(ConnectionClosed);
+    expect(cause.code).toBe(1013);
+  });
+
+  it("says nothing about a close with no status or a normal one", async () => {
+    for (const code of [1000, 1005]) {
+      const { socket, transport } = await connected();
+      const closed = vi.fn();
+      transport.onClose = closed;
+      socket.onclose?.({ code, reason: "" });
+      expect(closed).toHaveBeenCalledWith(undefined);
+    }
   });
 
   it("closes the socket, and says so once, when the app closes it", async () => {

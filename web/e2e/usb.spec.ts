@@ -2,13 +2,13 @@
 
 import { expect, test } from "./fixtures.ts";
 import { installFakeSerial, serialUse } from "./fake-serial.ts";
-import { MOCK_URL, mockBoard } from "./mock-board.ts";
+import { MOCK_USB_URL, mockBoard } from "./mock-board.ts";
 
 // Web Serial is played by a fake port wired to a scripted board: no real port is touched.
 
 async function connectUsb(page: import("@playwright/test").Page) {
   const mock = await mockBoard(page);
-  await installFakeSerial(page, MOCK_URL);
+  await installFakeSerial(page, MOCK_USB_URL);
   await page.goto("/");
   await page.getByRole("button", { name: "Connect with USB" }).click();
   await expect(page.getByTestId("connection")).toHaveText("Connected by USB");

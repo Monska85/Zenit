@@ -12,6 +12,7 @@ import { useRoute, type Route } from "./route";
 import { DeviceView } from "./views/device-view";
 import { ConnectView } from "./views/connect-view";
 import { LightView } from "./views/light-view";
+import { LoginView } from "./views/login-view";
 import { PrivacyView } from "./views/privacy-view";
 
 const THEME_ICONS: Record<ThemeChoice, typeof Sun> = { system: Monitor, light: Sun, dark: Moon };
@@ -39,27 +40,45 @@ function ThemeButton() {
 function ConnectionChip({ go }: { go: (route: Route) => void }) {
   const { board, session } = useBoard();
   if (board.phase === "connecting") return <span className="text-sm text-muted-foreground">Connecting...</span>;
+  if (board.phase === "login") {
+    return <span className="text-sm font-medium">Log in needed</span>;
+  }
   if (board.phase === "connected") {
     return (
       <div className="flex items-center gap-1">
         <span className="text-sm" data-testid="connection" title={board.label}>
           {board.kind === "usb" ? "Connected by USB" : "Connected over WiFi"}
         </span>
-        <Button
-          variant="ghost"
-          className="px-3"
-          aria-label="Disconnect"
-          onClick={() => {
-            void session.disconnect();
-            go("connect");
-          }}
-        >
-          <Unplug aria-hidden className="size-5" />
-        </Button>
+        {board.served && (
+          <span className="text-sm text-muted-foreground" data-testid="hostname">
+            {board.served.hostname}
+          </span>
+        )}
+        {/* The page is the board's own: there is no other place to connect to */}
+        {!board.served && (
+          <Button
+            variant="ghost"
+            className="px-3"
+            aria-label="Disconnect"
+            onClick={() => {
+              void session.disconnect();
+              go("connect");
+            }}
+          >
+            <Unplug aria-hidden className="size-5" />
+          </Button>
+        )}
       </div>
     );
   }
   if (board.phase === "lost") {
+    if (board.auto !== null) {
+      return (
+        <span role="status" className="text-sm font-medium" data-testid="auto-reconnect">
+          {board.auto === "restarting" ? "The board is restarting" : "Connecting again..."}
+        </span>
+      );
+    }
     return (
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium text-danger">Connection lost</span>
@@ -122,8 +141,11 @@ function Shell() {
       )}
       <main className="flex flex-col gap-4">
         {current === "privacy" && <PrivacyView />}
-        {current === "device" && <DeviceView go={go} />}
-        {(current === "light" || current === "connect") && (connectScreen ? <ConnectView go={go} /> : <LightView />)}
+        {current !== "privacy" && board.phase === "login" && <LoginView />}
+        {current === "device" && board.phase !== "login" && <DeviceView go={go} />}
+        {(current === "light" || current === "connect") &&
+          board.phase !== "login" &&
+          (connectScreen ? <ConnectView go={go} /> : <LightView />)}
       </main>
     </div>
   );

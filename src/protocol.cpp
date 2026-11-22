@@ -4,6 +4,7 @@
 
 #include <ArduinoJson.h>
 #include <frame.h>
+#include <net_auth.h>
 #include <proto_limits.h>
 #include <reply_cache.h>
 #include <request.h>
@@ -12,11 +13,15 @@
 #include <zenit_light.h>
 
 #include <cstdio>
+#include <string>
 #include <cstring>
 
 #include "app.h"
+#include "network.h"
 #include "platform.h"
+#include "protocol_status.h"
 #include "settings.h"
+#include "updates.h"
 
 namespace protocol
 {
@@ -30,13 +35,28 @@ using zenit::proto::Failure;
 constexpr int PARSE_NESTING = 8;
 // The reply is built in place: the JSON goes after the room left for the frame head.
 char reply_line[zenit::proto::MAX_REPLY_LINE + 1];
-// The lightness of `status`, written with one decimal and handed to the serializer as it is.
-char lightness_text[16];
 
 zenit::proto::ReplyCache caches[2];
 uint32_t boot_id = 0;
 
 zenit::proto::ReplyCache &cache_of(Transport transport) { return caches[static_cast<size_t>(transport)]; }
+
+// The login of the WiFi client, and a request the last command made to close its connection.
+zenit::net::AuthSession wifi_auth;
+bool close_wifi_requested = false;
+// The WiFi client's connection: whether one is open, since when, and whether its login timeout has been reported.
+bool wifi_connected = false;
+uint64_t wifi_opened_at = 0;
+bool login_timeout_reported = false;
+
+// A new WiFi connection, or none: the remembered reply, the login and a pending close request are forgotten.
+void reset_wifi_session()
+{
+  cache_of(Transport::Wifi).clear();
+  wifi_auth.reset();
+  close_wifi_requested = false;
+  login_timeout_reported = false;
+}
 
 // What `send` did with a reply.
 struct Sent
@@ -79,28 +99,6 @@ void send_error(const Failure &failure, Writer write)
 }
 
 void send_bad_frame(const char *message, Writer write) { send_error(zenit::proto::fail("bad_frame", message), write); }
-
-void write_light(JsonObject light)
-{
-  const zenit::LightStatus &status = app::last_frame().status;
-  light["on"] = status.on;
-  light["effect"] = zenit::effect_name(status.effect);
-  if (status.lit)
-    light["color"] = zenit::color_name(status.color);
-  else
-    light["color"] = nullptr;
-  std::snprintf(lightness_text, sizeof(lightness_text), "%.1f", status.lightness);
-  light["lightness"] = serialized(lightness_text);
-  light["power_scale"] = status.power_scale;
-  if (status.timer)
-  {
-    JsonObject timer = light["timer"].to<JsonObject>();
-    timer["minutes"] = status.timer_minutes;
-    timer["remaining"] = status.timer_remaining_s;
-  }
-  else
-    light["timer"] = nullptr;
-}
 
 // ---- Commands ----
 
@@ -146,6 +144,10 @@ Failure cmd_status(const Context &context, JsonDocument &reply)
   // Not older than this request: a change made a moment ago shows in the status already.
   app::tick(context.now);
   write_light(reply["light"].to<JsonObject>());
+  const network::Snapshot net = network::snapshot();
+  write_wifi(reply["wifi"].to<JsonObject>(), net);
+  write_time(reply["time"].to<JsonObject>(), net);
+  write_update(reply["update"].to<JsonObject>());
   return {};
 }
 
@@ -153,18 +155,25 @@ Failure cmd_settings_get(const Context &context, JsonDocument &reply)
 {
   if (Failure failure = zenit::proto::allow_only(context.request, {}))
     return failure;
-  zenit::proto::write_settings(reply["settings"].to<JsonObject>(), settings::current());
+  zenit::proto::write_settings(reply["settings"].to<JsonObject>(), settings::current(), settings::board(),
+                               context.transport == Transport::Usb);
   return {};
 }
 
 Failure cmd_settings_set(const Context &context, JsonDocument &reply)
 {
   zenit::LightSettings next = settings::current();
-  if (Failure failure = zenit::proto::apply_settings_request(context.request, next))
+  zenit::net::BoardSettings next_board = settings::board();
+  if (Failure failure = zenit::proto::apply_settings_request(context.request, next, next_board))
     return failure;
-  if (app::change_settings(next, context.now) != settings::Commit::Ok)
+  const bool login_turned_on = next_board.network_login && !settings::board().network_login;
+  if (app::change_settings(next, next_board, context.now) != settings::Commit::Ok)
     return zenit::proto::fail("storage_error", "the settings could not be saved; nothing changed");
-  zenit::proto::write_settings(reply["settings"].to<JsonObject>(), settings::current());
+  // The client that turned the login on logs in when it connects again.
+  if (login_turned_on)
+    close_wifi_requested = true;
+  zenit::proto::write_settings(reply["settings"].to<JsonObject>(), settings::current(), settings::board(),
+                               context.transport == Transport::Usb);
   return {};
 }
 
@@ -182,15 +191,131 @@ Failure cmd_light(const Context &context, JsonDocument &reply)
   return {};
 }
 
+Failure usb_only(const Context &context)
+{
+  if (context.transport != Transport::Usb)
+    return zenit::proto::fail("usb_only", "this command works over USB only");
+  return {};
+}
+
 Failure cmd_settings_reset(const Context &context, JsonDocument &reply)
 {
   if (Failure failure = zenit::proto::allow_only(context.request, {}))
     return failure;
-  if (context.transport != Transport::Usb)
-    return zenit::proto::fail("usb_only", "this command works over USB only");
-  if (app::change_settings(zenit::LightSettings(), context.now) != settings::Commit::Ok)
+  if (Failure failure = usb_only(context))
+    return failure;
+  if (app::change_settings(zenit::LightSettings(), settings::fresh_board_settings(), context.now) !=
+      settings::Commit::Ok)
     return zenit::proto::fail("storage_error", "the settings could not be saved; nothing changed");
-  zenit::proto::write_settings(reply["settings"].to<JsonObject>(), settings::current());
+  close_wifi_requested = true;
+  zenit::proto::write_settings(reply["settings"].to<JsonObject>(), settings::current(), settings::board(), true);
+  return {};
+}
+
+Failure cmd_wifi_forget(const Context &context, JsonDocument &)
+{
+  if (Failure failure = zenit::proto::allow_only(context.request, {}))
+    return failure;
+  if (Failure failure = usb_only(context))
+    return failure;
+  zenit::net::BoardSettings next = settings::board();
+  next.wifi_ssid[0] = '\0';
+  next.wifi_password[0] = '\0';
+  if (app::change_settings(settings::current(), next, context.now) != settings::Commit::Ok)
+    return zenit::proto::fail("storage_error", "the settings could not be saved; nothing changed");
+  return {};
+}
+
+Failure cmd_token_regenerate(const Context &context, JsonDocument &reply)
+{
+  if (Failure failure = zenit::proto::allow_only(context.request, {}))
+    return failure;
+  if (Failure failure = usb_only(context))
+    return failure;
+  zenit::net::BoardSettings next = settings::board();
+  next.token[0] = '\0';
+  if (app::change_settings(settings::current(), next, context.now) != settings::Commit::Ok)
+    return zenit::proto::fail("storage_error", "the token could not be saved; the old one stays");
+  close_wifi_requested = true;
+  reply["token"] = std::string(settings::board().token);
+  return {};
+}
+
+Failure cmd_auth_challenge(const Context &context, JsonDocument &reply)
+{
+  if (Failure failure = zenit::proto::allow_only(context.request, {}))
+    return failure;
+  if (context.transport != Transport::Wifi)
+    return zenit::proto::fail("bad_request", "authentication is for WiFi clients");
+  uint8_t random[zenit::net::NONCE_BYTES];
+  platform::random_bytes(random, sizeof(random));
+  reply["nonce"] = std::string(wifi_auth.challenge(random));
+  return {};
+}
+
+Failure cmd_auth(const Context &context, JsonDocument &)
+{
+  if (Failure failure = zenit::proto::allow_only(context.request, {"hmac"}))
+    return failure;
+  if (context.transport != Transport::Wifi)
+    return zenit::proto::fail("bad_request", "authentication is for WiFi clients");
+  JsonVariantConst hmac = context.request["hmac"];
+  if (!hmac.is<const char *>() || !zenit::net::is_hmac_text(hmac.as<const char *>()))
+    return zenit::proto::fail("bad_request", "\"hmac\" must be 64 lowercase hexadecimal digits");
+  switch (wifi_auth.attempt(settings::board().token, hmac.as<const char *>()))
+  {
+  case zenit::net::AuthSession::Verdict::Accepted:
+    return {};
+  case zenit::net::AuthSession::Verdict::Refused:
+    return zenit::proto::fail("unauthorized", "the login was not accepted");
+  case zenit::net::AuthSession::Verdict::RefusedAndClose:
+    close_wifi_requested = true;
+    return zenit::proto::fail("unauthorized", "the login was not accepted; the connection closes");
+  }
+  return {};
+}
+
+Failure update_failure(updates::Reply reply)
+{
+  switch (reply)
+  {
+  case updates::Reply::Ok:
+    return {};
+  case updates::Reply::UpdatesOff:
+    return zenit::proto::fail("updates_off", "firmware updates are off");
+  case updates::Reply::NoNetwork:
+    return zenit::proto::fail("no_network", "the board is not connected to WiFi");
+  case updates::Reply::NothingToInstall:
+    return zenit::proto::fail("nothing_to_install", "the last check found nothing to install");
+  case updates::Reply::Busy:
+    return zenit::proto::fail("busy", "an update check or install is running");
+  }
+  return {};
+}
+
+Failure cmd_update_check(const Context &context, JsonDocument &reply)
+{
+  if (Failure failure = zenit::proto::allow_only(context.request, {}))
+    return failure;
+  if (Failure failure = update_failure(updates::request_check(context.now)))
+    return failure;
+  write_update(reply["update"].to<JsonObject>());
+  return {};
+}
+
+Failure cmd_update_install(const Context &context, JsonDocument &reply)
+{
+  if (Failure failure = zenit::proto::allow_only(context.request, {"target", "force"}))
+    return failure;
+  JsonVariantConst target = context.request["target"];
+  if (!target.is<const char *>() || std::strcmp(target.as<const char *>(), "firmware") != 0)
+    return zenit::proto::fail("bad_request", "\"target\" must be \"firmware\"");
+  JsonVariantConst force = context.request["force"];
+  if (!force.isUnbound() && !force.is<bool>())
+    return zenit::proto::fail("bad_request", "\"force\" must be true or false");
+  if (Failure failure = update_failure(updates::request_install(force | false)))
+    return failure;
+  write_update(reply["update"].to<JsonObject>());
   return {};
 }
 
@@ -198,15 +323,23 @@ struct Command
 {
   const char *name;
   Failure (*run)(const Context &, JsonDocument &);
+  // Whether a WiFi client that has not logged in may send it (network login on).
+  bool before_login;
 };
 
 const Command COMMANDS[] = {
-    {"info", cmd_info},
-    {"status", cmd_status},
-    {"settings_get", cmd_settings_get},
-    {"settings_set", cmd_settings_set},
-    {"light", cmd_light},
-    {"settings_reset", cmd_settings_reset},
+    {"info", cmd_info, true},
+    {"status", cmd_status, false},
+    {"settings_get", cmd_settings_get, false},
+    {"settings_set", cmd_settings_set, false},
+    {"light", cmd_light, false},
+    {"settings_reset", cmd_settings_reset, false},
+    {"wifi_forget", cmd_wifi_forget, false},
+    {"token_regenerate", cmd_token_regenerate, false},
+    {"auth_challenge", cmd_auth_challenge, true},
+    {"auth", cmd_auth, true},
+    {"update_check", cmd_update_check, false},
+    {"update_install", cmd_update_install, false},
 };
 
 // A request read from a frame whose checksum matched.
@@ -247,7 +380,12 @@ Failure dispatch(const Request &request, Transport transport, uint64_t now, Json
   const Context context{request.document.as<JsonObjectConst>(), transport, now};
   for (const Command &command : COMMANDS)
     if (std::strcmp(request.command, command.name) == 0)
+    {
+      if (transport == Transport::Wifi && settings::board().network_login && !wifi_auth.authenticated() &&
+          !command.before_login)
+        return zenit::proto::fail("unauthorized", "log in first: auth_challenge, then auth");
       return command.run(context, reply);
+    }
   return zenit::proto::fail("unknown_command", "this firmware does not know the command");
 }
 
@@ -293,6 +431,8 @@ void begin(uint32_t id)
   boot_id = id;
   for (auto &cache : caches)
     cache.clear();
+  reset_wifi_session();
+  wifi_connected = false;
 }
 
 void handle_line(Transport transport, const char *line, size_t length, uint64_t now, Writer write)
@@ -326,7 +466,37 @@ void handle_line(Transport transport, const char *line, size_t length, uint64_t 
 
 void line_too_long(Transport, Writer write) { send_bad_frame("the line is too long", write); }
 
-void wifi_opened() { cache_of(Transport::Wifi).clear(); }
-void wifi_closed() { cache_of(Transport::Wifi).clear(); }
+void wifi_opened(uint64_t now)
+{
+  reset_wifi_session();
+  wifi_connected = true;
+  wifi_opened_at = now;
+}
+
+void wifi_closed()
+{
+  reset_wifi_session();
+  wifi_connected = false;
+}
+
+void poll(uint64_t now)
+{
+  // A client that stays unauthenticated is closed, so it cannot hold the single slot
+  if (wifi_connected && !login_timeout_reported && wifi_login_pending() &&
+      now - wifi_opened_at >= zenit::proto::LOGIN_WAIT_MS)
+  {
+    login_timeout_reported = true;
+    close_wifi_requested = true;
+  }
+}
+
+bool wifi_login_pending() { return settings::board().network_login && !wifi_auth.authenticated(); }
+
+bool take_wifi_close_request()
+{
+  const bool requested = close_wifi_requested;
+  close_wifi_requested = false;
+  return requested;
+}
 
 } // namespace protocol

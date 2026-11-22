@@ -1,0 +1,63 @@
+{
+  "description": "With network login off no client is closed for staying silent, and a closed connection is not timed.",
+  "steps": [
+    {
+      "event": "wifi_open"
+    },
+    {
+      "advance_ms": 20000
+    },
+    {
+      "close_requested": false
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "settings_set",
+        "network_login": true
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": true
+        }
+      },
+      "close": true,
+      "transport": "wifi"
+    },
+    {
+      "event": "wifi_close"
+    },
+    {
+      "advance_ms": 20000
+    },
+    {
+      "close_requested": false
+    }
+  ]
+}

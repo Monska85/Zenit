@@ -1,0 +1,2241 @@
+{
+  "description": "update_check starts a check in the background and the next status shows its result: a newer version is available, an equal or older one is up to date, a missing site, a refused certificate and every kind of bad manifest each have their result, and a failed check forgets the version it found. The running version is 0.1.0; 1790000000 is the time of the check.",
+  "steps": [
+    {
+      "advance_ms": 1100
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 1,
+        "ok": false,
+        "error": "no_network"
+      }
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "update_install",
+        "target": "firmware"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": false,
+        "error": "no_network"
+      }
+    },
+    {
+      "control": "!net state=connected ssid=HomeNet rssi=-50 ip=10.0.0.5"
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": true,
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "no_time",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_set",
+        "update_mode": "notify"
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "notify",
+          "update_firmware": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      }
+    },
+    {
+      "control": "!net synced=1 epoch=1790000000"
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 5,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": null,
+          "last_result": "no_time",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 6,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": null,
+          "last_result": "no_time",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      },
+      "transport": "wifi"
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 7,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 7,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": "0.2.0",
+          "last_check": 1790000000,
+          "last_result": "available",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.1.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 8,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 8,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": "0.2.0",
+          "last_check": 1790000000,
+          "last_result": "available",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 9,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 9,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "up_to_date",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.0.9\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 10,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 10,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "up_to_date",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 11,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 11,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "up_to_date",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 12,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 12,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "up_to_date",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 13,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 13,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": "0.2.0",
+          "last_check": 1790000000,
+          "last_result": "available",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update fail unreachable"
+    },
+    {
+      "send": {
+        "seq": 14,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 14,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": "0.2.0",
+          "last_check": 1790000000,
+          "last_result": "available",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 15,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 15,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "unreachable",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update fail not_published"
+    },
+    {
+      "send": {
+        "seq": 16,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 16,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "unreachable",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 17,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 17,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "not_published",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update fail tls_error"
+    },
+    {
+      "send": {
+        "seq": 18,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 18,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "not_published",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 19,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 19,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "tls_error",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\",\"extra\":1}"
+    },
+    {
+      "send": {
+        "seq": 20,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 20,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "tls_error",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 21,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 21,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536}"
+    },
+    {
+      "send": {
+        "seq": 22,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 22,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 23,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 23,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":2,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 24,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 24,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 25,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 25,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32\",\"version\":\"0.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 26,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 26,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 27,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 27,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0-rc.1\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 28,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 28,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 29,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 29,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"1.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 30,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 30,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 31,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 31,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"01.0.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 32,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 32,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 33,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 33,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"../firmware.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 34,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 34,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 35,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 35,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"dir/firmware.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 36,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 36,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 37,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 37,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"Firmware.BIN\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 38,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 38,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 39,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 39,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\".hidden\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 40,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 40,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 41,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 41,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 42,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 42,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 43,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 43,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65535,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 44,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 44,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 45,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 45,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":2031617,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 46,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 46,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 47,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 47,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":\"65536\",\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 48,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 48,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 49,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 49,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536,\"sha256\":\"DE2F256064A0AF797747C2B97505DC0B9F3DF0DE4F489EAC731C23AE9CA9CC31\"}"
+    },
+    {
+      "send": {
+        "seq": 50,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 50,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 51,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 51,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc3\"}"
+    },
+    {
+      "send": {
+        "seq": 52,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 52,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 53,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 53,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc310\"}"
+    },
+    {
+      "send": {
+        "seq": 54,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 54,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 55,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 55,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest not json"
+    },
+    {
+      "send": {
+        "seq": 56,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 56,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 57,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 57,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest []"
+    },
+    {
+      "send": {
+        "seq": 58,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 58,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 59,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 59,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {}"
+    },
+    {
+      "send": {
+        "seq": 60,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 60,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 61,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 61,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"a.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 62,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 62,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 63,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 63,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 64,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 64,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 65,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 65,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "send": {
+        "seq": 66,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 66,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": 1790000000,
+          "last_result": "bad_manifest",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 67,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 67,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": "0.2.0",
+          "last_check": 1790000000,
+          "last_result": "available",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 68,
+        "cmd": "update_check",
+        "now": true
+      },
+      "expect": {
+        "seq": 68,
+        "ok": false,
+        "error": "bad_request"
+      }
+    }
+  ]
+}

@@ -18,6 +18,9 @@ const decode = (line: Uint8Array): string => new TextDecoder().decode(line);
 class FakePort implements SerialPortLike {
   openOptions: { baudRate: number; bufferSize?: number } | null = null;
   written: string[] = [];
+  writtenBytes: number[] = [];
+  /** The chunks themselves, to see what the app does with them after the write. */
+  chunks: Uint8Array[] = [];
   closeCalls = 0;
   /** A write that never ends, as on a device that stopped taking bytes. */
   wedgeWrites = false;
@@ -43,6 +46,8 @@ class FakePort implements SerialPortLike {
       write: (chunk) => {
         if (this.wedgeWrites) return new Promise<void>(() => undefined);
         this.written.push(decode(chunk));
+        this.writtenBytes.push(...chunk);
+        this.chunks.push(chunk);
       },
     });
   }
@@ -205,5 +210,89 @@ describe("openSerial", () => {
       const transport = await openSerial(port);
       await expect(transport.close()).rejects.toBeInstanceOf(PortStuckError);
     });
+  });
+});
+
+describe("Improv frames on the serial port", () => {
+  // IMPROV, version 1, type 3 (RPC command), 2 bytes of data (command 2: request state, no arguments), checksum
+  const FRAME = "494d50524f560103020200e5";
+  const hex = (digits: string): Uint8Array => Uint8Array.from(digits.match(/../g) ?? [], (pair) => parseInt(pair, 16));
+
+  it("hands frames to Improv and everything else to the protocol, in order", async () => {
+    const port = new FakePort();
+    const transport = await openSerial(port);
+    const lines: string[] = [];
+    const frames: Array<[number, number[]]> = [];
+    transport.onLine = (line) => lines.push(decode(line));
+    transport.improv!.onFrame = (type, data) => frames.push([type, [...data]]);
+    port.push(text("zenit: hi\n"));
+    port.push(hex(FRAME));
+    port.push(text("\n@ZN 1 {}\n"));
+    await tick();
+    expect(lines).toEqual(["zenit: hi", "", "@ZN 1 {}"]);
+    expect(frames).toEqual([[3, [2, 0]]]);
+    await transport.close();
+  });
+
+  it("does not take a protocol line that starts like a frame for one", async () => {
+    const port = new FakePort();
+    const transport = await openSerial(port);
+    const lines: string[] = [];
+    transport.onLine = (line) => lines.push(decode(line));
+    port.push(text("IMPRO not a frame\nIMPROV\n"));
+    await tick();
+    expect(lines).toEqual(["IMPRO not a frame", "IMPROV"]);
+    await transport.close();
+  });
+
+  it("writes a frame after a newline, so it starts a line, and no newline after it", async () => {
+    const port = new FakePort();
+    const transport = await openSerial(port);
+    await transport.improv!.sendFrame(hex(FRAME));
+    expect(port.writtenBytes).toEqual([0x0a, ...hex(FRAME)]);
+    await transport.close();
+  });
+
+  it("clears the bytes it wrote once the write is over, for a password may be in them", async () => {
+    const port = new FakePort();
+    const transport = await openSerial(port);
+    await transport.improv!.sendFrame(hex(FRAME));
+    expect(port.writtenBytes.length).toBeGreaterThan(1);
+    expect(port.chunks[0]?.every((byte) => byte === 0)).toBe(true);
+    await transport.close();
+  });
+
+  it("clears the bytes of a frame sent to a port that is closed", async () => {
+    const port = new FakePort();
+    const transport = await openSerial(port);
+    const sent = hex(FRAME);
+    await transport.close();
+    const spy = vi.spyOn(Uint8Array.prototype, "fill");
+    try {
+      await expect(transport.improv!.sendFrame(sent)).rejects.toThrow("closed");
+      // The copy made for the port (the frame and a newline before it) was cleared although nothing was written
+      expect(spy.mock.contexts.some((array) => (array as Uint8Array).length === sent.length + 1)).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(port.chunks).toHaveLength(0);
+  });
+
+  it("drops a frame that stops for a second, so the lines after it are read", async () => {
+    vi.useFakeTimers();
+    try {
+      const port = new FakePort();
+      const transport = await openSerial(port);
+      const lines: string[] = [];
+      transport.onLine = (line) => lines.push(decode(line));
+      port.push(hex("494d50524f56010305"));
+      await vi.advanceTimersByTimeAsync(1100);
+      port.push(text("@ZN 2 {}\n"));
+      await vi.advanceTimersByTimeAsync(10);
+      expect(lines).toEqual(["@ZN 2 {}"]);
+      await transport.close();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

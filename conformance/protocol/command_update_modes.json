@@ -1,0 +1,223 @@
+{
+  "description": "With update_mode off, or update_firmware false, update_check and update_install are updates_off and the status shows the mode off.",
+  "steps": [
+    {
+      "advance_ms": 1100
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "settings_set",
+        "update_mode": "off"
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "off",
+          "update_firmware": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      }
+    },
+    {
+      "control": "!net state=connected ssid=HomeNet rssi=-50 ip=10.0.0.5 synced=1 epoch=1790000000"
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": false,
+        "error": "updates_off"
+      }
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "update_install",
+        "target": "firmware"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": false,
+        "error": "updates_off"
+      }
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "off",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "settings_set",
+        "update_mode": "notify",
+        "update_firmware": false
+      },
+      "expect": {
+        "seq": 5,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "notify",
+          "update_firmware": false,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 6,
+        "ok": false,
+        "error": "updates_off"
+      }
+    },
+    {
+      "send": {
+        "seq": 7,
+        "cmd": "update_install",
+        "target": "firmware"
+      },
+      "expect": {
+        "seq": 7,
+        "ok": false,
+        "error": "updates_off"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 8,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 8,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "off",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    }
+  ]
+}

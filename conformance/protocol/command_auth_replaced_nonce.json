@@ -1,0 +1,139 @@
+{
+  "description": "With network_login off the login still works. A new auth_challenge replaces the nonce, so the first nonce's HMAC fails, and the failed attempt used up the second nonce.",
+  "steps": [
+    {
+      "advance_ms": 1100
+    },
+    {
+      "control": "!token abcdefghij012345"
+    },
+    {
+      "event": "wifi_open"
+    },
+    {
+      "control": "!random 000102030405060708090a0b0c0d0e0f"
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "auth_challenge"
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "nonce": "000102030405060708090a0b0c0d0e0f"
+      },
+      "transport": "wifi"
+    },
+    {
+      "control": "!random ffeeddccbbaa99887766554433221100"
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "auth_challenge"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": true,
+        "nonce": "ffeeddccbbaa99887766554433221100"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "auth",
+        "hmac": "50af259ca3365bd47a06351859c29719ca602ff5c0084d42fed05fd5da380a67"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": false,
+        "error": "unauthorized"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "auth",
+        "hmac": "b447900eef2763115d1c10add754ed0542d884a5a7b5d0eb895ea497e9c827f4"
+      },
+      "expect": {
+        "seq": 4,
+        "ok": false,
+        "error": "unauthorized"
+      },
+      "transport": "wifi"
+    },
+    {
+      "control": "!random 0123456789abcdef0123456789abcdef"
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "auth_challenge"
+      },
+      "expect": {
+        "seq": 5,
+        "ok": true,
+        "nonce": "0123456789abcdef0123456789abcdef"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "auth",
+        "hmac": "7d230ef0db85d968fd1bfe242cce6f2209d9b002fca42ffc5b596741b9da17fd"
+      },
+      "expect": {
+        "seq": 6,
+        "ok": true
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 7,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 7,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "not_configured",
+          "ssid": null,
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      },
+      "transport": "wifi"
+    }
+  ]
+}

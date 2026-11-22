@@ -1,0 +1,7 @@
+{
+  "name": "ZenitNet",
+  "version": "0.1.0",
+  "description": "The network rules of docs/board/wifi-and-updates-v1.md: WiFi decisions, origin check, login, board settings and their record, the served app's answers. Plain C++17, no Arduino dependency.",
+  "frameworks": "*",
+  "platforms": "*"
+}

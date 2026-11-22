@@ -3,6 +3,7 @@
 // The light settings as the app shows and checks them (docs/board/light-v1.md, docs/protocol/protocol-v1.md#settings_get-settings_set).
 // The limits equal the protocol's; a change to one changes both.
 
+import { boardSettingsProblem } from "../device/settings";
 import type { BoardInfo, Settings } from "../protocol/types";
 
 export type { Settings } from "../protocol/types";
@@ -110,7 +111,7 @@ export function settingsProblem(settings: Settings, info: BoardInfo): string | n
   if (!inRange(settings.colors.length, LIMITS.colors)) return "colors is out of its limits";
   if (new Set(settings.colors).size !== settings.colors.length) return "colors names a color twice";
   if (!settings.colors.every((color) => info.colors.includes(color))) return "a color is not one the board lists";
-  return null;
+  return boardSettingsProblem(settings);
 }
 
 /** "45 s", "12 min", "1 h 12 min": a duration in seconds, rounded down to what a person reads. */

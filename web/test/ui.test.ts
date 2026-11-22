@@ -21,7 +21,17 @@ describe("routeOf", () => {
 
 describe("describeError", () => {
   it("has a sentence for each error code of the specification the app can meet", () => {
-    for (const code of ["bad_request", "unknown_command", "storage_error", "usb_only", "busy"]) {
+    for (const code of [
+      "bad_request",
+      "unknown_command",
+      "storage_error",
+      "usb_only",
+      "busy",
+      "unauthorized",
+      "no_network",
+      "updates_off",
+      "nothing_to_install",
+    ]) {
       expect(describeError(new BoardError(code, "for logs"))).toMatch(/\.$/);
       expect(describeError(new BoardError(code, "for logs"))).not.toContain("for logs");
     }
@@ -29,6 +39,12 @@ describe("describeError", () => {
 
   it("names an unknown code", () => {
     expect(describeError(new BoardError("new_thing", "x"))).toBe("Zenit refused the request (new_thing).");
+  });
+
+  it("explains the status a board closes a connection with", () => {
+    expect(describeError(new ClientError("closed", "x", 1008))).toContain("token was wrong three times");
+    expect(describeError(new ClientError("closed", "x", 1013))).toContain("already connected");
+    expect(describeError(new ClientError("closed", "x", 1006))).toContain("did not answer");
   });
 
   it("says Zenit did not answer when no reply came", () => {

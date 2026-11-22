@@ -6,6 +6,7 @@
 
 #include <cstdarg>
 #include <cstdio>
+#include <vector>
 
 namespace platform
 {
@@ -20,6 +21,33 @@ bool log_enabled = true;
 uint64_t now_ms() { return now; }
 
 uint32_t random32() { return next_random++; }
+
+namespace
+{
+std::vector<uint8_t> queued_random;
+} // namespace
+
+void sim_queue_random_bytes(const uint8_t *bytes, size_t size) { queued_random.assign(bytes, bytes + size); }
+
+void random_bytes(uint8_t *out, size_t size)
+{
+  size_t at = 0;
+  for (; at < size && !queued_random.empty(); at++)
+  {
+    out[at] = queued_random.front();
+    queued_random.erase(queued_random.begin());
+  }
+  out += at;
+  size -= at;
+  // Repeatable, so a run of the simulator is: a linear congruential generator seeded by the sim's random word.
+  static uint32_t state = 0x2545F491;
+  state ^= next_random++;
+  for (size_t i = 0; i < size; i++)
+  {
+    state = state * 1664525u + 1013904223u;
+    out[i] = static_cast<uint8_t>(state >> 24);
+  }
+}
 
 MemoryInfo memory_info() { return {0, 0}; }
 NvsInfo nvs_info() { return {0, 0}; }

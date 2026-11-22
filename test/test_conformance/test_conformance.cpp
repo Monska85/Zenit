@@ -13,13 +13,20 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <regex>
 #include <string>
 #include <vector>
 
 #include "app.h"
+#include "firmware.h"
+#include "network.h"
+#include "update_http.h"
+#include "updates.h"
 #include "platform.h"
 #include "protocol.h"
 #include "settings.h"
+#include "sim_control.h"
+#include "net_cases.h"
 #include "zenit_test.h"
 
 namespace fs = std::filesystem;
@@ -193,6 +200,15 @@ bool matches(JsonVariantConst expected, JsonVariantConst actual, std::string &wh
       why = path + ": not a " + type;
     return ok;
   }
+  if (expected.is<JsonObjectConst>() && expected["$pattern"].is<const char *>())
+  {
+    // A text that matches a regular expression, for what varies with the run (a token, a nonce).
+    const bool ok = actual.is<const char *>() &&
+                    std::regex_match(actual.as<const char *>(), std::regex(expected["$pattern"].as<const char *>()));
+    if (!ok)
+      why = path + ": does not match " + expected["$pattern"].as<const char *>();
+    return ok;
+  }
   if (expected.is<JsonObjectConst>())
   {
     if (!actual.is<JsonObjectConst>())
@@ -263,11 +279,17 @@ void start_protocol_case()
   replies.clear();
   settings::sim_fail_writes(false);
   settings::sim_clear();
-  settings::sim_reset_current();
+  settings::begin();
+  firmware::sim_reset();
+  update_http::sim_reset();
+  platform::sim_set_version("0.1.0");
+  platform::sim_queue_random_bytes(nullptr, 0);
+  sim_control::set_quiet(true);
   platform::sim_set_now_ms(0);
   app::begin(0, 1);
   app::tick(0);
   protocol::begin(BOOT_ID);
+  updates::protocol_ready();
 }
 
 // The bytes of a line and its newline through the line reader, as the serial port delivers them. A line with a newline
@@ -303,16 +325,32 @@ void run_protocol_case(const fs::path &path)
       {
         platform::sim_set_now_ms(now);
         app::tick(now);
+        app::service(now);
+        sim_control::after_step(now);
       }
       now = until;
       platform::sim_set_now_ms(now);
+      continue;
+    }
+    if (step["close_requested"].is<bool>())
+    {
+      // Whether a request without a line (a login that took too long) asked to close the WiFi client
+      TEST_ASSERT_EQUAL_MESSAGE(step["close_requested"].as<bool>(), protocol::take_wifi_close_request(),
+                                (label + ": close request").c_str());
+      continue;
+    }
+    if (step["control"].is<const char *>())
+    {
+      // A control line of the simulator (see conformance/README.md), run at the current time.
+      TEST_ASSERT_TRUE_MESSAGE(sim_control::handle(step["control"].as<const char *>(), now),
+                               (label + ": control").c_str());
       continue;
     }
     if (step["event"].is<const char *>())
     {
       const std::string event = step["event"].as<const char *>();
       if (event == "wifi_open")
-        protocol::wifi_opened();
+        protocol::wifi_opened(now);
       else if (event == "wifi_close")
         protocol::wifi_closed();
       else if (event == "storage_fail")
@@ -362,6 +400,12 @@ void run_protocol_case(const fs::path &path)
     else
       deliver_over_usb(line, now);
 
+    // `close`: whether the request asked to close the WiFi client's connection.
+    if (step["close"].is<bool>())
+      TEST_ASSERT_EQUAL_MESSAGE(step["close"].as<bool>(), protocol::take_wifi_close_request(),
+                                (label + ": close request").c_str());
+    else
+      (void)protocol::take_wifi_close_request();
     if (step["expect"].isNull())
     {
       TEST_ASSERT_EQUAL_size_t_MESSAGE(0, replies.size(), (label + ": a reply came").c_str());
@@ -416,5 +460,18 @@ int main()
   RUN_TEST(test_record);
   RUN_TEST(test_sequences);
   RUN_TEST(test_protocol_cases);
+  RUN_TEST(test_hash_cases);
+  RUN_TEST(test_origin_cases);
+  RUN_TEST(test_wifi_cases);
+  RUN_TEST(test_board_record_cases);
+  RUN_TEST(test_semver_cases);
+  RUN_TEST(test_manifest_cases);
+  RUN_TEST(test_schedule_cases);
+  RUN_TEST(test_boot_cases);
+  RUN_TEST(test_http_cases);
+  RUN_TEST(test_ws_message_cases);
+  RUN_TEST(test_improv_cases);
+  RUN_TEST(test_scan_cases);
+  RUN_TEST(test_stored_settings_cases);
   return UNITY_END();
 }

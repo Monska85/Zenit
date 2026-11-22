@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 namespace platform
@@ -14,6 +15,10 @@ uint64_t now_ms();
 
 // A random word, for seeds and identifiers that need no secrecy.
 uint32_t random32();
+
+// Hardware random bytes, for the token, the login nonce and anything that needs secrecy. On the board, before the
+// radio has started, the draw enables the bootloader's entropy source so the bytes are random then too.
+void random_bytes(uint8_t *out, size_t size);
 
 // Writes one log line, `zenit: ` and the text, to the serial port (the simulator's standard output).
 void log(const char *format, ...) __attribute__((format(printf, 1, 2)));
@@ -44,6 +49,10 @@ uint32_t stack_free_min();
 #endif
 
 #ifdef ZENIT_SIM
+// Simulator: the bytes random_bytes() returns next, before it goes back to its repeatable generator.
+void sim_queue_random_bytes(const uint8_t *bytes, size_t size);
+// Simulator: the version firmware_version() reports from now on (a restart into a new image).
+void sim_set_version(const char *version);
 // Simulator: sets the virtual clock.
 void sim_set_now_ms(uint64_t now);
 // Simulator: the value random32() returns next, then it counts up from there.

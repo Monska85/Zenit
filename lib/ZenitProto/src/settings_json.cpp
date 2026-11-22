@@ -3,6 +3,7 @@
 #include "settings_json.h"
 
 #include <cstdio>
+#include <string>
 #include <cstring>
 
 namespace zenit
@@ -57,9 +58,80 @@ Failure read_colors(JsonVariantConst value, ColorList &list)
 
 } // namespace
 
-Failure apply_settings_request(JsonObjectConst request, LightSettings &settings)
+// The board settings fields; `handled` is false when `name` is not one of them.
+Failure apply_board_field(const char *name, JsonVariantConst value, net::BoardSettings &next, bool &handled)
+{
+  handled = true;
+  uint32_t number = 0;
+  if (std::strcmp(name, "wifi_power") == 0)
+  {
+    if (!value.is<const char *>() || !net::wifi_power_from_name(value.as<const char *>(), next.wifi_power))
+      return bad_value(name, "expected auto, 8.5, 11, 13, 15, 17, 18.5 or 19.5");
+  }
+  else if (std::strcmp(name, "update_mode") == 0)
+  {
+    if (!value.is<const char *>() || !net::update_mode_from_name(value.as<const char *>(), next.update_mode))
+      return bad_value(name, "expected off, notify or automatic");
+  }
+  else if (std::strcmp(name, "update_firmware") == 0)
+  {
+    if (!value.is<bool>())
+      return bad_value(name, "expected true or false");
+    next.update_firmware = value.as<bool>();
+  }
+  else if (std::strcmp(name, "check_hours") == 0)
+  {
+    if (!read_integer(value, 1, 168, number))
+      return bad_value(name, "expected a whole number from 1 to 168");
+    next.check_hours = static_cast<uint8_t>(number);
+  }
+  else if (std::strcmp(name, "install_start") == 0)
+  {
+    if (!read_integer(value, 0, net::MINUTES_PER_DAY - 1, number))
+      return bad_value(name, "expected a whole number from 0 to 1439");
+    next.install_start = static_cast<uint16_t>(number);
+  }
+  else if (std::strcmp(name, "install_end") == 0)
+  {
+    if (!read_integer(value, 0, net::MINUTES_PER_DAY - 1, number))
+      return bad_value(name, "expected a whole number from 0 to 1439");
+    next.install_end = static_cast<uint16_t>(number);
+  }
+  else if (std::strcmp(name, "timezone") == 0)
+  {
+    if (!value.is<const char *>() || !net::valid_timezone(value.as<const char *>()))
+      return bad_value(name, "expected 1 to 64 printable characters without spaces");
+    std::strcpy(next.timezone, value.as<const char *>());
+  }
+  else if (std::strcmp(name, "time_sync_hours") == 0)
+  {
+    if (!read_integer(value, 1, 168, number))
+      return bad_value(name, "expected a whole number from 1 to 168");
+    next.time_sync_hours = static_cast<uint8_t>(number);
+  }
+  else if (std::strcmp(name, "ntp_server") == 0)
+  {
+    if (!value.is<const char *>() || !net::valid_ntp_server(value.as<const char *>()))
+      return bad_value(name, "expected a host name or address of 1 to 64 letters, digits, dots and hyphens");
+    std::strcpy(next.ntp_server, value.as<const char *>());
+  }
+  else if (std::strcmp(name, "network_login") == 0)
+  {
+    if (!value.is<bool>())
+      return bad_value(name, "expected true or false");
+    next.network_login = value.as<bool>();
+  }
+  else if (std::strcmp(name, "token") == 0)
+    return bad_value(name, "the token is read only");
+  else
+    handled = false;
+  return {};
+}
+
+Failure apply_settings_request(JsonObjectConst request, LightSettings &settings, net::BoardSettings &board)
 {
   LightSettings next = settings;
+  net::BoardSettings next_board = board;
   bool any = false;
   for (JsonPairConst field : request)
   {
@@ -68,6 +140,11 @@ Failure apply_settings_request(JsonObjectConst request, LightSettings &settings)
     if (std::strcmp(name, "seq") == 0 || std::strcmp(name, "cmd") == 0)
       continue;
     any = true;
+    bool handled = false;
+    if (Failure failure = apply_board_field(name, value, next_board, handled))
+      return failure;
+    if (handled)
+      continue;
     uint32_t number = 0;
     if (std::strcmp(name, "brightness") == 0)
     {
@@ -131,10 +208,11 @@ Failure apply_settings_request(JsonObjectConst request, LightSettings &settings)
   if (!any)
     return fail("bad_request", "settings_set needs at least one setting");
   settings = next;
+  board = next_board;
   return {};
 }
 
-void write_settings(JsonObject target, const LightSettings &s)
+void write_settings(JsonObject target, const LightSettings &s, const net::BoardSettings &b, bool with_token)
 {
   target["brightness"] = s.brightness;
   target["effect"] = effect_name(s.effect);
@@ -148,6 +226,18 @@ void write_settings(JsonObject target, const LightSettings &s)
   target["floor"] = s.floor;
   target["twinkle_strength"] = s.twinkle_strength;
   target["timer_minutes"] = s.timer_minutes;
+  target["wifi_power"] = net::wifi_power_name(b.wifi_power);
+  target["update_mode"] = net::update_mode_name(b.update_mode);
+  target["update_firmware"] = b.update_firmware;
+  target["check_hours"] = b.check_hours;
+  target["install_start"] = b.install_start;
+  target["install_end"] = b.install_end;
+  target["timezone"] = std::string(b.timezone);
+  target["time_sync_hours"] = b.time_sync_hours;
+  target["ntp_server"] = std::string(b.ntp_server);
+  target["network_login"] = b.network_login;
+  if (with_token)
+    target["token"] = std::string(b.token);
 }
 
 } // namespace proto

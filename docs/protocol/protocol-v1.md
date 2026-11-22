@@ -2,7 +2,7 @@
 
 Status: **accepted**. Why it works this way is recorded in [ADR 0001](../adr/0001-architecture.md), and how it is implemented in [ADR 0002](../adr/0002-protocol-and-releases.md). The light it controls is specified in [Light](../board/light-v1.md).
 
-The first firmware that speaks it (milestone 2) implements `info`, `status`, `settings_get`, `settings_set`, `light` and `settings_reset` over USB serial and over the simulator's WebSocket. What belongs to WiFi, authentication and updates is specified here too and marked "from the WiFi and updates milestone" below, the milestone that implements it; a firmware from before that milestone answers those commands `unknown_command`, and clients ignore the reply parts it leaves out.
+The first firmware that speaks it (milestone 2) implements `info`, `status`, `settings_get`, `settings_set`, `light` and `settings_reset` over USB serial and over the simulator's WebSocket. The WiFi and updates milestone (4) adds WiFi, authentication and updates, marked "from the WiFi and updates milestone" below and specified in [WiFi and updates](../board/wifi-and-updates-v1.md); a firmware from before that milestone answers those commands `unknown_command`, and clients ignore the reply parts it leaves out.
 
 This document specifies how a client (the web app, the command line tool, a test) talks to a Zenit board: reading what the board is, changing its settings, turning the light on and off, setting up WiFi and installing firmware updates. Zenit stores no files, so there is no file transfer.
 
@@ -24,7 +24,7 @@ A board connected to WiFi serves the protocol on `ws://<board>/ws`, port 80, and
 
 - Every WebSocket text message carries exactly one protocol line, without the final newline.
 - The [line limit](#limits) counts the whole message after reassembly. A longer message closes the connection with status 1009, a binary message with 1003, a text message containing a newline with 1008, and one that is not valid UTF-8 with 1007.
-- One client at a time: a second connection is refused until the first one closes (HTTP 503).
+- One client at a time: a second connection is refused until the first one closes. The simulator's bridge answers HTTP 503; the board accepts the handshake and closes the connection with status 1013 (try later), because its HTTP server runs the handler after the handshake.
 - **Origin check.** The board accepts a connection whose `Origin` is missing (command line clients), the project's site (the site address the firmware was built with), `localhost`, a `.local` name or a private network address. Any other origin is closed with status 1008 after the handshake. The simulator accepts a missing origin, `http://localhost` and `http://127.0.0.1` with any port, the project's site, and the origins added with `--ws-origin`.
 - **The simulator's WebSocket is the WiFi transport.** The commands reserved for USB answer `usb_only` there, as on a board on WiFi. `just serve` starts it (see [Simulator](../../README.md#simulator)).
 - With `network_login` on, a WiFi client [authenticates](#authentication) first.
@@ -95,7 +95,7 @@ A client offers only the colors, effects and color sets the board lists, so late
 
 ### `status`
 
-The light, and from the WiFi and updates milestone the WiFi, time and update state. No fields. Until that milestone the reply holds `light` only.
+The light, and from the WiFi and updates milestone the WiFi, time and update state. No fields. A firmware from before that milestone replies with `light` only.
 
 ```text
 > {"seq":2,"cmd":"status"}
@@ -110,11 +110,13 @@ The light, and from the WiFi and updates milestone the WiFi, time and update sta
 | `light.lightness`         | The lightness `L` sent to the curve now, from 0 to 100, always written with one decimal (`60.0`).                                 |
 | `light.power_scale`       | The percentage the [power limit](../board/light-v1.md#power-limit) leaves of the duties now, from 1 to 100.                       |
 | `light.timer`             | `null` with no timer, otherwise `minutes` (the setting) and `remaining`, the whole seconds until the fade-out starts, 0 after it. |
-| `wifi`, `time`, `update`  | From the WiFi and updates milestone, which specifies them. The hostname is `zenit-XXXX`.                                          |
+| `wifi`                    | From the WiFi and updates milestone: `state` (`not_configured`, `connecting`, `connected`, `not_found`, `wrong_password`, `no_address`), `ssid` (the stored network, or `null`), `rssi` (dBm, or `null` when not connected), `ip` (or `null`) and `hostname` (`zenit-XXXX`). |
+| `time`                    | `synced`, `epoch` (Unix seconds, or `null` until synced) and `local_minute` (minutes after midnight in `timezone`, or `null`).    |
+| `update`                  | `mode`, `state`, `available`, `last_check`, `last_result`, `progress`, `trial`, `skipped` and `rolled_back`, as [WiFi and updates](../board/wifi-and-updates-v1.md#status) defines them. |
 
 ### `settings_get`, `settings_set`
 
-The board's settings, stored in NVS. `settings_get` has no fields; its reply holds `settings`, an object with every setting. Until the WiFi and updates milestone that is the light settings.
+The board's settings, stored in NVS. `settings_get` has no fields; its reply holds `settings`, an object with every setting. A firmware from before the WiFi and updates milestone has the light settings only.
 
 Light settings, specified in [Light](../board/light-v1.md):
 
@@ -131,7 +133,7 @@ Light settings, specified in [Light](../board/light-v1.md):
 | `twinkle_strength` | integer | `20`                                | 5 to 50.                                                        |
 | `timer_minutes`    | integer | `0`                                 | 0 (no timer), or 1 to 360.                                      |
 
-Board settings, from the WiFi and updates milestone, which adds them to `settings_get`, `settings_set` and `settings_reset`. Until then `settings_set` has no field for them, so one is `bad_request`:
+Board settings, from the WiFi and updates milestone, which adds them to `settings_get`, `settings_set` and `settings_reset` (a firmware from before it has no field for them, so one is `bad_request`):
 
 | Setting           | Type    | Default             | Values                                                                        |
 | ----------------- | ------- | ------------------- | ----------------------------------------------------------------------------- |
@@ -141,17 +143,17 @@ Board settings, from the WiFi and updates milestone, which adds them to `setting
 | `check_hours`     | integer | `6`                 | 1 to 168.                                                                     |
 | `install_start`   | integer | `0`                 | 0 to 1,439, minutes after midnight.                                           |
 | `install_end`     | integer | `0`                 | 0 to 1,439. Equal to `install_start`: the whole day.                          |
-| `timezone`        | string  | `UTC0`              | A POSIX TZ string, 1 to 64 printable ASCII characters.                        |
+| `timezone`        | string  | `UTC0`              | A POSIX TZ string, 1 to 64 printable ASCII characters other than space.       |
 | `time_sync_hours` | integer | `6`                 | 1 to 168.                                                                     |
 | `ntp_server`      | string  | `pool.ntp.org`      | A host name or IPv4 address, 1 to 64 characters: letters, digits, `.`, `-`.   |
 | `network_login`   | boolean | `false`             | Whether WiFi clients must authenticate.                                       |
 | `token`           | string  | made at first start | Read only: 16 characters from `a-z` and `0-9`. USB only in `settings_get`.    |
 
-`settings_set` has one optional field per setting except `token`, and at least one of them. The board checks every field before changing anything: a value of the wrong type, out of range or unknown, `null` included, is `bad_request`. The light settings are stored as one record, written in one step, so a save is all or nothing even when the power fails during it. If the settings cannot be saved, the reply is `storage_error` and no setting has changed. On success the reply holds `settings`, with every setting after the change. Nothing is written when no setting differs.
+`settings_set` has one optional field per setting except `token`, and at least one of them. The board checks every field before changing anything: a value of the wrong type, out of range or unknown, `null` included, is `bad_request`. The light settings and the board settings are stored together, in one write, so a save is all or nothing even when the power fails during it. If the settings cannot be saved, the reply is `storage_error` and no setting has changed. On success the reply holds `settings`, with every setting after the change. Nothing is written when no setting differs.
 
 The board saves at once. A client sends a setting when the user has chosen it (a slider when it is released, for example), not while the user is still moving it, so the settings memory is not written many times a second.
 
-Light settings apply at once, with the [transitions](../board/light-v1.md#transitions) of the light. A change of `timer_minutes` while the light is on restarts the countdown.
+Light settings apply at once, with the [transitions](../board/light-v1.md#transitions) of the light. A change of `timer_minutes` while the light is on restarts the countdown. Board settings apply at once too: a new `wifi_power`, `timezone`, `ntp_server` or `time_sync_hours` reaches the network task; turning `network_login` on makes the board close the WiFi client's connection after the reply, so it logs in when it connects again.
 
 ```text
 > {"seq":9,"cmd":"settings_set","effect":"breathing","period_seconds":12}
@@ -171,23 +173,27 @@ The reply holds `light`, as in `status`.
 
 ### `settings_reset`
 
-Puts every setting back to its default, forgets the WiFi network and makes a new token. No fields. USB only: over WiFi the reply is `usb_only`. The reply holds `settings` after the reset. The light fades to the default configuration. Until the WiFi and updates milestone it puts the light settings back and has no network or token to forget. If the settings cannot be saved the reply is `storage_error` and nothing changes.
+Puts every setting back to its default, forgets the WiFi network and makes a new token. No fields. USB only: over WiFi the reply is `usb_only`. The reply holds `settings` after the reset. The light fades to the default configuration. A firmware from before the WiFi and updates milestone puts the light settings back and has no network or token to forget. If the settings cannot be saved the reply is `storage_error` and nothing changes.
 
 ### `wifi_forget`
 
-From the WiFi and updates milestone. Erases the stored WiFi network and disconnects. No fields. USB only. `busy` when the network task cannot take the request now.
+From the WiFi and updates milestone. Erases the stored WiFi network and disconnects. No fields; the reply has none. USB only: `usb_only` over WiFi. `storage_error` when the settings memory fails (nothing changes). The network task always takes the change, so `busy` does not happen.
 
 ### `token_regenerate`
 
-From the WiFi and updates milestone. Makes a new token and closes the WiFi client's connection. No fields. USB only. The reply holds `token`.
+From the WiFi and updates milestone. Makes a new token and closes the WiFi client's connection after the reply. No fields. USB only: `usb_only` over WiFi. The reply holds `token`; `storage_error` when it cannot be saved (the old token stays).
 
 ### `auth_challenge`, `auth`
 
-From the WiFi and updates milestone. [Authentication](#authentication) for a WiFi client. `auth_challenge` has no fields; its reply holds `nonce`, 32 lowercase hexadecimal digits. `auth` has one field, `hmac`, 64 lowercase hexadecimal digits.
+From the WiFi and updates milestone. [Authentication](#authentication) for a WiFi client. `auth_challenge` has no fields; its reply holds `nonce`, 32 lowercase hexadecimal digits. `auth` has one field, `hmac`, 64 lowercase hexadecimal digits; a field that is not 64 lowercase hexadecimal digits is `bad_request`, and its reply has no fields on success. They work over WiFi whether `network_login` is on or not. Over USB there is no authentication, and both answer `bad_request`.
 
 ### `update_check`, `update_install`
 
-From the WiFi and updates milestone. Firmware updates from the project's manifest: `update_check` starts a check in the background; `update_install` has `target` (`firmware`, the only value) and an optional `force` (installs a version on the skip list). Their rules, the update states and the update errors are specified with the WiFi and updates milestone.
+From the WiFi and updates milestone. Firmware updates from the project's manifest: `update_check` starts a check in the background; `update_install` has `target` (`firmware`, the only value) and an optional `force` (installs a version on the skip list). Both are `updates_off` when `update_mode` is `off` or `update_firmware` is `false`, and `no_network` when the board is not connected.
+
+- `update_check` starts a check in the background. Its reply holds `update`, the same object as `status.update`, with `state` `checking` (or the state the board is in when a check or install is already running; a second check does not start). The client follows the result with `status`.
+- `update_install` starts the download of the version the last check found, and its reply holds `update` with `state` `downloading`. `nothing_to_install` when no check has found a newer version (or the board is on trial, or the last check was not successful); `busy` when a check or an install is running; the version on the skip list is installed only with `force: true`. A version that is not newer than the running one is never installed. `target` must be `firmware`, and `force` a boolean; another value is `bad_request`.
+- When the download is verified, the board restarts. The connection drops and the client reconnects.
 
 ## Errors
 
@@ -221,6 +227,8 @@ Lines sent by the board can be longer; clients accept lines up to 4,096 bytes.
 
 Version 1 grows only by addition: new commands, new optional request fields, new reply fields, new error codes, new colors, effects and color sets. Removing or changing the meaning of anything makes protocol 2.
 
+Open words: the words that name a state, a result or a choice (`status.wifi.state`, `status.update.mode`, `status.update.state`, `status.update.last_result`, and the settings `wifi_power` and `update_mode`) may get new values in a later firmware. A client accepts any text there, shows an unknown word plainly, and applies a rule that depends on a word (an address only while `connected`, a percentage only while `downloading`) only to the words it knows. What the specification closes stays strict: ranges, whole numbers, versions of the form `X.Y.Z`, the token, the nonce, the host name and the null rules above.
+
 ### Firmware version
 
 `info.firmware` is set when the firmware is built, from the git tag:
@@ -232,7 +240,7 @@ Version 1 grows only by addition: new commands, new optional request fields, new
 ## Security
 
 - Every size, count and nesting depth has a limit, checked before memory is used for it.
-- Over USB and the simulator's WebSocket there is no authentication.
+- Over USB there is no authentication. The simulator's WebSocket is the WiFi transport: it checks the origin and the network login as a board on WiFi does.
 - Over WiFi, only the origins listed under [WebSocket](#websocket) connect. With `network_login` off (the default), anyone on the network can send every command except those reserved for USB. With it on, a WiFi client authenticates first.
 
 ### Authentication
@@ -241,7 +249,7 @@ With `network_login` on, a WiFi client authenticates once per connection:
 
 1. The client sends `auth_challenge`. The board answers with `nonce`: 16 random bytes from the hardware generator, as 32 lowercase hexadecimal digits. A new `auth_challenge` replaces the previous nonce.
 2. The client sends `auth` with `hmac`: HMAC-SHA256 with the token's 16 ASCII bytes as the key and the nonce's 32 ASCII characters as the message, as 64 lowercase hexadecimal digits.
-3. When it matches, the connection is authenticated until it closes. Otherwise the reply is `unauthorized`. A nonce serves one `auth` only. After 3 failed `auth` on one connection, the board closes it.
+3. A client that has not authenticated 10 seconds after its connection opened is closed (status 1008), so a silent client cannot hold the single connection. When it matches, the connection is authenticated until it closes. Otherwise the reply is `unauthorized`. A nonce serves one `auth` only. After 3 failed `auth` on one connection, the board closes it.
 
 Before authenticating, a WiFi client can send `info`, `auth_challenge` and `auth`; every other command is `unauthorized`. The token never crosses the network, but `ws://` is not encrypted.
 
@@ -250,6 +258,8 @@ Before authenticating, a WiFi client can send `info`, `auth_challenge` and `auth
 The cases in `conformance/protocol/` describe exchanges of requests and expected replies, run against the protocol core with a virtual clock. Each change to the protocol comes with new cases, worked out by hand from this document. Their format is in [`conformance/README.md`](../../conformance/README.md).
 
 ## Measurements
+
+The figures below are those of milestone 2; the figures of the WiFi and updates firmware are in [WiFi and updates](../board/wifi-and-updates-v1.md#measurements).
 
 On an ESP32-C3 SuperMini with the milestone 2 firmware (2026-11-22), after every command, a damaged line and a line over the limit had been sent several times, with the longest settings reply:
 

@@ -5,8 +5,9 @@
 // entry here: both suites pick it up, and `just web-screenshots-update` draws its images.
 
 import { expect, test, type Page } from "@playwright/test";
-import { installFakeSerial } from "../e2e/fake-serial.ts";
-import { MOCK_URL, mockBoard, type Mock } from "../e2e/mock-board.ts";
+import { installFakeSerial, scriptImprov } from "../e2e/fake-serial.ts";
+import { packet, rpcCommandOf } from "../e2e/improv-frames.ts";
+import { MOCK_URL, MOCK_USB_URL, mockBoard, type Mock } from "../e2e/mock-board.ts";
 import { FakeBoard } from "../test/helpers.ts";
 
 export interface State {
@@ -39,12 +40,56 @@ async function connectedLight(page: Page, fake: FakeBoard = board()): Promise<Mo
 
 const timerLine = (page: Page) => [page.getByTestId("timer-line")];
 
+/** A board from the WiFi and updates milestone, running an older release than the one it found. */
+function networkBoard(patch: (board: FakeBoard) => void = () => undefined): FakeBoard {
+  return board((fake) => {
+    fake.withNetwork();
+    fake.update = { ...fake.update, last_check: 1_800_000_000, last_result: "available", available: "1.0.0" };
+    patch(fake);
+  });
+}
+
+/** Opens the Device view of `fake` over WiFi. */
+async function deviceOverWifi(page: Page, fake: FakeBoard): Promise<Mock> {
+  const mock = await mockBoard(page, fake);
+  await page.goto("/");
+  await page.getByLabel("Address of your Zenit").fill(MOCK_URL);
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await page.getByRole("link", { name: "Device" }).click();
+  await expect(page.getByRole("heading", { name: "Firmware updates" })).toBeVisible();
+  return mock;
+}
+
+/** Opens the Device view of `fake` over USB, with an Improv board that sees one network. */
+async function deviceOverUsb(page: Page, fake: FakeBoard): Promise<Mock> {
+  const mock = await mockBoard(page, fake);
+  await scriptImprov(page, (frame) =>
+    rpcCommandOf(frame) === 4 ? [packet("one scanned network"), packet("the end of a scan")] : [],
+  );
+  await installFakeSerial(page, MOCK_USB_URL);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Connect with USB" }).click();
+  await expect(page.getByTestId("connection")).toHaveText("Connected by USB");
+  await page.getByRole("link", { name: "Device" }).click();
+  await expect(page.getByTestId("wifi-setup")).toBeVisible();
+  return mock;
+}
+
+/** A page served by a board: its own origin answers /board.json and the board's WebSocket. */
+async function served(page: Page, fake: FakeBoard): Promise<Mock> {
+  const base = new URL(test.info().project.use.baseURL as string);
+  await page.route("**/board.json", (route) =>
+    route.fulfill({ contentType: "application/json", body: '{"zenit":true,"hostname":"zenit-a1b2","ws":"/ws"}' }),
+  );
+  return mockBoard(page, fake, [`ws://${base.host}/ws`]);
+}
+
 export const STATES: State[] = [
   {
     name: "connect",
     dark: true,
     reach: async (page) => {
-      await installFakeSerial(page, MOCK_URL);
+      await installFakeSerial(page, MOCK_USB_URL);
       await page.goto("/");
       await expect(page.getByRole("heading", { name: "Connect to your Zenit" })).toBeVisible();
     },
@@ -52,7 +97,7 @@ export const STATES: State[] = [
   {
     name: "connect-error",
     reach: async (page) => {
-      await installFakeSerial(page, MOCK_URL);
+      await installFakeSerial(page, MOCK_USB_URL);
       await page.goto("/");
       await page.getByLabel("Address of your Zenit").fill("not an address");
       await page.getByRole("button", { name: "Connect", exact: true }).click();
@@ -64,7 +109,7 @@ export const STATES: State[] = [
     name: "connect-secure-site",
     reach: async (page) => {
       const base = test.info().project.use.baseURL;
-      await installFakeSerial(page, MOCK_URL);
+      await installFakeSerial(page, MOCK_USB_URL);
       await page.route("https://zenit-site.test/**", async (route) => {
         const path = new URL(route.request().url()).pathname;
         await route.fulfill({ response: await route.fetch({ url: `${base}${path}` }) });
@@ -129,7 +174,7 @@ export const STATES: State[] = [
     name: "light-usb",
     reach: async (page) => {
       await mockBoard(page, board());
-      await installFakeSerial(page, MOCK_URL);
+      await installFakeSerial(page, MOCK_USB_URL);
       await page.goto("/");
       await page.getByRole("button", { name: "Connect with USB" }).click();
       await expect(page.getByTestId("connection")).toHaveText("Connected by USB");
@@ -173,13 +218,139 @@ export const STATES: State[] = [
     name: "device-reset",
     reach: async (page) => {
       await mockBoard(page, board());
-      await installFakeSerial(page, MOCK_URL);
+      await installFakeSerial(page, MOCK_USB_URL);
       await page.goto("/");
       await page.getByRole("button", { name: "Connect with USB" }).click();
       await expect(page.getByTestId("connection")).toBeVisible();
       await page.getByRole("link", { name: "Device" }).click();
       await page.getByRole("button", { name: "Reset to defaults" }).click();
       await expect(page.getByRole("alertdialog")).toBeVisible();
+    },
+  },
+  {
+    name: "device-wifi-setup",
+    reach: async (page) => {
+      await deviceOverUsb(page, networkBoard());
+      await page.getByRole("button", { name: "Scan for networks" }).click();
+      await page.getByRole("button", { name: /HomeNet/ }).click();
+      await expect(page.getByLabel("Network name")).toHaveValue("HomeNet");
+    },
+  },
+  {
+    name: "device-access-usb",
+    dark: true,
+    reach: async (page) => {
+      await deviceOverUsb(
+        page,
+        networkBoard((fake) => (fake.settings["network_login"] = true)),
+      );
+      await expect(page.getByTestId("token")).toBeVisible();
+    },
+  },
+  {
+    name: "device-updates",
+    dark: true,
+    reach: async (page) => {
+      await deviceOverWifi(page, networkBoard());
+      await expect(page.getByTestId("update-result")).toHaveText("Version 1.0.0 is available.");
+    },
+  },
+  {
+    name: "device-update-downloading",
+    reach: async (page) => {
+      await deviceOverWifi(
+        page,
+        networkBoard((fake) => {
+          fake.update = { ...fake.update, state: "downloading", progress: 40 };
+        }),
+      );
+      await expect(page.getByRole("progressbar", { name: "Download progress" })).toHaveAttribute("aria-valuenow", "40");
+    },
+  },
+  {
+    name: "device-update-skipped",
+    reach: async (page) => {
+      await deviceOverWifi(
+        page,
+        networkBoard((fake) => {
+          fake.update = {
+            ...fake.update,
+            last_result: "skipped",
+            skipped: "1.0.0",
+            rolled_back: "1.0.0",
+            trial: false,
+          };
+        }),
+      );
+      await expect(page.getByRole("button", { name: "Install 1.0.0 anyway" })).toBeVisible();
+    },
+  },
+  {
+    name: "device-install-confirm",
+    dark: true,
+    reach: async (page) => {
+      await deviceOverWifi(page, networkBoard());
+      await page.getByRole("button", { name: "Install 1.0.0" }).click();
+      await expect(page.getByRole("alertdialog")).toBeVisible();
+    },
+  },
+  {
+    name: "device-not-published",
+    reach: async (page) => {
+      await deviceOverWifi(
+        page,
+        networkBoard((fake) => {
+          fake.update = { ...fake.update, available: null, last_result: "not_published" };
+        }),
+      );
+      await expect(page.getByTestId("update-result")).toContainText("no firmware published yet");
+    },
+  },
+  {
+    name: "login",
+    dark: true,
+    reach: async (page) => {
+      await mockBoard(
+        page,
+        networkBoard((fake) => (fake.settings["network_login"] = true)),
+      );
+      await page.goto("/");
+      await page.getByLabel("Address of your Zenit").fill(MOCK_URL);
+      await page.getByRole("button", { name: "Connect", exact: true }).click();
+      await expect(page.getByRole("heading", { name: "Log in to your Zenit" })).toBeVisible();
+    },
+  },
+  {
+    name: "restarting",
+    reach: async (page) => {
+      const mock = await deviceOverWifi(
+        page,
+        networkBoard((fake) => {
+          fake.update = { ...fake.update, state: "restarting" };
+        }),
+      );
+      mock.refuse = true;
+      mock.drop();
+      await expect(page.getByTestId("auto-reconnect")).toHaveText("The board is restarting");
+    },
+  },
+  {
+    // The app served by a board: the header names the board, there is no installer and no USB option
+    name: "served-light",
+    reach: async (page) => {
+      await served(page, networkBoard());
+      await page.goto("/");
+      await expect(page.getByTestId("hostname")).toHaveText("zenit-a1b2");
+      await expect(page.getByTestId("live-effect")).toBeVisible();
+    },
+  },
+  {
+    name: "served-device",
+    reach: async (page) => {
+      await served(page, networkBoard());
+      await page.goto("/#/device");
+      await expect(page.getByTestId("install-served-note")).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Firmware updates" })).toBeVisible();
     },
   },
   {

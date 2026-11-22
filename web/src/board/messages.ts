@@ -10,6 +10,16 @@ const BOARD_ERRORS: Record<string, string> = {
   storage_error: "Zenit could not save that. Nothing was changed.",
   usb_only: "This works only with a USB cable.",
   busy: "Zenit is busy. Try again in a moment.",
+  unauthorized: "Zenit needs the access token first.",
+  no_network: "Zenit is not connected to WiFi.",
+  updates_off: "Firmware updates are turned off. Turn them on in the Device page.",
+  nothing_to_install: "There is no update to install. Check for updates first.",
+};
+
+/** The WebSocket close statuses the board uses on purpose (docs/board/wifi-and-updates-v1.md#websocket). */
+export const CLOSE_MESSAGES: Record<number, string> = {
+  1008: "Zenit closed the connection: the access token was wrong three times, or this page is not allowed to connect.",
+  1013: "Another page or phone is already connected to this Zenit. Close it, then connect again.",
 };
 
 export const NO_ANSWER = "Zenit did not answer. Check the cable or the address.";
@@ -20,6 +30,8 @@ export function describeError(error: unknown): string {
   if (error instanceof ClientError) {
     if (error.failure === "protocol")
       return "This Zenit speaks a newer protocol than this app. Reload the app, or update it.";
+    if (error.failure === "closed" && error.closeCode !== undefined && CLOSE_MESSAGES[error.closeCode])
+      return CLOSE_MESSAGES[error.closeCode] as string;
     return NO_ANSWER;
   }
   return "Something went wrong.";

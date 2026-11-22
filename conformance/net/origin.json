@@ -1,0 +1,201 @@
+{
+  "description": "Which WebSocket origins the board accepts: none, the site, localhost, a .local name or a private IPv4 address, over http or https.",
+  "site_origin": "https://monska85.github.io",
+  "site_origin_of": [
+    {
+      "url": "https://monska85.github.io/Zenit/",
+      "origin": "https://monska85.github.io"
+    },
+    {
+      "url": "https://Example.COM/x?y#z",
+      "origin": "https://example.com"
+    },
+    {
+      "url": "https://example.com:443/",
+      "origin": "https://example.com"
+    },
+    {
+      "url": "https://example.com:8443/",
+      "origin": "https://example.com:8443"
+    },
+    {
+      "url": "http://example.com/",
+      "origin": null
+    },
+    {
+      "url": "https://",
+      "origin": null
+    },
+    {
+      "url": "example.com",
+      "origin": null
+    },
+    {
+      "url": "https://hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh.iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii.example.org/ppppppppppppppppppppppppppppppppppppppp/",
+      "origin": "https://hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh.iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii.example.org"
+    },
+    {
+      "url": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.org/",
+      "origin": null,
+      "note": "longer than the buffer of the longest accepted address"
+    }
+  ],
+  "cases": [
+    {
+      "origin": null,
+      "allowed": true
+    },
+    {
+      "origin": "https://monska85.github.io",
+      "allowed": true
+    },
+    {
+      "origin": "http://localhost",
+      "allowed": true
+    },
+    {
+      "origin": "http://localhost:5173",
+      "allowed": true
+    },
+    {
+      "origin": "https://localhost",
+      "allowed": true
+    },
+    {
+      "origin": "http://zenit-a1b2.local",
+      "allowed": true
+    },
+    {
+      "origin": "http://zenit-a1b2.local:8080",
+      "allowed": true
+    },
+    {
+      "origin": "http://192.168.1.20",
+      "allowed": true
+    },
+    {
+      "origin": "http://10.0.0.1",
+      "allowed": true
+    },
+    {
+      "origin": "http://172.16.0.1",
+      "allowed": true
+    },
+    {
+      "origin": "http://172.31.255.255",
+      "allowed": true
+    },
+    {
+      "origin": "http://169.254.1.1",
+      "allowed": true
+    },
+    {
+      "origin": "http://127.0.0.1:9000",
+      "allowed": true
+    },
+    {
+      "origin": "http://172.32.0.1",
+      "allowed": false
+    },
+    {
+      "origin": "http://172.15.0.1",
+      "allowed": false
+    },
+    {
+      "origin": "http://8.8.8.8",
+      "allowed": false
+    },
+    {
+      "origin": "http://192.169.1.1",
+      "allowed": false
+    },
+    {
+      "origin": "http://11.0.0.1",
+      "allowed": false
+    },
+    {
+      "origin": "https://example.com",
+      "allowed": false
+    },
+    {
+      "origin": "http://example.com",
+      "allowed": false
+    },
+    {
+      "origin": "https://monska85.github.io.evil.com",
+      "allowed": false
+    },
+    {
+      "origin": "http://monska85.github.io",
+      "allowed": false
+    },
+    {
+      "origin": "https://monska85.github.io:8443",
+      "allowed": false
+    },
+    {
+      "origin": "http://localhost.evil.com",
+      "allowed": false
+    },
+    {
+      "origin": "http://evil.local.com",
+      "allowed": false
+    },
+    {
+      "origin": "http://.local",
+      "allowed": false
+    },
+    {
+      "origin": "http://-a.local",
+      "allowed": false
+    },
+    {
+      "origin": "http://A.local",
+      "allowed": false
+    },
+    {
+      "origin": "http://192.168.01.1",
+      "allowed": false
+    },
+    {
+      "origin": "http://192.168.1.256",
+      "allowed": false
+    },
+    {
+      "origin": "http://192.168.1",
+      "allowed": false
+    },
+    {
+      "origin": "ftp://localhost",
+      "allowed": false
+    },
+    {
+      "origin": "localhost",
+      "allowed": false
+    },
+    {
+      "origin": "null",
+      "allowed": false
+    },
+    {
+      "origin": "",
+      "allowed": false
+    },
+    {
+      "origin": "http://localhost:99999",
+      "allowed": false
+    },
+    {
+      "origin": "http://localhost:",
+      "allowed": false
+    },
+    {
+      "origin": "http://localhost:80a",
+      "allowed": false
+    },
+    {
+      "origin": "http://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.local",
+      "allowed": false
+    }
+  ]
+}

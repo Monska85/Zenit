@@ -1,0 +1,127 @@
+{
+  "description": "What the boot does with the update record: a settled boot (not on trial) from the pending version, whether the pending image started (booted), the running version and whether the other slot is invalid (it may be so from an earlier rollback), the record after the pending image started on trial, and the record after a confirmed trial.",
+  "settled": [
+    {
+      "pending": "",
+      "running": "1.0.0",
+      "other_invalid": false,
+      "action": "nothing",
+      "booted": false
+    },
+    {
+      "pending": "",
+      "running": "1.0.0",
+      "other_invalid": true,
+      "action": "nothing",
+      "booted": false
+    },
+    {
+      "pending": "1.1.0",
+      "running": "1.0.0",
+      "other_invalid": true,
+      "action": "rollback",
+      "skipped": "1.1.0",
+      "rolled_back": "1.1.0",
+      "pending_after": "",
+      "booted": true
+    },
+    {
+      "pending": "1.1.0",
+      "booted": false,
+      "running": "1.0.0",
+      "other_invalid": true,
+      "action": "drop",
+      "skipped": "",
+      "rolled_back": "",
+      "pending_after": "",
+      "note": "an old rollback left the slot invalid and the new image never ran"
+    },
+    {
+      "pending": "1.1.0",
+      "booted": true,
+      "running": "1.0.0",
+      "other_invalid": false,
+      "action": "drop",
+      "skipped": "",
+      "rolled_back": "",
+      "pending_after": "",
+      "note": "it ran but no slot is invalid: nothing to roll back"
+    },
+    {
+      "pending": "1.1.0",
+      "running": "1.0.0",
+      "other_invalid": false,
+      "action": "drop",
+      "skipped": "",
+      "rolled_back": "",
+      "pending_after": "",
+      "booted": false
+    },
+    {
+      "pending": "1.1.0",
+      "running": "1.1.0",
+      "other_invalid": false,
+      "action": "drop",
+      "skipped": "",
+      "rolled_back": "",
+      "pending_after": "",
+      "booted": false
+    },
+    {
+      "pending": "1.1.0",
+      "running": "1.1.0",
+      "other_invalid": true,
+      "action": "drop",
+      "skipped": "",
+      "rolled_back": "",
+      "pending_after": "",
+      "booted": false
+    }
+  ],
+  "confirmed": [
+    {
+      "pending": "1.1.0",
+      "skipped": "1.1.0",
+      "rolled_back": "1.1.0",
+      "running": "1.1.0",
+      "pending_after": "",
+      "skipped_after": "",
+      "rolled_back_after": "1.1.0"
+    },
+    {
+      "pending": "",
+      "skipped": "1.1.0",
+      "rolled_back": "",
+      "running": "1.0.0",
+      "pending_after": "",
+      "skipped_after": "1.1.0",
+      "rolled_back_after": ""
+    },
+    {
+      "pending": "1.2.0",
+      "skipped": "1.1.0",
+      "rolled_back": "",
+      "running": "1.0.0",
+      "pending_after": "1.2.0",
+      "skipped_after": "1.1.0",
+      "rolled_back_after": ""
+    }
+  ],
+  "ran": [
+    {
+      "pending": "1.1.0",
+      "running": "1.1.0",
+      "booted_after": true
+    },
+    {
+      "pending": "1.1.0",
+      "running": "1.0.0",
+      "booted_after": false
+    },
+    {
+      "pending": "",
+      "running": "1.0.0",
+      "booted_after": false
+    }
+  ]
+}

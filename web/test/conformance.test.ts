@@ -27,6 +27,10 @@ interface Step {
   note?: string;
   advance_ms?: number;
   event?: string;
+  /** A line for the simulator's control channel (`!token ...`, `!net ...`): not a protocol line, not the client's business. */
+  control?: string;
+  /** The board closes the WiFi connection after this step's reply. */
+  close?: boolean;
 }
 interface Case {
   description: string;
@@ -43,13 +47,27 @@ const encoder = new TextEncoder();
 /** Cases that test limits only the board has: the board reads 1,024 bytes and 4 levels, the client more. */
 const BOARD_ONLY = new Set(["framing_line_limit", "framing_nesting_limit"]);
 
-/** `$any` placeholders as a sample of their type; the firmware version of the case is a plain text. */
+/**
+ * A text that matches a `$pattern` of the cases, which are all of the form `^[class]{n}$` (the token). Anything else would
+ * need a generator of its own, and the test says so.
+ */
+function sampleFor(pattern: string): string {
+  const match = /^\^\[a-z0-9\]\{(\d+)\}\$$/.exec(pattern);
+  if (!match) throw new Error(`no sample for the pattern ${pattern}`);
+  const sample = "abcdefghij0123456789abcdefghij0123456789".slice(0, Number(match[1]));
+  expect(new RegExp(pattern).test(sample)).toBe(true);
+  return sample;
+}
+
+/** `$any` and `$pattern` placeholders as a sample of their type; the firmware version of the case is a plain text. */
 function concrete(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(concrete);
   if (typeof value === "object" && value !== null) {
     const entries = Object.entries(value);
     const any = (value as Record<string, unknown>)["$any"];
+    const pattern = (value as Record<string, unknown>)["$pattern"];
     if (entries.length === 1 && typeof any === "string") return { string: "1.0.0", integer: 1, boolean: true }[any];
+    if (entries.length === 1 && typeof pattern === "string") return sampleFor(pattern);
     return Object.fromEntries(entries.map(([key, item]) => [key, concrete(item)]));
   }
   return value;
@@ -71,7 +89,10 @@ describe("conformance cases", () => {
   const info = toInfo({ ...INFO } as unknown as JsonObject);
 
   describe.each(cases)("%s", (name, testCase) => {
-    const steps = testCase.steps.filter((step) => step.advance_ms === undefined && step.event === undefined);
+    // The clock, the simulator's events and control lines are for the board; `close` only says how a connection ends
+    const steps = testCase.steps.filter(
+      (step) => step.advance_ms === undefined && step.event === undefined && step.control === undefined,
+    );
 
     it("throws away the lines the board refuses and reads the ones it answers", () => {
       if (BOARD_ONLY.has(name)) return;

@@ -33,8 +33,19 @@ void handle_line(Transport transport, const char *line, size_t length, uint64_t 
 // Answers a protocol line that was longer than the line limit and has been dropped.
 void line_too_long(Transport transport, Writer write);
 
-// A WiFi connection opened or closed: the reply remembered for the WiFi transport is forgotten.
-void wifi_opened();
+// A WiFi connection opened or closed: the reply remembered for the WiFi transport is forgotten, and so is the login.
+// `now` is the time the connection opened, for the login timeout.
+void wifi_opened(uint64_t now);
 void wifi_closed();
+
+// Closes a WiFi client that has not logged in after LOGIN_WAIT_MS (asks for it: see take_wifi_close_request). Call
+// often.
+void poll(uint64_t now);
+
+// Whether network login is on and the WiFi client has not logged in.
+bool wifi_login_pending();
+// Whether the last request asks to close the WiFi client's connection (a failed login, a new token, network login
+// turned on); reading it clears it. Call after the reply has been written.
+bool take_wifi_close_request();
 
 } // namespace protocol

@@ -12,6 +12,7 @@
 #include "protocol.h"
 #include "serial_link.h"
 #include "settings.h"
+#include "updates.h"
 
 namespace
 {
@@ -26,11 +27,14 @@ void setup()
   output::begin();
   Serial.setRxBufferSize(SERIAL_RX_BUFFER);
   Serial.begin(SERIAL_BAUD);
+  serial_link::begin();
   settings::begin();
   protocol::begin(platform::random32());
   const uint64_t now = platform::now_ms();
+  // Starts the network task too, with the settings just read.
   app::begin(now, platform::random32());
   app::tick(now);
+  updates::protocol_ready();
   next_tick = now + zenit::TICK_MS;
   platform::log("firmware %s on %s", platform::firmware_version(), platform::board_name());
 }
@@ -45,6 +49,7 @@ void loop()
     // The next tick on the 10 ms grid; a late tick does not try to catch up.
     next_tick = now - now % zenit::TICK_MS + zenit::TICK_MS;
   }
+  app::service(now);
   delay(1);
 }
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import type { Page } from "@playwright/test";
-import { connectByAddress, expect, test } from "./fixtures.ts";
+import { collectErrors, connectByAddress, expect, test } from "./fixtures.ts";
 
 /** The site publishes this firmware version; a test can publish another. */
 async function publish(page: Page, version: string | null): Promise<void> {
@@ -86,11 +86,7 @@ test("asks for the panel power socket to be unplugged before the installer", asy
 });
 
 test("loads the installer for the manifest of the site after the confirmation", async ({ page }) => {
-  const errors: string[] = [];
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
-  page.on("pageerror", (error) => errors.push(error.message));
+  const errors = collectErrors(page);
   await page.goto("/#/device");
   await page.getByRole("button", { name: "Install or update firmware" }).click();
   await page.getByRole("alertdialog").getByLabel("The panel power socket is unplugged").check();

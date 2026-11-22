@@ -6,6 +6,7 @@
   "platforms": "*",
   "dependencies": {
     "bblanchon/ArduinoJson": "7.4.3",
-    "ZenitLight": "*"
+    "ZenitLight": "*",
+    "ZenitNet": "*"
   }
 }

@@ -20,12 +20,20 @@ sim := ".pio/build/native/program"
 default:
     @just --list
 
-# Build the firmware
-build:
+# Build the firmware (the web app is built first: the firmware serves it)
+build: web-build
     nice -n {{nice}} pio run -j {{jobs}} -e {{board}}
 
+# Build the update test firmware: like the firmware, but it reads updates from a plain http:// test server (SITE_URL=http://192.168.1.5:8000/, see `just update-server`). Never released
+build-update-test site_url: web-build
+    ZENIT_SITE_URL={{site_url}} nice -n {{nice}} pio run -j {{jobs}} -e esp32c3_test_http
+
+# Serve a firmware file and its update manifest for the update test firmware (e.g. just update-server 1.2.0 .pio/build/esp32c3/firmware.bin)
+update-server version firmware *args:
+    {{python}} tools/update_server.py --version {{version}} --firmware {{firmware}} {{args}}
+
 # Flash the firmware (PORT=/dev/ttyACM0 to choose the port). Never with the panel socket powered
-upload:
+upload: web-build
     nice -n {{nice}} pio run -j {{jobs}} -e {{board}} -t upload {{upload_port}}
 
 # Open the serial monitor
@@ -48,7 +56,7 @@ sim *args: sim-build
 sim-live *args: sim-build
     {{sim}} --live --no-files {{args}}
 
-# Serve the simulator on a local WebSocket for the web app (e.g. just serve --port 9000)
+# Serve the simulator on a local WebSocket for the web app (e.g. just serve --port 9000); `just serve --app web/dist` also serves the built app, as a board does
 serve *args: sim-build
     {{python}} tools/ws_bridge.py --sim {{sim}} {{args}}
 
@@ -69,7 +77,7 @@ notices:
     {{python}} tools/firmware_notices.py --version check --out .pio/build/{{board}}/THIRD_PARTY_NOTICES.txt
 
 # Build the files of a release in release/ (e.g. just release-assets 1.2.3): factory image, firmware, notices, checksums
-release-assets version:
+release-assets version: web-build
     ZENIT_VERSION={{version}} nice -n {{nice}} pio run -j {{jobs}} -e {{board}}
     {{python}} tools/firmware_notices.py --version {{version}} --out .pio/build/{{board}}/THIRD_PARTY_NOTICES.txt
     {{python}} tools/release_assets.py --version {{version}} --out release --notices .pio/build/{{board}}/THIRD_PARTY_NOTICES.txt
@@ -83,7 +91,7 @@ format-check:
     find src include test lib \( -name '*.cpp' -o -name '*.h' \) -exec nice -n {{nice}} clang-format --dry-run --Werror {} +
 
 # Check formatting, run every test suite, build the firmware and the simulator, build the notices
-check: format-check
+check: format-check web-build
     nice -n {{nice}} pio test -e native_test
     nice -n {{nice}} pio run -j {{jobs}} -e native -e {{board}}
     nice -n {{nice}} {{python}} -m unittest discover -s tools

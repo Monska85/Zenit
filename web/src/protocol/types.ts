@@ -18,7 +18,7 @@ export interface BoardInfo {
 }
 
 /** The light settings of `settings_get`, with the names of the protocol. */
-export interface Settings {
+export interface Settings extends BoardSettings {
   brightness: number;
   effect: string;
   color: string;
@@ -31,6 +31,22 @@ export interface Settings {
   timer_minutes: number;
 }
 
+/** The board settings, from the WiFi and updates milestone: all optional, a firmware from before it has none. */
+export interface BoardSettings {
+  wifi_power?: string;
+  update_mode?: string;
+  update_firmware?: boolean;
+  check_hours?: number;
+  install_start?: number;
+  install_end?: number;
+  timezone?: string;
+  time_sync_hours?: number;
+  ntp_server?: string;
+  network_login?: boolean;
+  /** Only in `settings_get` over USB. */
+  token?: string;
+}
+
 export interface LightStatus {
   on: boolean;
   effect: string;
@@ -38,6 +54,40 @@ export interface LightStatus {
   lightness: number;
   power_scale: number;
   timer: { minutes: number; remaining: number } | null;
+}
+
+export interface WifiStatus {
+  state: string;
+  ssid: string | null;
+  rssi: number | null;
+  ip: string | null;
+  hostname: string;
+}
+
+export interface TimeStatus {
+  synced: boolean;
+  epoch: number | null;
+  local_minute: number | null;
+}
+
+export interface UpdateStatus {
+  mode: string;
+  state: string;
+  available: string | null;
+  last_check: number | null;
+  last_result: string;
+  progress: number | null;
+  trial: boolean;
+  skipped: string | null;
+  rolled_back: string | null;
+}
+
+/** What `status` reports: the light, and from the WiFi and updates milestone the rest (null from an older board). */
+export interface BoardStatus {
+  light: LightStatus;
+  wifi: WifiStatus | null;
+  time: TimeStatus | null;
+  update: UpdateStatus | null;
 }
 
 /** A parsed value as plain JavaScript: floats are numbers. */
@@ -54,3 +104,14 @@ export const plain = (value: JsonValue): unknown => {
 export const toInfo = (reply: JsonObject): BoardInfo => plain(reply) as BoardInfo;
 export const toSettings = (reply: JsonObject): Settings => plain(reply["settings"] as JsonValue) as Settings;
 export const toLight = (reply: JsonObject): LightStatus => plain(reply["light"] as JsonValue) as LightStatus;
+export const toStatus = (reply: JsonObject): BoardStatus => {
+  const value = plain(reply) as Partial<BoardStatus>;
+  return {
+    light: value.light as LightStatus,
+    wifi: value.wifi ?? null,
+    time: value.time ?? null,
+    update: value.update ?? null,
+  };
+};
+/** The `update` object of `update_check` and `update_install`. */
+export const toUpdate = (reply: JsonObject): UpdateStatus => plain(reply["update"] as JsonValue) as UpdateStatus;

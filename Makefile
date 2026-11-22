@@ -11,6 +11,8 @@ JOBS ?= 4
 NICE ?= 10
 ARGS ?=
 VERSION ?=
+FIRMWARE ?=
+SITE_URL ?=
 SIM := .pio/build/native/program
 
 ifeq ($(shell printf '%s' '$(JOBS)' | grep -Ex '[1-9][0-9]*'),)
@@ -23,15 +25,23 @@ endif
 UPLOAD_PORT := $(if $(PORT),--upload-port $(PORT),)
 MONITOR_PORT := $(if $(PORT),--port $(PORT),)
 
-.PHONY: help build upload monitor flash sim-build sim sim-live serve cli test tools-test notices release-assets format format-check check clean web-install web-dev web-format web-test web-build web-size web-e2e web-screenshots web-screenshots-update web-check
+.PHONY: help build build-update-test update-server upload monitor flash sim-build sim sim-live serve cli test tools-test notices release-assets format format-check check clean web-install web-dev web-format web-test web-build web-size web-e2e web-screenshots web-screenshots-update web-check
 
 help: ## List the targets
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/' | expand -t 16
 
-build: ## Build the firmware
+build: web-build ## Build the firmware (the web app is built first: the firmware serves it)
 	nice -n $(NICE) pio run -j $(JOBS) -e $(BOARD)
 
-upload: ## Flash the firmware (PORT=/dev/ttyACM0 to choose the port). Never with the panel socket powered
+build-update-test: web-build ## Build the update test firmware: it reads updates from a plain http:// test server (SITE_URL=http://192.168.1.5:8000/). Never released
+	@test -n "$(SITE_URL)" || { echo "SITE_URL is required, e.g. make build-update-test SITE_URL=http://192.168.1.5:8000/" >&2; exit 2; }
+	ZENIT_SITE_URL=$(SITE_URL) nice -n $(NICE) pio run -j $(JOBS) -e esp32c3_test_http
+
+update-server: ## Serve a firmware file and its update manifest for the update test firmware (VERSION=1.2.0 FIRMWARE=.pio/build/esp32c3/firmware.bin)
+	@test -n "$(VERSION)" -a -n "$(FIRMWARE)" || { echo "VERSION and FIRMWARE are required" >&2; exit 2; }
+	$(PYTHON) tools/update_server.py --version $(VERSION) --firmware $(FIRMWARE) $(ARGS)
+
+upload: web-build ## Flash the firmware (PORT=/dev/ttyACM0 to choose the port). Never with the panel socket powered
 	nice -n $(NICE) pio run -j $(JOBS) -e $(BOARD) -t upload $(UPLOAD_PORT)
 
 monitor: ## Open the serial monitor
@@ -49,7 +59,7 @@ sim: sim-build ## Run the simulator and write trace.csv and viewer.html (ARGS="-
 sim-live: sim-build ## Run the simulator in real time and draw the light in the terminal
 	$(SIM) --live --no-files $(ARGS)
 
-serve: sim-build ## Serve the simulator on a local WebSocket for the web app (ARGS="--port 9000")
+serve: sim-build ## Serve the simulator on a local WebSocket for the web app (ARGS="--port 9000"; ARGS="--app web/dist" also serves the built app, as a board does)
 	$(PYTHON) tools/ws_bridge.py --sim $(SIM) $(ARGS)
 
 cli: ## Run the command line client against a board or the simulator (ARGS="--port /dev/ttyACM0 info")
@@ -64,7 +74,7 @@ tools-test: ## Run the Python tool tests (the simulator tests need `make sim-bui
 notices: ## Write the third-party notices of the firmware build (`make build` first)
 	$(PYTHON) tools/firmware_notices.py --version check --out .pio/build/$(BOARD)/THIRD_PARTY_NOTICES.txt
 
-release-assets: ## Build the files of a release in release/ (VERSION=1.2.3): factory image, firmware, notices, checksums
+release-assets: web-build ## Build the files of a release in release/ (VERSION=1.2.3): factory image, firmware, notices, checksums
 	@test -n "$(VERSION)" || { echo "VERSION is required, e.g. make release-assets VERSION=1.2.3"; exit 1; }
 	ZENIT_VERSION=$(VERSION) nice -n $(NICE) pio run -j $(JOBS) -e $(BOARD)
 	$(PYTHON) tools/firmware_notices.py --version $(VERSION) --out .pio/build/$(BOARD)/THIRD_PARTY_NOTICES.txt
@@ -76,7 +86,7 @@ format: ## Format the C++ sources with clang-format
 format-check: ## Fail if a C++ source is not formatted
 	find src include test lib \( -name '*.cpp' -o -name '*.h' \) -exec nice -n $(NICE) clang-format --dry-run --Werror {} +
 
-check: format-check ## Check formatting, run every test suite, build the firmware and the simulator, build the notices
+check: format-check web-build ## Check formatting, run every test suite, build the firmware and the simulator, build the notices
 	nice -n $(NICE) pio test -e native_test
 	nice -n $(NICE) pio run -j $(JOBS) -e native -e $(BOARD)
 	nice -n $(NICE) $(PYTHON) -m unittest discover -s tools

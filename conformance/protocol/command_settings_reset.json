@@ -27,7 +27,20 @@
           "period_seconds": 8,
           "floor": 20,
           "twinkle_strength": 20,
-          "timer_minutes": 5
+          "timer_minutes": 5,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
         }
       },
       "transport": "usb"
@@ -67,7 +80,20 @@
           "period_seconds": 8,
           "floor": 20,
           "twinkle_strength": 20,
-          "timer_minutes": 5
+          "timer_minutes": 5,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
         }
       },
       "transport": "usb"
@@ -95,7 +121,20 @@
           "period_seconds": 8,
           "floor": 20,
           "twinkle_strength": 20,
-          "timer_minutes": 0
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
         }
       },
       "transport": "usb"
@@ -123,7 +162,20 @@
           "period_seconds": 8,
           "floor": 20,
           "twinkle_strength": 20,
-          "timer_minutes": 0
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
         }
       },
       "transport": "usb"
@@ -151,7 +203,20 @@
           "period_seconds": 8,
           "floor": 20,
           "twinkle_strength": 20,
-          "timer_minutes": 0
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
         }
       },
       "transport": "usb",

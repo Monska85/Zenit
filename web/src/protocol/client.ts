@@ -7,7 +7,7 @@ import { frameRequest, parseLine } from "./frame";
 import { isBadFrameReply, isInt, isSeq, validBody } from "./schema";
 import type { JsonObject } from "./strict-json";
 import { toInfo, type BoardInfo } from "./types";
-import type { LineTransport } from "./transport";
+import { ConnectionClosed, type LineTransport } from "./transport";
 
 export const REPLY_TIMEOUT_MS = 2000;
 export const ATTEMPTS = 5;
@@ -22,6 +22,8 @@ export class ClientError extends Error {
   constructor(
     readonly failure: ClientFailure,
     message: string,
+    /** The WebSocket close status, when the board closed the connection with one (1008, 1013). */
+    readonly closeCode?: number,
   ) {
     super(message);
   }
@@ -92,6 +94,8 @@ function randomSeq(): number {
 
 export class Client {
   info: BoardInfo | null = null;
+  /** Called once when the connection ends, with the reason, whoever ended it. */
+  onEnd: ((error: ClientError) => void) | null = null;
   private readonly queue = new LineQueue();
   private readonly timeoutMs: number;
   private readonly attempts: number;
@@ -107,14 +111,24 @@ export class Client {
     this.attempts = options.attempts ?? ATTEMPTS;
     this.seq = options.seq ?? randomSeq();
     transport.onLine = (line) => this.queue.push(line);
-    transport.onClose = (cause) =>
-      this.queue.end(
-        new ClientError("closed", cause ? `the connection closed: ${cause.message}` : "the connection closed"),
+    transport.onClose = (cause) => {
+      const error = new ClientError(
+        "closed",
+        cause ? `the connection closed: ${cause.message}` : "the connection closed",
+        cause instanceof ConnectionClosed ? cause.code : undefined,
       );
+      this.onEnd?.(error);
+      this.queue.end(error);
+    };
   }
 
   get kind(): "usb" | "websocket" {
     return this.transport.kind;
+  }
+
+  /** The Improv side of the connection, when it has one (USB serial). */
+  get improv(): LineTransport["improv"] {
+    return this.transport.improv;
   }
 
   /** Whether a request is waiting its turn or for its reply. */

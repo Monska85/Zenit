@@ -1,0 +1,190 @@
+{
+  "description": "The install window (minutes after midnight; equal ends are the whole day; an end before the start runs over midnight) and when a check is due.",
+  "window": [
+    {
+      "start": 0,
+      "end": 0,
+      "minute": 0,
+      "in": true
+    },
+    {
+      "start": 600,
+      "end": 600,
+      "minute": 1439,
+      "in": true
+    },
+    {
+      "start": 600,
+      "end": 720,
+      "minute": 599,
+      "in": false
+    },
+    {
+      "start": 600,
+      "end": 720,
+      "minute": 600,
+      "in": true
+    },
+    {
+      "start": 600,
+      "end": 720,
+      "minute": 719,
+      "in": true
+    },
+    {
+      "start": 600,
+      "end": 720,
+      "minute": 720,
+      "in": false
+    },
+    {
+      "start": 1320,
+      "end": 360,
+      "minute": 1320,
+      "in": true
+    },
+    {
+      "start": 1320,
+      "end": 360,
+      "minute": 1439,
+      "in": true
+    },
+    {
+      "start": 1320,
+      "end": 360,
+      "minute": 0,
+      "in": true
+    },
+    {
+      "start": 1320,
+      "end": 360,
+      "minute": 359,
+      "in": true
+    },
+    {
+      "start": 1320,
+      "end": 360,
+      "minute": 360,
+      "in": false
+    },
+    {
+      "start": 1320,
+      "end": 360,
+      "minute": 1319,
+      "in": false
+    },
+    {
+      "start": 1439,
+      "end": 0,
+      "minute": 1439,
+      "in": true
+    },
+    {
+      "start": 1439,
+      "end": 0,
+      "minute": 0,
+      "in": false
+    }
+  ],
+  "check_due": [
+    {
+      "now": 119999,
+      "ready": 0,
+      "attempted": false,
+      "last": 0,
+      "failed": false,
+      "hours": 6,
+      "due": false
+    },
+    {
+      "now": 120000,
+      "ready": 0,
+      "attempted": false,
+      "last": 0,
+      "failed": false,
+      "hours": 6,
+      "due": true
+    },
+    {
+      "now": 1119999,
+      "ready": 1000000,
+      "attempted": false,
+      "last": 0,
+      "failed": false,
+      "hours": 6,
+      "due": false
+    },
+    {
+      "now": 1120000,
+      "ready": 1000000,
+      "attempted": false,
+      "last": 0,
+      "failed": false,
+      "hours": 6,
+      "due": true
+    },
+    {
+      "now": 21600999,
+      "ready": 0,
+      "attempted": true,
+      "last": 1000,
+      "failed": false,
+      "hours": 6,
+      "due": false
+    },
+    {
+      "now": 21601000,
+      "ready": 0,
+      "attempted": true,
+      "last": 1000,
+      "failed": false,
+      "hours": 6,
+      "due": true
+    },
+    {
+      "now": 3600000,
+      "ready": 0,
+      "attempted": true,
+      "last": 0,
+      "failed": false,
+      "hours": 1,
+      "due": true
+    },
+    {
+      "now": 1799999,
+      "ready": 0,
+      "attempted": true,
+      "last": 0,
+      "failed": true,
+      "hours": 6,
+      "due": false
+    },
+    {
+      "now": 1800000,
+      "ready": 0,
+      "attempted": true,
+      "last": 0,
+      "failed": true,
+      "hours": 6,
+      "due": true
+    },
+    {
+      "now": 604799999,
+      "ready": 0,
+      "attempted": true,
+      "last": 0,
+      "failed": false,
+      "hours": 168,
+      "due": false
+    },
+    {
+      "now": 604800000,
+      "ready": 0,
+      "attempted": true,
+      "last": 0,
+      "failed": false,
+      "hours": 168,
+      "due": true
+    }
+  ]
+}

@@ -11,6 +11,15 @@ forwarded. The bridge applies the WebSocket rules of the specification: one clie
 refused with HTTP 503), an origin check (the connection is closed with 1008 after the handshake), and the close codes
 1009 (message over the line limit), 1003 (binary message), 1008 (a newline inside a message) and 1007 (invalid UTF-8).
 
+With --app DIR the same port also serves the built web app (web/dist) over plain HTTP, as a board does
+(docs/board/wifi-and-updates-v1.md#the-served-web-app): `GET /` and the files of DIR, `GET /board.json`, 404 for anything
+else and 405 with `Allow: GET` for another method (HEAD included, as on the board), with the board's security headers.
+One difference: the WebSocket library closes the connection of a request that has a body, where a board answers 405. The app, loaded from there, connects to `/ws` on
+its own origin. Without it only the WebSocket is served.
+
+The simulator's line `!close-client` (a failed login, a new token) makes the bridge close the open connection with 1008
+after the replies that came before it.
+
 The first line the bridge prints on standard output is `listening ws://127.0.0.1:PORT`. It stops when the simulator
 stops, or on Ctrl-C.
 
@@ -20,9 +29,11 @@ Needs Python 3.11 or later (what websockets 17 asks for) and the websockets pack
 import argparse
 import asyncio
 import http
+import json
 import re
 import signal
 import sys
+from pathlib import Path
 
 # The longest line the board reads, which a message may not exceed. Mirrors MAX_LINE in
 # lib/ZenitProto/src/proto_limits.h.
@@ -30,26 +41,79 @@ BOARD_MAX_LINE = 1024
 HANDSHAKE_TIMEOUT = 5.0
 CLOSE_TIMEOUT = 1.0
 MARKER = "@ZN "
-# A port is 1 to 65535, without leading zeros
-PORT = r"(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])"
-LOCAL_ORIGIN = re.compile(rf"http://(localhost|127\.0\.0\.1)(:{PORT})?")
 # The project's site: GitHub Pages serves the repository at this origin
 SITE_ORIGIN = "https://monska85.github.io"
+MAX_ORIGIN = 255
+
+
+# The headers of every answer of the served app: the same as COMMON_HEADERS in lib/ZenitNet/src/net_http.cpp, which
+# tools/test_ws_bridge.py compares them with.
+SECURITY_HEADERS = {
+    "Content-Security-Policy": "default-src 'self'; connect-src 'self' ws:; img-src 'self' data:; style-src 'self' "
+    "'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Cross-Origin-Resource-Policy": "same-origin",
+    "Connection": "close",
+}
+MEDIA_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".json": "application/json",
+    ".txt": "text/plain; charset=utf-8",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+    ".woff2": "font/woff2",
+}
+CLOSE_CLIENT = object()
+
+
+def _is_port(text):
+    return 0 < len(text) <= 5 and text.isascii() and text.isdigit() and int(text) <= 65535
+
+
+def _private_ipv4(host):
+    parts = host.split(".")
+    if len(parts) != 4 or not all(re.fullmatch(r"(0|[1-9][0-9]{0,2})", part) and int(part) <= 255 for part in parts):
+        return None
+    a, b = int(parts[0]), int(parts[1])
+    return a in (10, 127) or (a == 172 and 16 <= b <= 31) or (a == 192 and b == 168) or (a == 169 and b == 254)
+
+
+def _local_name(host):
+    return len(host) > 6 and host.endswith(".local") and re.fullmatch(r"[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*", host) is not None
 
 
 def origin_allowed(origin, extra=()):
-    """Whether a connection with this Origin header (None when missing) may use the bridge."""
+    """Whether a connection with this Origin header (None when missing) may use the bridge. It is the rule of the board
+    (`origin_allowed` in lib/ZenitNet/src/net_origin.cpp, docs/protocol/protocol-v1.md#websocket), with the origins
+    added by --ws-origin: no origin, the project's site, localhost, a `.local` name or a private IPv4 address, over http
+    or https, with an optional port. tools/test_ws_bridge.py runs it on the cases of conformance/net/origin.json."""
     if origin is None:
         return True  # command line clients send none
-    return bool(LOCAL_ORIGIN.fullmatch(origin)) or origin == SITE_ORIGIN or origin in extra
+    if len(origin) > MAX_ORIGIN:
+        return False
+    if origin == SITE_ORIGIN or origin in extra:
+        return True
+    match = re.fullmatch(r"https?://([^:]*)(?::(.*))?", origin)
+    if not match:
+        return False
+    host, port = match.group(1), match.group(2)
+    if port is not None and not _is_port(port):
+        return False
+    return host == "localhost" or bool(_private_ipv4(host)) or _local_name(host)
 
 
 class Bridge:
     """One client at a time between the WebSocket and the simulator's standard input and output."""
 
-    def __init__(self, process, extra_origins=()):
+    def __init__(self, process, extra_origins=(), app_dir=None, hostname="zenit-0000"):
         self.process = process
         self.extra_origins = tuple(extra_origins)
+        self.app_dir = Path(app_dir).resolve() if app_dir else None
+        self.hostname = hostname
         self.client = None  # the connection holding the slot, from its request until it closes
         self.replies = None  # lines waiting for the open client
         self.tasks = set()
@@ -60,8 +124,41 @@ class Bridge:
         self.closed = asyncio.Event()
         self.close_ack_timeout = 2.0
 
+    def page(self, connection, request, allowed=True):
+        """The answer to an HTTP request that is not a WebSocket handshake, as the board gives it; None without --app."""
+        from websockets.datastructures import Headers
+        from websockets.http11 import Response
+
+        def answer(status, media, body, extra=None):
+            headers = Headers({**SECURITY_HEADERS, "Content-Type": media, "Content-Length": str(len(body)), **(extra or {})})
+            return Response(status.value, status.phrase, headers, body)
+
+        if not allowed:
+            return answer(http.HTTPStatus.METHOD_NOT_ALLOWED, "text/plain; charset=utf-8", b"method not allowed\n", {"Allow": "GET"})
+        path = request.path.split("?", 1)[0].split("#", 1)[0]
+        if path == "/board.json":
+            body = json.dumps({"zenit": True, "hostname": self.hostname, "ws": "/ws"}, separators=(",", ":")).encode()
+            return answer(http.HTTPStatus.OK, "application/json", body, {"Cache-Control": "no-store"})
+        relative = "index.html" if path == "/" else path.lstrip("/")
+        if (
+            self.app_dir is not None
+            and relative
+            and not re.search(r"[^\x21-\x7e]|\\|\.\.", relative)
+        ):
+            file = (self.app_dir / relative).resolve()
+            if file.is_file() and self.app_dir in file.parents:
+                media = MEDIA_TYPES.get(file.suffix.lower(), "application/octet-stream")
+                cache = "public, max-age=31536000, immutable" if relative.startswith("assets/") else "no-cache"
+                return answer(http.HTTPStatus.OK, media, file.read_bytes(), {"Cache-Control": cache})
+        return answer(http.HTTPStatus.NOT_FOUND, "text/plain; charset=utf-8", b"not found\n")
+
     def process_request(self, connection, request):
-        """Refuses a second connection while the first one is open."""
+        """Serves the web app to a page request, and refuses a second WebSocket while the first one is open."""
+        if self.app_dir is not None and request.headers.get("Upgrade", "").lower() != "websocket":
+            if getattr(request, "method", "GET") != "GET":
+                # As the board: only GET is served (HEAD included), anything else is 405 with Allow: GET
+                return self.page(connection, request, allowed=False)
+            return self.page(connection, request)
         if self.client is not None:
             return connection.respond(http.HTTPStatus.SERVICE_UNAVAILABLE, "Service Unavailable\n")
         self.client = connection
@@ -115,7 +212,11 @@ class Bridge:
 
     async def send_replies(self, connection, replies):
         while True:
-            await connection.send(await replies.get())
+            line = await replies.get()
+            if line is CLOSE_CLIENT:
+                await connection.close(1008)
+                return
+            await connection.send(line)
 
     def reply(self, line):
         """Queues a line from the simulator for the open client; dropped when no client is open."""
@@ -132,11 +233,13 @@ class Bridge:
             text = raw.decode("utf-8", "replace").rstrip("\r\n")
             if text == "!wifi-closed":
                 self.closed.set()
+            elif text == "!close-client":
+                self.reply(CLOSE_CLIENT)
             elif text.startswith(MARKER):
                 self.reply(text)
 
 
-async def run(sim, port, extra_origins, out=sys.stdout):
+async def run(sim, port, extra_origins, out=sys.stdout, app_dir=None, hostname="zenit-0000"):
     """Starts the simulator and serves until it stops. Returns its exit status."""
     from websockets.asyncio.server import serve
 
@@ -149,7 +252,7 @@ async def run(sim, port, extra_origins, out=sys.stdout):
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
     )
-    bridge = Bridge(process, extra_origins)
+    bridge = Bridge(process, extra_origins, app_dir, hostname)
     forwarder = None
     try:
         # No compression and no keepalive pings: plain RFC 6455, as the clients expect.
@@ -191,13 +294,17 @@ def main(argv=None):
     parser.add_argument("--sim", required=True, help="the simulator program (pio run -e native builds it)")
     parser.add_argument("--port", type=int, default=8765, help="port on 127.0.0.1 (0 picks a free one)")
     parser.add_argument("--ws-origin", action="append", default=[], metavar="ORIGIN", help="also accept this Origin (repeatable)")
+    parser.add_argument("--app", metavar="DIR", help="also serve the built web app of DIR over HTTP, as a board does")
+    parser.add_argument("--hostname", default="zenit-0000", help="the hostname /board.json reports (default zenit-0000)")
     args = parser.parse_args(argv)
+    if args.app and not (Path(args.app) / "index.html").is_file():
+        sys.exit(f"ws_bridge: {args.app}/index.html is missing: build the web app first")
     try:
         import websockets.asyncio.server  # noqa: F401
     except ImportError:
         sys.exit("ws_bridge: needs the websockets package, version 17 (pip install websockets)")
     loop = asyncio.new_event_loop()
-    main_task = loop.create_task(run(args.sim, args.port, args.ws_origin))
+    main_task = loop.create_task(run(args.sim, args.port, args.ws_origin, app_dir=args.app, hostname=args.hostname))
     for name in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(name, main_task.cancel)
     try:

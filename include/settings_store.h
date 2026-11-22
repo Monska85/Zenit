@@ -13,7 +13,8 @@ namespace settings
 namespace store
 {
 
-void begin();
+// False when the memory could not be opened.
+bool begin();
 // The size of the stored record (at most `capacity` bytes are copied into `out`), or 0 when it is missing or
 // unreadable.
 size_t read(const char *key, uint8_t *out, size_t capacity);

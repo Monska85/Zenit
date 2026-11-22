@@ -4,7 +4,7 @@
 
 namespace zenit
 {
-namespace proto
+namespace net
 {
 
 namespace
@@ -50,5 +50,5 @@ size_t utf8_sequence_length(const char *text, size_t length, size_t index)
   return 0;
 }
 
-} // namespace proto
+} // namespace net
 } // namespace zenit

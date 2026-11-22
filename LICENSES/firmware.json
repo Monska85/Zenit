@@ -4,7 +4,9 @@
     "esp-idf": "v5.5.5",
     "arduino": "3.3.12",
     "components": {
-      "espressif__esp_diagnostics": "1.3.4"
+      "espressif__esp_diagnostics": "1.3.4",
+      "espressif__mdns": "1.13.1",
+      "espressif__network_provisioning": "1.0.2"
     }
   },
   "sections": [
@@ -14,7 +16,7 @@
       "license": "LGPL-2.1-or-later",
       "source": "https://github.com/espressif/arduino-esp32/tree/{version}",
       "files": ["arduino-esp32.LICENSE.md"],
-      "archives": ["libFrameworkArduino.a", "libPreferences.a"]
+      "archives": ["libESPmDNS.a", "libFrameworkArduino.a", "libNetwork.a", "libPreferences.a", "libWiFi.a"]
     },
     {
       "name": "ESP-IDF",
@@ -23,22 +25,27 @@
       "source": "https://github.com/espressif/esp-idf/tree/{version}",
       "files": ["esp-idf.LICENSE"],
       "archives": [
-        "libapp_update.a", "libbootloader_support.a", "libbt.a", "libcxx.a", "libefuse.a", "libesp_app_format.a",
-        "libesp_coex.a", "libesp_common.a", "libesp_driver_gpio.a", "libesp_driver_ledc.a", "libesp_driver_rmt.a",
-        "libesp_driver_spi.a", "libesp_driver_tsens.a", "libesp_driver_uart.a", "libesp_driver_usb_serial_jtag.a",
-        "libesp_event.a", "libesp_hw_support.a", "libesp_mm.a", "libesp_partition.a", "libesp_phy.a", "libesp_pm.a",
-        "libesp_ringbuf.a", "libesp_security.a", "libesp_system.a", "libesp_timer.a", "libesp_vfs_console.a",
-        "libespcoredump.a", "libfreertos.a", "libhal.a", "libheap.a", "liblog.a", "libmbedcrypto.a", "libnewlib.a", "libnvs_flash.a",
-        "libnvs_sec_provider.a", "libpthread.a", "libriscv.a", "libsoc.a", "libspi_flash.a", "libvfs.a"
+        "libapp_update.a", "libbootloader_support.a", "libbt.a", "libcxx.a", "libefuse.a", "libesp-tls.a",
+        "libesp_app_format.a", "libesp_coex.a", "libesp_common.a", "libesp_driver_gpio.a", "libesp_driver_ledc.a",
+        "libesp_driver_rmt.a", "libesp_driver_spi.a", "libesp_driver_tsens.a", "libesp_driver_uart.a",
+        "libesp_driver_usb_serial_jtag.a", "libesp_eth.a", "libesp_event.a", "libesp_http_client.a",
+        "libesp_http_server.a", "libesp_hw_support.a", "libesp_mm.a", "libesp_netif.a", "libesp_partition.a",
+        "libesp_phy.a", "libesp_pm.a", "libesp_ringbuf.a", "libesp_security.a", "libesp_system.a", "libesp_timer.a",
+        "libesp_vfs_console.a", "libesp_wifi.a", "libespcoredump.a", "libfreertos.a", "libhal.a", "libheap.a",
+        "liblog.a", "libmbedcrypto.a", "libnewlib.a", "libnvs_flash.a", "libnvs_sec_provider.a", "libprotocomm.a",
+        "libpthread.a", "libriscv.a", "libsoc.a", "libspi_flash.a", "libtcp_transport.a", "libvfs.a"
       ]
     },
     {
-      "name": "Espressif binary libraries (PHY, Bluetooth, coexistence), in object form only",
+      "name": "Espressif binary libraries (PHY, Bluetooth, coexistence, WiFi), in object form only",
       "version": "esp-idf",
       "license": "Apache-2.0",
       "source": "https://github.com/espressif/esp-idf/tree/{version}",
       "files": ["esp-idf.LICENSE"],
-      "archives": ["libbtbb.a", "libbtdm_app.a", "libcoexist.a", "libphy.a"]
+      "archives": [
+        "libbtbb.a", "libbtdm_app.a", "libcoexist.a", "libcore.a", "libespnow.a", "libmesh.a", "libnet80211.a",
+        "libphy.a", "libpp.a", "libsmartconfig.a"
+      ]
     },
     {
       "name": "FreeRTOS kernel (in ESP-IDF, components/freertos)",
@@ -54,7 +61,7 @@
       "license": "Apache-2.0 OR GPL-2.0-or-later",
       "source": "https://github.com/espressif/mbedtls",
       "files": ["mbedtls.LICENSE"],
-      "archives": ["libmbedcrypto.a"]
+      "archives": ["libmbedcrypto.a", "libmbedtls.a", "libmbedtls_2.a", "libmbedx509.a"]
     },
     {
       "name": "TLSF memory allocator (in ESP-IDF, components/heap/tlsf)",
@@ -87,6 +94,62 @@
       "source": "https://gcc.gnu.org/",
       "files": ["toolchain:share/licenses/gcc/COPYING3", "toolchain:share/licenses/gcc/COPYING.RUNTIME"],
       "archives": ["libgcc.a", "libstdc++.a"]
+    },
+    {
+      "name": "lwIP (in ESP-IDF, components/lwip, espressif/esp-lwip)",
+      "version": "esp-idf",
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/espressif/esp-lwip",
+      "files": ["lwip.LICENSE"],
+      "archives": ["liblwip.a"]
+    },
+    {
+      "name": "cJSON (in ESP-IDF, components/json)",
+      "version": "esp-idf",
+      "license": "MIT",
+      "source": "https://github.com/DaveGamble/cJSON",
+      "files": ["cJSON.LICENSE"],
+      "archives": ["libjson.a"]
+    },
+    {
+      "name": "http-parser (in ESP-IDF, components/http_parser)",
+      "version": "esp-idf",
+      "license": "MIT",
+      "source": "https://github.com/espressif/esp-idf/tree/{version}/components/http_parser",
+      "files": ["http_parser.LICENSE"],
+      "archives": ["libhttp_parser.a"]
+    },
+    {
+      "name": "wpa_supplicant and hostapd (in ESP-IDF, components/wpa_supplicant)",
+      "version": "esp-idf",
+      "license": "BSD-3-Clause",
+      "source": "https://github.com/espressif/esp-idf/tree/{version}/components/wpa_supplicant",
+      "files": ["wpa_supplicant.LICENSE"],
+      "archives": ["libwpa_supplicant.a"]
+    },
+    {
+      "name": "mdns (component espressif/mdns)",
+      "version": "component:espressif__mdns",
+      "license": "Apache-2.0",
+      "source": "https://components.espressif.com/components/espressif/mdns/versions/{version}",
+      "files": ["esp-idf.LICENSE"],
+      "archives": ["libespressif__mdns.a"]
+    },
+    {
+      "name": "network_provisioning (component espressif/network_provisioning)",
+      "version": "component:espressif__network_provisioning",
+      "license": "Apache-2.0",
+      "source": "https://components.espressif.com/components/espressif/network_provisioning/versions/{version}",
+      "files": ["esp-idf.LICENSE"],
+      "archives": ["libespressif__network_provisioning.a"]
+    },
+    {
+      "name": "protobuf-c (in ESP-IDF, components/protobuf-c)",
+      "version": "esp-idf",
+      "license": "BSD-2-Clause",
+      "source": "https://github.com/protobuf-c/protobuf-c",
+      "files": ["protobuf-c.LICENSE"],
+      "archives": ["libprotobuf-c.a"]
     }
   ],
   "libraries": {

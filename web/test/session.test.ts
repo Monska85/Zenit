@@ -161,7 +161,7 @@ describe("BoardSession.setPower and resetSettings", () => {
   });
 
   it("resets and shows the defaults", async () => {
-    const { session, board } = await connected();
+    const { session, board } = await connected(new FakeBoard(), null, "usb");
     await session.setSettings({ brightness: 5 });
     await session.resetSettings();
     expect(commands(board).slice(-2)).toEqual(["settings_reset", "status"]);

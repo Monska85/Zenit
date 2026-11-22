@@ -1,0 +1,7 @@
+{
+  "name": "ZenitImprov",
+  "version": "0.1.0",
+  "description": "Improv Wi-Fi Serial, version 1 (https://www.improv-wifi.com/serial/): frame codec and the splitter that tells its frames from protocol lines. Plain C++17, no Arduino dependency.",
+  "frameworks": "*",
+  "platforms": "*"
+}

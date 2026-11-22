@@ -15,13 +15,18 @@ import {
   AlertDialogDescription,
   AlertDialogTitle,
 } from "../components/alert-dialog";
+import { AccessCard, TimeCard, UpdateSettingsCard } from "../device/settings-cards";
+import { UpdateCard } from "../device/update-card";
+import { WifiCard } from "../device/wifi-card";
 import type { Route } from "../route";
 import { FirmwareInstall } from "./firmware-install";
 
 /** The firmware published next to the app, or null while it loads, or when there is none (a local build, offline). */
-function usePublishedFirmware(): FirmwareManifest | null | "missing" {
+function usePublishedFirmware(enabled: boolean): FirmwareManifest | null | "missing" {
   const [manifest, setManifest] = useState<FirmwareManifest | null | "missing">(null);
   useEffect(() => {
+    // A page served by a board has no published firmware next to it
+    if (!enabled) return;
     const controller = new AbortController();
     fetch(new URL("firmware/manifest.json", document.baseURI), { signal: controller.signal, cache: "no-store" })
       .then((response) => (response.ok ? response.json() : null))
@@ -30,8 +35,8 @@ function usePublishedFirmware(): FirmwareManifest | null | "missing" {
         if (!(error instanceof DOMException && error.name === "AbortError")) setManifest("missing");
       });
     return () => controller.abort();
-  }, []);
-  return manifest;
+  }, [enabled]);
+  return enabled ? manifest : "missing";
 }
 
 const watts = (milliwatts: number): string => `${Number((milliwatts / 1000).toFixed(2))} W`;
@@ -59,17 +64,21 @@ function FirmwareCard({ published }: { published: FirmwareManifest | null | "mis
             <dd data-testid="firmware-running">{running}</dd>
           </>
         )}
-        <dt className="text-muted-foreground">Latest published</dt>
-        <dd data-testid="firmware-published">
-          {published === null ? "Checking..." : published === "missing" ? "Not available" : published.version}
-        </dd>
+        {!board.served && (
+          <>
+            <dt className="text-muted-foreground">Latest published</dt>
+            <dd data-testid="firmware-published">
+              {published === null ? "Checking..." : published === "missing" ? "Not available" : published.version}
+            </dd>
+          </>
+        )}
       </dl>
       {state && (
         <p role="status" className="mt-3 text-base font-medium" data-testid="firmware-state">
           {sentence[state]}
         </p>
       )}
-      {published === "missing" && (
+      {published === "missing" && !board.served && (
         <p className="mt-3 text-base text-muted-foreground">
           The published firmware could not be read. This happens when the app runs on your own computer, or offline.
         </p>
@@ -139,7 +148,8 @@ function ResetCard() {
             <AlertDialogContent>
               <AlertDialogTitle className="mb-2 text-lg font-semibold">Reset to defaults?</AlertDialogTitle>
               <AlertDialogDescription className="mb-4 text-base">
-                Every setting goes back to its default. The light changes to the default look.
+                Every setting goes back to its default. The light changes to the default look. Zenit also forgets its
+                WiFi network and makes a new token.
               </AlertDialogDescription>
               <div className="flex justify-end gap-2">
                 <AlertDialogCancel asChild>
@@ -163,10 +173,16 @@ function ResetCard() {
 
 export function DeviceView({ go }: { go: (route: Route) => void }) {
   const { board } = useBoard();
-  const published = usePublishedFirmware();
+  const served = board.served !== null;
+  const published = usePublishedFirmware(!served);
   return (
     <>
       <h1 className="text-2xl font-semibold">Device</h1>
+      {board.phase === "lost" && board.auto === "restarting" && (
+        <Banner tone="info">
+          <p role="status">The board is restarting. This page connects again by itself in a few seconds.</p>
+        </Banner>
+      )}
       {board.info ? (
         <BoardCard />
       ) : (
@@ -177,9 +193,25 @@ export function DeviceView({ go }: { go: (route: Route) => void }) {
           </a>
         </Banner>
       )}
+      <WifiCard />
       <FirmwareCard published={published} />
+      <UpdateCard />
+      <UpdateSettingsCard />
+      <TimeCard />
+      <AccessCard />
       <ResetCard />
-      <FirmwareInstall published={published === "missing" ? null : published} go={go} />
+      {served ? (
+        <Card aria-labelledby="install-title">
+          <CardTitle id="install-title">Install or update the firmware</CardTitle>
+          <p className="text-base text-muted-foreground" data-testid="install-served-note">
+            Installing firmware over a USB cable needs a page from the internet (the browser allows it only there). Open
+            the project's page on a computer with Chrome or Edge, and connect Zenit with the USB cable. Updates over
+            WiFi work from here.
+          </p>
+        </Card>
+      ) : (
+        <FirmwareInstall published={published === "missing" ? null : published} go={go} />
+      )}
     </>
   );
 }

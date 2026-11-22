@@ -1,0 +1,313 @@
+{
+  "description": "status reports the WiFi state, the network name, the signal and address only while connected, and the time with the minute of the day in UTC. 1790000000 is 14:13:20 UTC (51200 s after midnight).",
+  "steps": [
+    {
+      "advance_ms": 1100
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "not_configured",
+          "ssid": null,
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!net state=connecting ssid=HomeNet"
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connecting",
+          "ssid": "HomeNet",
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!net state=wrong_password ssid=HomeNet rssi=-70"
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "wrong_password",
+          "ssid": "HomeNet",
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!net state=not_found"
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "not_found",
+          "ssid": "HomeNet",
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!net state=no_address"
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 5,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "no_address",
+          "ssid": "HomeNet",
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "control": "!net state=connected rssi=-61 ip=192.168.1.20 synced=1 epoch=1790000000"
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 6,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -61,
+          "ip": "192.168.1.20",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    },
+    {
+      "advance_ms": 5000
+    },
+    {
+      "send": {
+        "seq": 7,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 7,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -61,
+          "ip": "192.168.1.20",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000005,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null
+        }
+      }
+    }
+  ]
+}

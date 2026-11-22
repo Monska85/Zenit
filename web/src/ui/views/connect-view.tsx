@@ -3,6 +3,7 @@
 import { Usb, Wifi } from "lucide-react";
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { connectAddress, connectUsb, serialSupported } from "../../board/connect";
+import { servedOpener } from "../../board/served";
 import { addressUnavailableHere } from "../../protocol/address";
 import { loadAddress, saveAddress } from "../../lib/storage";
 import { useBoard } from "../board-context";
@@ -32,6 +33,39 @@ export function ConnectView({ go }: { go: (route: Route) => void }) {
     const message = await connectAddress(session, address);
     setProblem(message);
     if (message === null) saveAddress(address.trim());
+  }
+
+  // The page asks its own origin whether a Zenit served it; the answer comes in a moment
+  if (board.probing) {
+    return (
+      <p role="status" className="text-base text-muted-foreground">
+        Looking for your Zenit...
+      </p>
+    );
+  }
+
+  // Served by a Zenit: it is the board to talk to, so there is nothing to choose
+  if (board.served) {
+    return (
+      <>
+        <h1 className="text-2xl font-semibold">Your Zenit</h1>
+        <Card>
+          <CardTitle>{board.served.hostname}</CardTitle>
+          <p className="mb-3 text-base">This page comes from your Zenit, so it connects to it by itself.</p>
+          {connecting ? (
+            <p role="status" className="text-base text-muted-foreground">
+              Waiting for Zenit...
+            </p>
+          ) : (
+            <Button onClick={() => void session.open(servedOpener(location.host), location.host)}>Connect</Button>
+          )}
+        </Card>
+        <p className="text-base text-muted-foreground">
+          To install firmware on a new Zenit, use the USB cable from the project's own page. A page from a Zenit cannot
+          do it.
+        </p>
+      </>
+    );
   }
 
   return (

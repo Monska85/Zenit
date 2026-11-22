@@ -124,7 +124,7 @@ The ESP32-C3 SuperMini's blue LED (GPIO 8, on when low) is always off, except wh
 
 ## Stored settings
 
-The light settings are stored in NVS as one record under the key `light` (namespace `zenit`), written in one step, so a save is all or nothing even when the power fails during it. Version 1 is 17 bytes:
+The light settings are a record of 17 bytes, stored in NVS (namespace `zenit`) together with the [board record](wifi-and-updates-v1.md#stored-settings) as one blob under the key `settings`: the light record first, then the board record, 272 bytes. The blob is written in one step, so a save is all or nothing even when the power fails during it, and a save of both records has no state in between to repair. A board from before the blob has the records under the keys `light` and `board`; they are read while `settings` is missing, and the next save writes the blob. A blob of another size is damaged: both records take their defaults. `conformance/board/stored.json` gives what is read from each combination. Version 1 is 17 bytes:
 
 | Byte  | Content                                                                           |
 | ----- | --------------------------------------------------------------------------------- |

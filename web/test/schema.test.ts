@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { isBadFrameReply, isSeq, validBody } from "../src/protocol/schema";
 import { parseStrictObject } from "../src/protocol/strict-json";
-import { DEFAULT_SETTINGS, INFO, text } from "./helpers";
+import { BOARD_SETTINGS, DEFAULT_SETTINGS, INFO, TIME_STATUS, UPDATE_STATUS, WIFI_STATUS, text } from "./helpers";
 
 const reply = (value: unknown) => parseStrictObject(text(JSON.stringify(value)));
 const light = { on: true, effect: "static", color: "white", lightness: 60.0, power_scale: 100, timer: null };
@@ -96,5 +96,146 @@ describe("isBadFrameReply", () => {
     expect(isBadFrameReply(reply({ ok: false, error: "bad_request", message: "x" }))).toBe(false);
     expect(isBadFrameReply(reply({ ok: false, error: "bad_frame" }))).toBe(false);
     expect(isBadFrameReply(reply({ ok: true }))).toBe(false);
+  });
+});
+
+describe("the replies of the WiFi and updates milestone", () => {
+  it("accepts the status parts, and a status without them", () => {
+    expect(validBody("status", reply({ seq: 1, ok: true, light }))).toBe(true);
+    expect(
+      validBody(
+        "status",
+        reply({ seq: 1, ok: true, light, wifi: WIFI_STATUS, time: TIME_STATUS, update: UPDATE_STATUS }),
+      ),
+    ).toBe(true);
+    expect(
+      validBody(
+        "status",
+        reply({
+          seq: 1,
+          ok: true,
+          light,
+          wifi: { state: "not_configured", ssid: null, rssi: null, ip: null, hostname: "zenit-a1b2" },
+          time: { synced: false, epoch: null, local_minute: null },
+          update: {
+            ...UPDATE_STATUS,
+            state: "downloading",
+            available: "1.2.0",
+            last_check: 5,
+            progress: 7,
+            skipped: "1.1.0",
+            rolled_back: "1.1.0",
+          },
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("accepts the words a newer firmware may add: states, modes, results and the settings that name them", () => {
+    for (const ok of [
+      { wifi: { ...WIFI_STATUS, state: "roaming", ip: "10.0.0.2", rssi: -50 } },
+      { wifi: { ...WIFI_STATUS, state: "roaming", ip: null, rssi: null } },
+      { update: { ...UPDATE_STATUS, state: "paused" } },
+      { update: { ...UPDATE_STATUS, state: "paused", progress: 40 } },
+      { update: { ...UPDATE_STATUS, mode: "smart" } },
+      { update: { ...UPDATE_STATUS, last_result: "rate_limited" } },
+    ])
+      expect(validBody("status", reply({ seq: 1, ok: true, light, ...ok })), JSON.stringify(ok)).toBe(true);
+    const settings = { ...DEFAULT_SETTINGS, ...BOARD_SETTINGS };
+    for (const word of [{ wifi_power: "21" }, { update_mode: "smart" }])
+      expect(validBody("settings_get", reply({ seq: 1, ok: true, settings: { ...settings, ...word } }))).toBe(true);
+    for (const command of ["update_check", "update_install"])
+      expect(
+        validBody(command, reply({ seq: 1, ok: true, update: { ...UPDATE_STATUS, last_result: "rate_limited" } })),
+      ).toBe(true);
+  });
+
+  it("refuses a status part that is there and wrong", () => {
+    for (const bad of [
+      { wifi: { ...WIFI_STATUS, rssi: "-58" } },
+      { wifi: { ...WIFI_STATUS, hostname: null } },
+      { wifi: { state: "connected" } },
+      { time: { ...TIME_STATUS, synced: 1 } },
+      { time: { ...TIME_STATUS, epoch: 1.5 } },
+      { update: { ...UPDATE_STATUS, trial: "no" } },
+      { update: { ...UPDATE_STATUS, progress: "7" } },
+      { update: { ...UPDATE_STATUS, last_result: null } },
+      { update: null },
+      // Out of range, an unknown word, or a null-when rule broken (docs/board/wifi-and-updates-v1.md#status)
+      { wifi: { ...WIFI_STATUS, hostname: "zenit" } },
+      { wifi: { ...WIFI_STATUS, rssi: 5 } },
+      { wifi: { ...WIFI_STATUS, rssi: -200 } },
+      { wifi: { ...WIFI_STATUS, ssid: "" } },
+      { wifi: { ...WIFI_STATUS, ssid: "x".repeat(33) } },
+      { wifi: { ...WIFI_STATUS, ip: "300.1.1.1" } },
+      { wifi: { ...WIFI_STATUS, state: "connected", ip: null } },
+      { wifi: { ...WIFI_STATUS, state: "connecting", ip: "192.168.1.5" } },
+      { wifi: { ...WIFI_STATUS, state: "wrong_password", rssi: -60, ip: null } },
+      { wifi: { ...WIFI_STATUS, state: "not_configured", ip: null, rssi: null, ssid: "HomeNet" } },
+      { time: { synced: true, epoch: null, local_minute: null } },
+      { time: { synced: false, epoch: 5, local_minute: null } },
+      { time: { synced: true, epoch: 5, local_minute: 1440 } },
+      { time: { synced: true, epoch: -1, local_minute: 3 } },
+      { update: { ...UPDATE_STATUS, state: "downloading", progress: 500 } },
+      { update: { ...UPDATE_STATUS, state: "downloading", progress: -1 } },
+      { update: { ...UPDATE_STATUS, state: "downloading", progress: null } },
+      { update: { ...UPDATE_STATUS, state: "idle", progress: 5 } },
+      { update: { ...UPDATE_STATUS, available: "1.2" } },
+      { update: { ...UPDATE_STATUS, available: "1.2.0-rc.1" } },
+      { update: { ...UPDATE_STATUS, skipped: "latest" } },
+      { update: { ...UPDATE_STATUS, rolled_back: 3 } },
+      { update: { ...UPDATE_STATUS, last_check: -5 } },
+      { update: { ...UPDATE_STATUS, last_result: "available", available: null } },
+      { update: { ...UPDATE_STATUS, last_result: "skipped", available: null } },
+      { update: { ...UPDATE_STATUS, last_result: "up_to_date", available: "1.2.0" } },
+    ])
+      expect(validBody("status", reply({ seq: 1, ok: true, light, ...bad })), JSON.stringify(bad)).toBe(false);
+  });
+
+  it("accepts settings with the board fields, the token included, and refuses a mistyped one", () => {
+    const settings = { ...DEFAULT_SETTINGS, ...BOARD_SETTINGS, token: "abcdefghij012345" };
+    for (const command of ["settings_get", "settings_set", "settings_reset"])
+      expect(validBody(command, reply({ seq: 1, ok: true, settings }))).toBe(true);
+    for (const bad of [
+      { wifi_power: 19.5 },
+      { update_mode: null },
+      { update_firmware: "true" },
+      { check_hours: "6" },
+      { install_start: 1.5 },
+      { network_login: 0 },
+      { token: 1 },
+      // The ranges and words of the settings table
+      { check_hours: 0 },
+      { check_hours: 169 },
+      { install_start: 1440 },
+      { install_end: -1 },
+      { time_sync_hours: 0 },
+      { time_sync_hours: 169 },
+      { timezone: "" },
+      { timezone: "A B" },
+      { timezone: "x".repeat(65) },
+      { ntp_server: "" },
+      { ntp_server: "bad host" },
+      { ntp_server: "h".repeat(65) },
+      { token: "ABCDEFGHIJ012345" },
+      { token: "abc" },
+    ])
+      expect(validBody("settings_get", reply({ seq: 1, ok: true, settings: { ...settings, ...bad } }))).toBe(false);
+  });
+
+  it("knows the replies of the new commands", () => {
+    expect(validBody("token_regenerate", reply({ seq: 1, ok: true, token: "abcdefghij012345" }))).toBe(true);
+    expect(validBody("token_regenerate", reply({ seq: 1, ok: true }))).toBe(false);
+    expect(validBody("auth_challenge", reply({ seq: 1, ok: true, nonce: "00".repeat(16) }))).toBe(true);
+    for (const nonce of ["00", "0".repeat(31), "0".repeat(33), "G".repeat(32), "A".repeat(32)])
+      expect(validBody("auth_challenge", reply({ seq: 1, ok: true, nonce })), nonce).toBe(false);
+    for (const token of ["abc", "ABCDEFGHIJ012345", "abcdefghij01234!"])
+      expect(validBody("token_regenerate", reply({ seq: 1, ok: true, token })), token).toBe(false);
+    expect(validBody("auth_challenge", reply({ seq: 1, ok: true }))).toBe(false);
+    for (const command of ["update_check", "update_install"]) {
+      expect(validBody(command, reply({ seq: 1, ok: true, update: UPDATE_STATUS }))).toBe(true);
+      expect(validBody(command, reply({ seq: 1, ok: true }))).toBe(false);
+    }
+    for (const command of ["wifi_forget", "auth"]) expect(validBody(command, reply({ seq: 1, ok: true }))).toBe(true);
   });
 });

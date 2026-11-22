@@ -8,11 +8,11 @@
 
 namespace zenit
 {
-namespace proto
+namespace net
 {
 
 // The length of the well-formed UTF-8 sequence that starts at text[index], or 0 when the bytes there are not one.
 size_t utf8_sequence_length(const char *text, size_t length, size_t index);
 
-} // namespace proto
+} // namespace net
 } // namespace zenit

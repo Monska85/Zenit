@@ -1,0 +1,101 @@
+{
+  "description": "What the board's HTTP server makes of a request path: the page, an embedded file, the board's own answer, or nothing.",
+  "assets": [
+    "index.html",
+    "assets/index-abc123.js",
+    "favicon.svg"
+  ],
+  "cases": [
+    {
+      "uri": "/",
+      "route": "asset",
+      "asset": "index.html"
+    },
+    {
+      "uri": "/?x=1",
+      "route": "asset",
+      "asset": "index.html"
+    },
+    {
+      "uri": "/index.html",
+      "route": "asset",
+      "asset": "index.html"
+    },
+    {
+      "uri": "/assets/index-abc123.js",
+      "route": "asset",
+      "asset": "assets/index-abc123.js"
+    },
+    {
+      "uri": "/favicon.svg#x",
+      "route": "asset",
+      "asset": "favicon.svg"
+    },
+    {
+      "uri": "/board.json",
+      "route": "board_json"
+    },
+    {
+      "uri": "/board.json?x",
+      "route": "board_json"
+    },
+    {
+      "uri": "/missing",
+      "route": "not_found"
+    },
+    {
+      "uri": "/assets/",
+      "route": "not_found"
+    },
+    {
+      "uri": "/../index.html",
+      "route": "not_found"
+    },
+    {
+      "uri": "/assets/../index.html",
+      "route": "not_found"
+    },
+    {
+      "uri": "/assets\\index-abc123.js",
+      "route": "not_found"
+    },
+    {
+      "uri": "/index.html ",
+      "route": "not_found"
+    },
+    {
+      "uri": "index.html",
+      "route": "not_found"
+    },
+    {
+      "uri": "",
+      "route": "not_found"
+    },
+    {
+      "uri": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "route": "not_found"
+    },
+    {
+      "uri": "/%2e%2e/index.html",
+      "route": "not_found"
+    },
+    {
+      "uri": "/INDEX.HTML",
+      "route": "not_found"
+    }
+  ],
+  "board_json": {
+    "hostname": "zenit-a1b2",
+    "body": "{\"zenit\":true,\"hostname\":\"zenit-a1b2\",\"ws\":\"/ws\"}"
+  },
+  "immutable": [
+    {
+      "asset": "assets/index-abc123.js",
+      "cache_control": "public, max-age=31536000, immutable"
+    },
+    {
+      "asset": "index.html",
+      "cache_control": "no-cache"
+    }
+  ]
+}

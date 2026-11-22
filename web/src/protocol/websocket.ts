@@ -3,7 +3,7 @@
 // The WebSocket of a board on WiFi or of the simulator: one text message is one line.
 
 import { MAX_REPLY_LINE } from "./frame";
-import type { LineTransport } from "./transport";
+import { ConnectionClosed, type LineTransport } from "./transport";
 
 /** The part of the WebSocket API the transport uses, so a test can stand in for it. */
 export interface SocketLike {
@@ -36,7 +36,11 @@ class WebSocketTransport implements LineTransport {
       const line = encoder.encode(event.data);
       if (line.length <= MAX_REPLY_LINE) this.onLine?.(line);
     };
-    socket.onclose = (event) => this.finish(event.reason ? new Error(event.reason) : undefined);
+    // 1000 is a close the page asked for, 1005 a close with no status: neither says anything. The others carry the board's reason.
+    socket.onclose = (event) =>
+      this.finish(
+        event.code === 1000 || event.code === 1005 ? undefined : new ConnectionClosed(event.code, event.reason),
+      );
     socket.onerror = () => undefined;
   }
 

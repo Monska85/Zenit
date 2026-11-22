@@ -7,8 +7,10 @@
 --web is the archive a web release attaches (the built `web/dist`). --firmware is a folder with the files of a firmware
 release (the bootloader, partition table, boot_app0 and firmware binaries, and `SHA256SUMS` when it has one: each is
 checked against it) and --firmware-version its version, X.Y.Z. The site then holds the app, the four binaries under
-`firmware/` and `firmware/manifest.json`, the manifest ESP Web Tools installs from, with each part at its own offset so
-an update keeps the settings (docs/web/web-app-v1.md#installing-firmware). Without
+`firmware/`, `firmware/manifest.json`, the manifest ESP Web Tools installs from, with each part at its own offset so
+an update keeps the settings (docs/web/web-app-v1.md#installing-firmware), and `firmware/update.json`, the update
+manifest a board on WiFi reads (docs/board/wifi-and-updates-v1.md#source): the version, the application's file name,
+its size and SHA-256. Without
 --firmware the site holds the app alone, which then says no firmware is published. `.nojekyll` is written so Pages
 serves the files as they are.
 
@@ -30,6 +32,10 @@ import release_assets as assets
 # The parts of the factory image that the installer writes, each at its own offset: the file names and offsets are those
 # of tools/release_assets.py and partitions.csv. The settings memory (0x9000 to 0xDFFF) is not among them, so an update
 # keeps the settings.
+# The longest manifest the board reads (lib/ZenitUpdate/src/manifest.h)
+MAX_UPDATE_MANIFEST = 1024
+# The smallest application a board installs (lib/ZenitUpdate/src/manifest.h)
+MIN_FIRMWARE_SIZE = 65536
 VERSION = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
 
 
@@ -62,6 +68,22 @@ def manifest(version):
             }
         ],
     }
+
+
+def update_manifest(version, firmware_bytes):
+    """The update manifest of a firmware release, as the board reads it: strict JSON with exactly these fields, in one
+    line of at most 1,024 bytes. The size and the hash are those of the application file the site serves."""
+    return json.dumps(
+        {
+            "schema": 1,
+            "board": "esp32c3",
+            "version": version,
+            "file": assets.FIRMWARE_NAME,
+            "size": len(firmware_bytes),
+            "sha256": hashlib.sha256(firmware_bytes).hexdigest(),
+        },
+        separators=(",", ":"),
+    )
 
 
 def extract_web(archive, out):
@@ -112,6 +134,17 @@ def assemble(web, out, firmware=None, firmware_version=None):
                 checked_sum(firmware, name)
                 shutil.copyfile(firmware / name, target / name)
             (target / "manifest.json").write_text(json.dumps(manifest(firmware_version), indent=2) + "\n", encoding="utf-8")
+            firmware_bytes = (target / assets.FIRMWARE_NAME).read_bytes()
+            slot_size = assets.app_slot(assets.ROOT / "partitions.csv")[1]
+            if not MIN_FIRMWARE_SIZE <= len(firmware_bytes) <= slot_size:
+                raise SiteError(
+                    f"{assets.FIRMWARE_NAME} is {len(firmware_bytes)} bytes: a board updates only to a file of "
+                    f"{MIN_FIRMWARE_SIZE} to {slot_size} bytes"
+                )
+            update = update_manifest(firmware_version, firmware_bytes)
+            if len(update) > MAX_UPDATE_MANIFEST:
+                raise SiteError("the update manifest is longer than the board reads")
+            (target / "update.json").write_text(update + "\n", encoding="utf-8")
         (staging / ".nojekyll").write_text("", encoding="utf-8")
         out.mkdir(parents=True, exist_ok=True)
         for item in staging.iterdir():

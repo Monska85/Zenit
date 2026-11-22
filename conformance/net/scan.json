@@ -1,0 +1,473 @@
+{
+  "description": "The list of a WiFi scan: one entry per network name with its strongest access point, the best capacity names, sorted strongest first with equal signals in the order found. The board applies the capacity (16) to the names, never to the access points. A name that fails the rule for WiFi names (valid UTF-8, 1 to 32 bytes, no control character) is left out before ranking.",
+  "cases": [
+    {
+      "name": "a name keeps its strongest access point",
+      "capacity": 16,
+      "found": [
+        {
+          "ssid": "A",
+          "rssi": -70,
+          "secure": true
+        },
+        {
+          "ssid": "B",
+          "rssi": -50,
+          "secure": true
+        },
+        {
+          "ssid": "A",
+          "rssi": -40,
+          "secure": false
+        }
+      ],
+      "expect": [
+        {
+          "ssid": "A",
+          "rssi": -40,
+          "secure": false
+        },
+        {
+          "ssid": "B",
+          "rssi": -50,
+          "secure": true
+        }
+      ]
+    },
+    {
+      "name": "a full list lets a stronger new name replace the weakest",
+      "capacity": 3,
+      "found": [
+        {
+          "ssid": "A",
+          "rssi": -80,
+          "secure": true
+        },
+        {
+          "ssid": "B",
+          "rssi": -70,
+          "secure": true
+        },
+        {
+          "ssid": "C",
+          "rssi": -60,
+          "secure": true
+        },
+        {
+          "ssid": "D",
+          "rssi": -50,
+          "secure": true
+        }
+      ],
+      "expect": [
+        {
+          "ssid": "D",
+          "rssi": -50,
+          "secure": true
+        },
+        {
+          "ssid": "C",
+          "rssi": -60,
+          "secure": true
+        },
+        {
+          "ssid": "B",
+          "rssi": -70,
+          "secure": true
+        }
+      ]
+    },
+    {
+      "name": "a weaker new name does not replace anything",
+      "capacity": 3,
+      "found": [
+        {
+          "ssid": "A",
+          "rssi": -50,
+          "secure": true
+        },
+        {
+          "ssid": "B",
+          "rssi": -60,
+          "secure": true
+        },
+        {
+          "ssid": "C",
+          "rssi": -70,
+          "secure": true
+        },
+        {
+          "ssid": "D",
+          "rssi": -80,
+          "secure": true
+        }
+      ],
+      "expect": [
+        {
+          "ssid": "A",
+          "rssi": -50,
+          "secure": true
+        },
+        {
+          "ssid": "B",
+          "rssi": -60,
+          "secure": true
+        },
+        {
+          "ssid": "C",
+          "rssi": -70,
+          "secure": true
+        }
+      ]
+    },
+    {
+      "name": "a name that was pushed out comes back when it is stronger",
+      "capacity": 2,
+      "found": [
+        {
+          "ssid": "A",
+          "rssi": -90,
+          "secure": true
+        },
+        {
+          "ssid": "B",
+          "rssi": -80,
+          "secure": true
+        },
+        {
+          "ssid": "C",
+          "rssi": -70,
+          "secure": true
+        },
+        {
+          "ssid": "A",
+          "rssi": -60,
+          "secure": true
+        }
+      ],
+      "expect": [
+        {
+          "ssid": "A",
+          "rssi": -60,
+          "secure": true
+        },
+        {
+          "ssid": "C",
+          "rssi": -70,
+          "secure": true
+        }
+      ]
+    },
+    {
+      "name": "equal signals keep the order they were found in",
+      "capacity": 16,
+      "found": [
+        {
+          "ssid": "X",
+          "rssi": -60,
+          "secure": true
+        },
+        {
+          "ssid": "Y",
+          "rssi": -60,
+          "secure": true
+        },
+        {
+          "ssid": "Z",
+          "rssi": -60,
+          "secure": true
+        }
+      ],
+      "expect": [
+        {
+          "ssid": "X",
+          "rssi": -60,
+          "secure": true
+        },
+        {
+          "ssid": "Y",
+          "rssi": -60,
+          "secure": true
+        },
+        {
+          "ssid": "Z",
+          "rssi": -60,
+          "secure": true
+        }
+      ]
+    },
+    {
+      "name": "many access points of one name do not hide another network",
+      "capacity": 16,
+      "found": [
+        {
+          "ssid": "Dup",
+          "rssi": -60,
+          "secure": true
+        },
+        {
+          "ssid": "Dup",
+          "rssi": -59,
+          "secure": true
+        },
+        {
+          "ssid": "Dup",
+          "rssi": -58,
+          "secure": true
+        },
+        {
+          "ssid": "Dup",
+          "rssi": -57,
+          "secure": true
+        },
+        {
+          "ssid": "Dup",
+          "rssi": -56,
+          "secure": true
+        },
+        {
+          "ssid": "Dup",
+          "rssi": -55,
+          "secure": true
+        },
+        {
+          "ssid": "Dup",
+          "rssi": -54,
+          "secure": true
+        },
+        {
+          "ssid": "Dup",
+          "rssi": -53,
+          "secure": true
+        },
+        {
+          "ssid": "Dup",
+          "rssi": -52,
+          "secure": true
+        },
+        {
+          "ssid": "Dup",
+          "rssi": -51,
+          "secure": true
+        },
+        {
+          "ssid": "Dup",
+          "rssi": -50,
+          "secure": true
+        },
+        {
+          "ssid": "Dup",
+          "rssi": -49,
+          "secure": true
+        },
+        {
+          "ssid": "Dup",
+          "rssi": -48,
+          "secure": true
+        },
+        {
+          "ssid": "Dup",
+          "rssi": -47,
+          "secure": true
+        },
+        {
+          "ssid": "Dup",
+          "rssi": -46,
+          "secure": true
+        },
+        {
+          "ssid": "Dup",
+          "rssi": -45,
+          "secure": true
+        },
+        {
+          "ssid": "Dup",
+          "rssi": -44,
+          "secure": true
+        },
+        {
+          "ssid": "Dup",
+          "rssi": -43,
+          "secure": true
+        },
+        {
+          "ssid": "Other",
+          "rssi": -80,
+          "secure": false
+        }
+      ],
+      "expect": [
+        {
+          "ssid": "Dup",
+          "rssi": -43,
+          "secure": true
+        },
+        {
+          "ssid": "Other",
+          "rssi": -80,
+          "secure": false
+        }
+      ]
+    },
+    {
+      "name": "nothing found",
+      "capacity": 16,
+      "found": [],
+      "expect": []
+    },
+    {
+      "name": "names that cannot be reported never rank: 16 strong invalid names do not hide a valid one",
+      "capacity": 16,
+      "found": [
+        {
+          "ssid": "bad\u0001N0",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "bad\u0001N1",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "bad\u0001N2",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "bad\u0001N3",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "bad\u0001N4",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "bad\u0001N5",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "bad\u0001N6",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "bad\u0001N7",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "bad\u0001N8",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "bad\u0001N9",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "bad\u0001N10",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "bad\u0001N11",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "bad\u0001N12",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "bad\u0001N13",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "bad\u0001N14",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "bad\u0001N15",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "Valid",
+          "rssi": -80,
+          "secure": true
+        }
+      ],
+      "expect": [
+        {
+          "ssid": "Valid",
+          "rssi": -80,
+          "secure": true
+        }
+      ]
+    },
+    {
+      "name": "an empty name and a name with DEL are left out",
+      "capacity": 16,
+      "found": [
+        {
+          "ssid": "",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "a\u007fb",
+          "rssi": -20,
+          "secure": true
+        },
+        {
+          "ssid": "Ok",
+          "rssi": -60,
+          "secure": false
+        }
+      ],
+      "expect": [
+        {
+          "ssid": "Ok",
+          "rssi": -60,
+          "secure": false
+        }
+      ]
+    },
+    {
+      "name": "a name of 33 bytes is too long, not cut to 32: it never ranks",
+      "capacity": 16,
+      "found": [
+        {
+          "ssid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "rssi": -10,
+          "secure": true
+        },
+        {
+          "ssid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "rssi": -60,
+          "secure": true
+        },
+        {
+          "ssid": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9",
+          "rssi": -20,
+          "secure": true
+        }
+      ],
+      "expect": [
+        {
+          "ssid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "rssi": -60,
+          "secure": true
+        }
+      ]
+    }
+  ]
+}

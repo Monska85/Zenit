@@ -2,7 +2,7 @@
 
 Firmware for Zenit, a star projector: one RGBW power LED under a perforated dome projects a starry sky or Christmas shapes on the ceiling. An ESP32-C3 SuperMini drives the four colors through MOSFET modules with a perceptual brightness curve, a power limit, effects, smooth transitions and a switch-off timer. A simulator runs the same code on your computer, without any hardware.
 
-The project is under construction. This version holds the light engine, the command protocol over USB, the simulator, a command line client, the web app, and releases; WiFi and over-the-air updates follow.
+The project is under construction. This version holds the light engine, the command protocol over USB and WiFi, WiFi setup with Improv, a board that serves the web app itself, over-the-air updates with a trial boot and rollback, the simulator, a command line client, the web app, and releases.
 
 ## Documentation
 
@@ -12,6 +12,7 @@ The project is under construction. This version holds the light engine, the comm
 | [`docs/reference/hardware.md`](docs/reference/hardware.md)           | The board, the LED, the MOSFET modules, pins and limits       |
 | [`docs/adr/`](docs/adr/)                                             | Architecture decision records                                 |
 | [`docs/board/light-v1.md`](docs/board/light-v1.md)                   | The light: curve, power limit, effects, transitions and timer |
+| [`docs/board/wifi-and-updates-v1.md`](docs/board/wifi-and-updates-v1.md) | WiFi, Improv setup, the served web app, updates and rollback |
 | [`docs/protocol/protocol-v1.md`](docs/protocol/protocol-v1.md)       | The command protocol over USB and WiFi                        |
 | [`docs/web/web-app-v1.md`](docs/web/web-app-v1.md)                   | The web app: views, connection, wording, privacy, tests       |
 | [`conformance/README.md`](conformance/README.md)                     | Test cases every implementation must pass                     |
@@ -26,7 +27,9 @@ The `justfile` and the `Makefile` have the same commands: `just <name>` or `make
 
 | Command           | What it does                                                                                |
 | ----------------- | ------------------------------------------------------------------------------------------- |
-| `just build`      | Build the firmware for the ESP32-C3 SuperMini                                               |
+| `just build`      | Build the web app, then the firmware for the ESP32-C3 SuperMini (the firmware serves the app) |
+| `just build-update-test http://192.168.1.5:8000/` | Build the update test firmware, which reads updates from a plain `http://` test server. Never released |
+| `just update-server 1.2.0 .pio/build/esp32c3/firmware.bin` | Serve a firmware file and its update manifest for the update test firmware |
 | `just upload`     | Flash the firmware (`PORT=/dev/ttyACM0 just upload` to choose the port)                     |
 | `just monitor`    | Open the serial monitor (115200 baud)                                                       |
 | `just flash`      | Flash, then open the serial monitor                                                         |
@@ -75,7 +78,9 @@ The simulator speaks the [command protocol](docs/protocol/protocol-v1.md) as the
 printf '@ZN 3c250228 {"seq":1,"cmd":"info"}\n!advance 500\n' | .pio/build/native/program --protocol
 ```
 
-`just serve` runs the simulator behind `tools/ws_bridge.py`, a local WebSocket at `ws://127.0.0.1:8765` that follows the [WebSocket rules](docs/protocol/protocol-v1.md#websocket): one client at a time, an origin check (`just serve --ws-origin https://example.org` adds an origin), and the close codes of the specification. It needs the `websockets` package (`pip install -r requirements-ci.txt`).
+`just serve` runs the simulator behind `tools/ws_bridge.py`, a local WebSocket at `ws://127.0.0.1:8765` that follows the [WebSocket rules](docs/protocol/protocol-v1.md#websocket): one client at a time, an origin check (`just serve --ws-origin https://example.org` adds an origin), the close codes of the specification, and the network login (a failed login closes the connection with 1008). `just serve --app web/dist` serves the built web app on the same port, as a board does, with its security headers and `/board.json`: open `http://127.0.0.1:8765/` and the app connects by itself. It needs the `websockets` package (`pip install -r requirements-ci.txt`).
+
+The simulator has control lines for the network, the update source and the firmware slots (`!net`, `!scan`, `!store-wifi`, `!token`, `!random`, `!version`, `!update ...`, `!firmware ...`, `!restart`), used by the conformance cases and the native tests; see [WiFi and updates](docs/board/wifi-and-updates-v1.md#tests-and-simulator).
 
 ### Command line client
 
@@ -87,9 +92,17 @@ just cli --port /dev/ttyACM0 settings-set brightness=40 effect=breathing
 just cli --port /dev/ttyACM0 light off
 just cli --ws ws://127.0.0.1:8765 status
 just cli --port /dev/ttyACM0 raw '{"cmd":"settings_get"}'
+just cli --port /dev/ttyACM0 update-check
+just cli --ws ws://zenit-a1b2.local/ws --token <token> status
 ```
 
 `settings-set` takes `KEY=VALUE` pairs: numbers, `true`, `false` and `null` as such, `colors=red,blue` as a list, anything else as text. Only one program can open the serial port at a time, and the `just monitor` window must be closed first.
+
+## WiFi and updates
+
+A Zenit joins the home WiFi once, over USB, from the web app (the Device page, on the published `https://` site, in Chrome or Edge) or from the Connect to Wi-Fi button of ESP Web Tools: both speak [Improv Wi-Fi Serial](https://www.improv-wifi.com/serial/). The board is then `zenit-XXXX.local` (the last two bytes of its MAC address) and serves the web app itself at `http://zenit-XXXX.local/`, with the protocol on `ws://zenit-XXXX.local/ws`. Network login is off by default; with it on, a client logs in with the 16-character token printed by `settings-get` over USB.
+
+The board checks the project's site for a newer firmware (`firmware/update.json`) every few hours, and installs it by itself inside a time window (settings `update_mode`, `install_start`, `install_end`, `timezone`). The new firmware boots on trial, confirms itself after a health check, and the board goes back to the old one if it does not; a version that failed is skipped. The settings are in the [protocol](docs/protocol/protocol-v1.md#settings_get-settings_set), the rules in [WiFi and updates](docs/board/wifi-and-updates-v1.md). While the repository is private its site does not exist, and a check reports `not_published`. To test an update before that, build the test firmware (`just build-update-test`) and serve a firmware file with `just update-server`.
 
 ## Web app
 
@@ -102,16 +115,23 @@ just serve                 # the simulator on ws://127.0.0.1:8765 (needs the web
 just web-dev               # in a second terminal: the app on http://localhost:5173
 ```
 
-Open `http://localhost:5173`, type `ws://127.0.0.1:8765` in the address field and press Connect. A browser lets a page on `localhost` reach the simulator; a page loaded over `https://` cannot open an unencrypted WebSocket to a board on the network, so the published site connects over USB (WiFi arrives with the WiFi milestone). The commands, the test suites (Vitest, Playwright, reference screenshots) and the layout of `web/` are described in [`web/README.md`](web/README.md).
+Open `http://localhost:5173`, type `ws://127.0.0.1:8765` in the address field and press Connect. A browser lets a page on `localhost` reach the simulator; a page loaded over `https://` cannot open an unencrypted WebSocket to a board on the network, so the published site connects over USB and sets WiFi up, and a board on WiFi is used from its own `http://` address, which serves this app. The commands, the test suites (Vitest, Playwright, reference screenshots) and the layout of `web/` are described in [`web/README.md`](web/README.md).
 
 ## Project layout
 
 | Path                    | Content                                                                                         |
 | ----------------------- | ----------------------------------------------------------------------------------------------- |
 | `lib/ZenitLight/`       | The light engine: curve, power limit, effects, transitions and timer. Plain C++, no hardware    |
-| `lib/ZenitProto/`       | The protocol: CRC-32, framing, strict JSON, request checks, settings as JSON, reply cache       |
+| `lib/ZenitProto/`       | The protocol: CRC-32, framing, strict JSON, request checks, settings as JSON, reply cache, WebSocket messages |
+| `lib/ZenitNet/`         | WiFi decisions, origin check, login, SHA-256 and HMAC, board settings and their record, the served app's answers |
+| `lib/ZenitImprov/`      | Improv Wi-Fi Serial: frame codec and the splitter that tells frames from protocol lines         |
+| `lib/ZenitUpdate/`      | Semantic versions, the update manifest, the schedule and window, the update record and boot decisions |
 | `src/protocol.cpp`      | The commands, and the dispatch to the light and the settings                                    |
-| `src/serial_link.cpp`   | The USB serial transport (board only)                                                           |
+| `src/serial_link.cpp`   | The USB serial transport, with Improv frames (board only)                                       |
+| `src/network_*.cpp`     | The network task: WiFi, mDNS, SNTP and the update transfers on the board (`_board`), a stand-in in the simulator (`_sim`) |
+| `src/ws_server_board.cpp` | The HTTP and WebSocket server: the web app and the protocol on WiFi                          |
+| `src/firmware_*.cpp`, `src/update*.cpp` | The firmware slots (trial boot, rollback, install) and the update flow          |
+| `src/improv.cpp`        | Improv's commands over the network API                                                          |
 | `src/main.cpp`          | `setup()` and `loop()` of the board                                                             |
 | `src/app.cpp`           | The light engine on the loop task, with its settings and outputs                                |
 | `src/output_*.cpp`      | The LED outputs: LEDC PWM on the board (`_board`), a recorder in the simulator (`_sim`)         |
@@ -135,13 +155,13 @@ Open `http://localhost:5173`, type `ws://127.0.0.1:8765` in the address field an
 
 Once the repository is public, each file carries a signed build provenance attestation, made by the release workflow with `actions/attest-build-provenance` (a private repository needs a paid plan for it, so the step runs only when the repository is public). Check a download with `gh attestation verify zenit-esp32c3-factory.bin --repo Monska85/Zenit`: it proves the file was built by that workflow from the tagged commit.
 
-A web release attaches `zenit-web-X.Y.Z.tar.gz` (the built app, with its third-party notices) and its `SHA256SUMS`. After either release the workflow assembles one GitHub Pages site from the latest of each (`tools/pages_site.py`): the web app at the root, and the latest firmware under `firmware/` (the ESP Web Tools manifest and the firmware parts the Device page installs, which keep the settings). GitHub Pages on a private repository needs a paid plan, so the deploy job runs only when the repository is public; turn Pages on (Settings, Pages, source GitHub Actions) at that point.
+A web release attaches `zenit-web-X.Y.Z.tar.gz` (the built app, with its third-party notices) and its `SHA256SUMS`. After either release the workflow assembles one GitHub Pages site from the latest of each (`tools/pages_site.py`): the web app at the root, and the latest firmware under `firmware/` (the ESP Web Tools manifest and the firmware parts the Device page installs, which keep the settings, and `update.json`, the manifest boards on WiFi read to update themselves). GitHub Pages on a private repository needs a paid plan, so the deploy job runs only when the repository is public; turn Pages on (Settings, Pages, source GitHub Actions) at that point.
 
 `just release-assets 1.2.3` builds the firmware files in `release/`. The repository needs the setting "Allow GitHub Actions to create and approve pull requests". A release pull request opened with the default token does not start the other workflows; a `RELEASE_PLEASE_TOKEN` secret (a fine-grained token with Contents, Pull requests and Issues read and write) makes the workflow use that token instead.
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on every pull request and every push to `main`: `actionlint` checks the workflows, `check` runs `make check` (tests, builds, tool tests and the notices), checks that the firmware leaves 64 KiB of its slot free and attaches a simulator trace of every effect, and `web` runs the web gate (types, lint, formatting, unit and conformance tests, the build with its size budget, the end-to-end tests against the simulator and the reference screenshots). On a pull request that changes only documentation (`docs/` and Markdown files), `check` and `web` are skipped and report success.
+`.github/workflows/ci.yml` runs on every pull request and every push to `main`: `actionlint` checks the workflows, `check` builds the web app, then runs `make check` (tests, builds with the web app inside the firmware, tool tests and the notices), checks that the firmware leaves 64 KiB of its slot free and attaches a simulator trace of every effect, and `web` runs the web gate (types, lint, formatting, unit and conformance tests, the build with its size budget, the end-to-end tests against the simulator and the reference screenshots). On a pull request that changes only documentation (`docs/` and Markdown files), `check` and `web` are skipped and report success.
 
 ## Contributing
 

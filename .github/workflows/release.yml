@@ -5,7 +5,7 @@ name: Release
 # jobs below then build that tag and attach its files: for the firmware the factory image, the firmware, its parts
 # (bootloader, partition table, boot_app0) that the web installer writes, the third-party notices and their checksums;
 # for the web app `zenit-web-X.Y.Z.tar.gz`. After either release, one GitHub Pages site is assembled from the latest of
-# each: the web app at the root, the firmware parts and manifest under firmware/. A manual run
+# each: the web app at the root, the firmware parts, the installer manifest and the update manifest (the one boards on WiFi read) under firmware/. A manual run
 # with dry_run builds the same files from the branch it runs on, publishes nothing and keeps them as workflow
 # artifacts for 14 days.
 #
@@ -39,6 +39,16 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup
+
+      # The firmware embeds the built web app, so the web app is built first (make does it)
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: web/package.json
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install the web app's dependencies from the lockfile
+        run: make web-install
 
       - name: Check
         run: make check
@@ -91,6 +101,16 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup
+
+      # The firmware embeds the built web app, so the web app is built first (make does it)
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: web/package.json
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install the web app's dependencies from the lockfile
+        run: make web-install
 
       # Builds the firmware with the release version, then writes the notices from its link map and the files to attach
       - name: Build the release files

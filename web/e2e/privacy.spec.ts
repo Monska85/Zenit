@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { connectByAddress, expect, test } from "./fixtures.ts";
+import { collectErrors, connectByAddress, expect, test } from "./fixtures.ts";
 
 test("states what the app does with data, and links the license and the notices", async ({ page }) => {
   await page.goto("/#/privacy");
@@ -64,6 +64,19 @@ test("makes no request outside its own site and the board, over a whole visit", 
   expect(outside).toEqual([]);
 });
 
+test("a page loaded over https makes no probe request for a board", async ({ page }) => {
+  const base = test.info().project.use.baseURL;
+  const requests: string[] = [];
+  await page.route("https://zenit-site.test/**", async (route) => {
+    requests.push(new URL(route.request().url()).pathname);
+    const path = new URL(route.request().url()).pathname;
+    await route.fulfill({ response: await route.fetch({ url: `${base}${path}` }) });
+  });
+  await page.goto("https://zenit-site.test/");
+  await expect(page.getByRole("heading", { name: "Connect to your Zenit" })).toBeVisible();
+  expect(requests).not.toContain("/board.json");
+});
+
 test("the page carries the content security policy that forbids outside requests", async ({ page }) => {
   const response = await page.goto("/");
   const html = await response!.text();
@@ -87,11 +100,7 @@ test("an outside request is blocked by the policy", async ({ page }) => {
 });
 
 test("raises no console error on any page", async ({ page, simulator }) => {
-  const errors: string[] = [];
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
-  page.on("pageerror", (error) => errors.push(error.message));
+  const errors = collectErrors(page);
   await connectByAddress(page, simulator.url);
   for (const name of ["Device", "Privacy", "Light"]) await page.getByRole("link", { name }).click();
   expect(errors).toEqual([]);

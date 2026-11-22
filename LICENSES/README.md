@@ -1,6 +1,6 @@
 # Third-party licenses
 
-The firmware links Arduino-ESP32 and ESP-IDF with their components, including the binary-only libraries Espressif distributes (PHY, Bluetooth, coexistence); [`LICENSE-EXCEPTION`](../LICENSE-EXCEPTION) gives the permission to combine Zenit with them. ArduinoJson (MIT license) is compiled into the firmware and the simulator.
+The firmware links Arduino-ESP32 and ESP-IDF with their components (WiFi, lwIP, the HTTP server and client, mDNS and mbedTLS among them), including the binary-only libraries Espressif distributes (PHY, Bluetooth, coexistence, WiFi); [`LICENSE-EXCEPTION`](../LICENSE-EXCEPTION) gives the permission to combine Zenit with them. ArduinoJson (MIT license) is compiled into the firmware and the simulator.
 
 ## Firmware
 
@@ -21,6 +21,11 @@ The texts in `firmware/`, taken on 2026-11-22:
 | `FreeRTOS-Kernel.LICENSE.md` | `components/freertos/FreeRTOS-Kernel/LICENSE.md`, ESP-IDF v5.5.5                                        |
 | `mbedtls.LICENSE`            | `LICENSE` of espressif/mbedtls at the commit of ESP-IDF v5.5.5 (9d669eadb195)                           |
 | `tlsf.LICENSE`               | the BSD-3-Clause text (SPDX) with the copyright line of `tlsf.c`, espressif/tlsf at the commit of ESP-IDF v5.5.5 (2867f6883a12) |
+| `lwip.LICENSE`               | `COPYING` of espressif/esp-lwip at the commit of ESP-IDF v5.5.5 (fd432e4ee2cf)                          |
+| `cJSON.LICENSE`              | `LICENSE` of DaveGamble/cJSON at the commit of ESP-IDF v5.5.5 (b2890c8d76bb)                            |
+| `http_parser.LICENSE`        | `components/http_parser/LICENSE.txt`, ESP-IDF v5.5.5                                                    |
+| `wpa_supplicant.LICENSE`     | `components/wpa_supplicant/COPYING` and the license terms of its `README`, ESP-IDF v5.5.5               |
+| `protobuf-c.LICENSE`         | `LICENSE` of protobuf-c/protobuf-c at the commit of ESP-IDF v5.5.5 (abc67a11c6db)                       |
 
 ## Web app
 

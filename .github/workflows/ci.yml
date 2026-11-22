@@ -60,7 +60,8 @@ jobs:
           tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" -color
 
-  # Formatting, the tool tests, the native tests with the conformance cases, and the firmware and simulator builds
+  # Formatting, the tool tests, the native tests with the conformance cases, and the firmware (with the web app inside)
+  # and simulator builds
   check:
     needs: changes
     if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}
@@ -74,6 +75,16 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup
+
+      # The firmware embeds the built web app, so the web app is built first (make check does it)
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version-file: web/package.json
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install the web app's dependencies from the lockfile
+        run: make web-install
 
       - name: Check
         run: make check

@@ -1,0 +1,216 @@
+{
+  "description": "token_regenerate makes a new token of 16 characters of a-z and 0-9 over USB only, asks to close the WiFi client, and a failed save keeps the old token. The random bytes are chosen: 0xff and 0xfc are skipped, and 0x24 and 0x25 wrap to a and b.",
+  "steps": [
+    {
+      "control": "!token abcdefghij012345"
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": "abcdefghij012345"
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false
+        }
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "token_regenerate"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": false,
+        "error": "usb_only"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "token_regenerate",
+        "x": 1
+      },
+      "expect": {
+        "seq": 4,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "event": "storage_fail"
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "token_regenerate"
+      },
+      "expect": {
+        "seq": 5,
+        "ok": false,
+        "error": "storage_error"
+      }
+    },
+    {
+      "event": "storage_ok"
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 6,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": "abcdefghij012345"
+        }
+      }
+    },
+    {
+      "control": "!random fffc000102030405060708090a0b0c0d2425000000000000000000000000000000"
+    },
+    {
+      "send": {
+        "seq": 7,
+        "cmd": "token_regenerate"
+      },
+      "expect": {
+        "seq": 7,
+        "ok": true,
+        "token": "abcdefghijklmnab"
+      },
+      "close": true
+    },
+    {
+      "send": {
+        "seq": 8,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 8,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": "abcdefghijklmnab"
+        }
+      }
+    }
+  ]
+}

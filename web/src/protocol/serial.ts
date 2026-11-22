@@ -3,7 +3,8 @@
 // The board's USB serial port, through Web Serial (docs/web/web-app-v1.md#usb-serial).
 
 import { MAX_REPLY_LINE } from "./frame";
-import type { LineTransport } from "./transport";
+import { FRAME_IDLE_MS, ImprovDemux } from "./improv";
+import type { ImprovLink, LineTransport } from "./transport";
 
 /** The part of a Web Serial port the transport uses, so a test can stand in for it. */
 export interface SerialPortLike {
@@ -84,6 +85,20 @@ class SerialTransport implements LineTransport {
     this.reading = this.read();
   }
 
+  /** Improv frames and protocol lines share the port: the demultiplexer hands the frames to Improv and the rest on. */
+  readonly improv: ImprovLink = {
+    onFrame: null,
+    sendFrame: (frame) => {
+      // A newline first, so the frame starts a line whatever half-line the board holds
+      const bytes = new Uint8Array(frame.length + 1);
+      bytes[0] = 0x0a;
+      bytes.set(frame, 1);
+      return this.write(bytes);
+    },
+  };
+  private readonly demux = new ImprovDemux();
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+
   private async read(): Promise<void> {
     const splitter = new LineSplitter();
     let cause: Error | undefined;
@@ -91,13 +106,25 @@ class SerialTransport implements LineTransport {
       for (;;) {
         const { value, done } = await this.reader.read();
         if (done) break;
-        if (value) for (const line of splitter.push(value)) this.onLine?.(line);
+        if (value) {
+          for (const event of this.demux.feed(value, Date.now())) {
+            if (event.kind === "pass") for (const line of splitter.push(event.bytes)) this.onLine?.(line);
+            else if (event.kind === "frame") this.improv.onFrame?.(event.type, event.data);
+          }
+          this.watchIdle();
+        }
       }
     } catch (error) {
       cause = error instanceof Error ? error : new Error(String(error));
     }
     // The cable pulled, or our own close
     if (!this.closing) this.finish(cause);
+  }
+
+  /** A frame that stops for a second is dropped: a lost byte must not swallow the protocol lines after it. */
+  private watchIdle(): void {
+    if (this.idleTimer !== null) clearTimeout(this.idleTimer);
+    this.idleTimer = this.demux.partial ? setTimeout(() => this.demux.idle(Date.now()), FRAME_IDLE_MS) : null;
   }
 
   private finish(cause?: Error): void {
@@ -107,11 +134,21 @@ class SerialTransport implements LineTransport {
   }
 
   async send(line: Uint8Array): Promise<void> {
-    if (this.closed || this.closing) throw new Error("the port is closed");
     const bytes = new Uint8Array(line.length + 1);
     bytes.set(line);
     bytes.set(NEWLINE, line.length);
-    await Promise.race([this.writer.write(bytes), this.ended]);
+    await this.write(bytes);
+  }
+
+  private async write(bytes: Uint8Array): Promise<void> {
+    try {
+      // Inside the try: a frame sent to a closed port is cleared too
+      if (this.closed || this.closing) throw new Error("the port is closed");
+      await Promise.race([this.writer.write(bytes), this.ended]);
+    } finally {
+      // A frame may carry a WiFi password: the copy made for the port is cleared once the write is over, failed or not
+      bytes.fill(0);
+    }
   }
 
   /**
@@ -121,6 +158,7 @@ class SerialTransport implements LineTransport {
   async close(): Promise<void> {
     if (this.closing) return;
     this.closing = true;
+    if (this.idleTimer !== null) clearTimeout(this.idleTimer);
     this.end(new Error("the port is closed"));
     await withLimit(this.reader.cancel(), CLOSE_STEP_MS);
     await withLimit(this.reading, CLOSE_STEP_MS);

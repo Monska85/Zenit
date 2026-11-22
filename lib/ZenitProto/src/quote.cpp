@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <cstring>
 
-#include "utf8.h"
+#include <utf8.h>
 
 namespace zenit
 {
@@ -19,7 +19,7 @@ size_t quote_text(const char *text, size_t length, char *out, size_t capacity)
   for (size_t i = 0; i < length;)
   {
     const unsigned char c = static_cast<unsigned char>(text[i]);
-    const size_t sequence = utf8_sequence_length(text, length, i);
+    const size_t sequence = net::utf8_sequence_length(text, length, i);
     if (sequence == 1 && c >= 0x20 && c != 0x7F)
     {
       if (written + 1 > room)

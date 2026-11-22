@@ -31,6 +31,8 @@
 #include "platform.h"
 #include "protocol.h"
 #include "settings.h"
+#include "sim_control.h"
+#include "updates.h"
 
 namespace
 {
@@ -441,6 +443,15 @@ void write_to_stdout(const char *line, size_t length)
   std::fflush(stdout);
 }
 
+// The transport of the protocol session, for the requests made without a line (a login that took too long).
+protocol::Transport session_transport = protocol::Transport::Usb;
+
+void report_close_request()
+{
+  if (session_transport == protocol::Transport::Wifi && protocol::take_wifi_close_request())
+    write_to_stdout("!close-client\n", sizeof("!close-client\n") - 1);
+}
+
 // Lines in, replies out. The virtual clock is the one platform::now_ms() reports.
 class ProtocolSession
 {
@@ -452,6 +463,7 @@ public:
 
   void feed(uint8_t byte, uint64_t now)
   {
+    now_ = now;
     switch (reader_.feed(byte))
     {
     case zenit::proto::LineReader::Event::None:
@@ -494,7 +506,7 @@ private:
       if (transport_ != protocol::Transport::Wifi)
         std::fprintf(stderr, "zenit-sim: '%s' ignored: only the wifi transport has connections\n", line.c_str());
       else if (line == "!wifi-open")
-        protocol::wifi_opened();
+        protocol::wifi_opened(now_);
       else
       {
         protocol::wifi_closed();
@@ -503,7 +515,7 @@ private:
         write_to_stdout("!wifi-closed\n", sizeof("!wifi-closed\n") - 1);
       }
     }
-    else
+    else if (!sim_control::handle(line, now_))
       std::fprintf(stderr, "zenit-sim: unknown control line '%s'\n", line.c_str());
   }
 
@@ -512,13 +524,19 @@ private:
     if (!line.empty() && line[0] == '!')
       control(line);
     else
+    {
       protocol::handle_line(transport_, line.data(), line.size(), now, write_to_stdout);
+      // The bridge closes the client's connection after the reply it has just sent.
+      if (transport_ == protocol::Transport::Wifi && protocol::take_wifi_close_request())
+        write_to_stdout("!close-client\n", sizeof("!close-client\n") - 1);
+    }
   }
 
   protocol::Transport transport_;
   bool live_;
   zenit::proto::LineReader reader_;
   uint64_t advance_ = 0;
+  uint64_t now_ = 0;
 };
 
 // Runs the 10 ms grid up to `until`, one tick per step.
@@ -529,6 +547,9 @@ void tick_to(uint64_t &now, uint64_t until)
     now += zenit::TICK_MS;
     platform::sim_set_now_ms(now);
     app::tick(now);
+    app::service(now);
+    report_close_request();
+    sim_control::after_step(now);
   }
 }
 
@@ -581,6 +602,9 @@ void run_protocol_live(ProtocolSession &session)
       now = current - current % zenit::TICK_MS;
       platform::sim_set_now_ms(now);
       app::tick(now);
+      app::service(now);
+      report_close_request();
+      sim_control::after_step(now);
       next_tick = now + zenit::TICK_MS;
     }
   }
@@ -607,7 +631,9 @@ int main(int argc, char **argv)
     if (options.live)
       platform::sim_set_random(std::random_device{}());
     protocol::begin(platform::random32());
+    updates::protocol_ready();
     app::tick(0);
+    session_transport = options.transport;
     ProtocolSession session(options.transport, options.live);
     if (options.live)
       run_protocol_live(session);

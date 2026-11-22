@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <cstring>
 
-#include "utf8.h"
+#include <utf8.h>
 
 namespace zenit
 {
@@ -187,7 +187,7 @@ struct Scan
       }
       else if (b >= 0x80)
       {
-        const size_t n = utf8_sequence_length(json, length, i);
+        const size_t n = net::utf8_sequence_length(json, length, i);
         if (n == 0)
           return fail("invalid UTF-8");
         i += n - 1;

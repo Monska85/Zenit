@@ -1,0 +1,208 @@
+{
+  "description": "Improv Wi-Fi Serial frames: the packets the board writes (the checksum is the sum of the bytes before it, modulo 256, then a newline), the RPC frames it reads, and a byte stream that mixes frames, protocol lines and noise.",
+  "packets": [
+    {
+      "name": "state ready",
+      "state": 2,
+      "hex": "494d50524f5601010102e20a"
+    },
+    {
+      "name": "state provisioning",
+      "state": 3,
+      "hex": "494d50524f5601010103e30a"
+    },
+    {
+      "name": "state provisioned",
+      "state": 4,
+      "hex": "494d50524f5601010104e40a"
+    },
+    {
+      "name": "error none",
+      "error": 0,
+      "hex": "494d50524f5601020100e10a"
+    },
+    {
+      "name": "error invalid rpc",
+      "error": 1,
+      "hex": "494d50524f5601020101e20a"
+    },
+    {
+      "name": "error unknown rpc",
+      "error": 2,
+      "hex": "494d50524f5601020102e30a"
+    },
+    {
+      "name": "error unable to connect",
+      "error": 3,
+      "hex": "494d50524f5601020103e40a"
+    },
+    {
+      "name": "empty result for wifi settings",
+      "command": 1,
+      "strings": [],
+      "hex": "494d50524f560104020100e50a"
+    },
+    {
+      "name": "device info",
+      "command": 3,
+      "strings": [
+        "Zenit",
+        "1.0.0",
+        "ESP32-C3",
+        "zenit-a1b2"
+      ],
+      "hex": "494d50524f560104220320055a656e697405312e302e300845535033322d43330a7a656e69742d61316232a70a"
+    },
+    {
+      "name": "one scanned network",
+      "command": 4,
+      "strings": [
+        "HomeNet",
+        "-61",
+        "YES"
+      ],
+      "hex": "494d50524f56010412041007486f6d654e6574032d3631035945534a0a"
+    },
+    {
+      "name": "the end of a scan",
+      "command": 4,
+      "strings": [],
+      "hex": "494d50524f560104020400e80a"
+    }
+  ],
+  "wifi_settings": [
+    {
+      "args_hex": "07486f6d654e65740d636f72726563742d686f727365",
+      "ssid": "HomeNet",
+      "password": "correct-horse"
+    },
+    {
+      "args_hex": "044361666500",
+      "ssid": "Cafe",
+      "password": ""
+    }
+  ],
+  "wifi_settings_invalid": [
+    "0000",
+    "2178787878787878787878787878787878787878787878787878787878787878787800",
+    "0443616665417070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070707070",
+    "0443616665036162",
+    "04436166650078",
+    "",
+    "02610000",
+    "07486f6d65"
+  ],
+  "streams": [
+    {
+      "name": "a frame alone",
+      "hex": "494d50524f560103020200e5",
+      "events": [
+        {
+          "frame": {
+            "type": 3,
+            "data_hex": "0200"
+          }
+        }
+      ]
+    },
+    {
+      "name": "a frame with a newline after it",
+      "hex": "494d50524f560103020200e50a",
+      "events": [
+        {
+          "frame": {
+            "type": 3,
+            "data_hex": "0200"
+          }
+        },
+        {
+          "pass_hex": "0a"
+        }
+      ]
+    },
+    {
+      "name": "a frame in the middle of lines",
+      "hex": "7a656e69743a2068690a494d50524f560103020300e6405a4e2031207b7d0a",
+      "events": [
+        {
+          "pass_hex": "7a656e69743a2068690a"
+        },
+        {
+          "frame": {
+            "type": 3,
+            "data_hex": "0300"
+          }
+        },
+        {
+          "pass_hex": "405a4e2031207b7d0a"
+        }
+      ]
+    },
+    {
+      "name": "a bad checksum",
+      "hex": "494d50524f560103020200e6",
+      "events": [
+        {
+          "bad_checksum": true
+        }
+      ]
+    },
+    {
+      "name": "two frames with no newline between",
+      "hex": "494d50524f560103020200e5494d50524f560103020300e6",
+      "events": [
+        {
+          "frame": {
+            "type": 3,
+            "data_hex": "0200"
+          }
+        },
+        {
+          "frame": {
+            "type": 3,
+            "data_hex": "0300"
+          }
+        }
+      ]
+    },
+    {
+      "name": "the header in the middle of a line is not a frame",
+      "hex": "78494d50524f56010a",
+      "events": [
+        {
+          "pass_hex": "78494d50524f56010a"
+        }
+      ]
+    },
+    {
+      "name": "a line that starts like a header",
+      "hex": "494d50524f210a",
+      "events": [
+        {
+          "pass_hex": "494d50524f210a"
+        }
+      ]
+    },
+    {
+      "name": "a line that starts with I",
+      "hex": "49726f6e0a",
+      "events": [
+        {
+          "pass_hex": "49726f6e0a"
+        }
+      ]
+    },
+    {
+      "name": "the length decides the end, a newline byte inside the data included",
+      "hex": "494d50524f56010307010503610a6200be",
+      "events": [
+        {
+          "frame": {
+            "type": 3,
+            "data_hex": "010503610a6200"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # Zenit web app
 
-A static React and TypeScript app (Vite) that controls a Zenit from the browser, over USB (Web Serial) or a WebSocket. The specification is [`docs/web/web-app-v1.md`](../docs/web/web-app-v1.md) and the decisions are in [ADR 0003](../docs/adr/0003-web-app.md).
+A static React and TypeScript app (Vite) that controls a Zenit from the browser, over USB (Web Serial) or a WebSocket. Over USB it also sets up the board's WiFi (Improv Wi-Fi Serial). The board serves the same app on its own address, and the page then connects to that board by itself. It shows and changes the board's update, time and login settings, and installs firmware updates. The specification is [`docs/web/web-app-v1.md`](../docs/web/web-app-v1.md) and the decisions are in [ADR 0003](../docs/adr/0003-web-app.md).
 
 ## Commands
 
@@ -30,17 +30,20 @@ just web-dev   # in a second terminal
 
 Open `http://localhost:5173`, type `ws://127.0.0.1:8765` and press Connect. Only one client at a time can use the simulator's bridge.
 
+To try the page as a board serves it, build the app (`just web-build`) and start the bridge with `python3 tools/ws_bridge.py --sim .pio/build/native/program --app web/dist`. Open the `http://127.0.0.1:<port>/` address it prints: the page finds `/board.json` and connects by itself.
+
 ## Tests
 
 - **Unit and conformance (Vitest, Node):** `test/`. The protocol client runs the cases of `conformance/protocol/` from its side; Web Serial runs against a fake port that fails the test if the control lines are touched; the limits are compared with the specifications.
-- **End to end (Playwright, Chromium):** `e2e/`. The built app is served by `e2e/serve-site.mjs` with a fixture firmware release under `firmware/`, as Pages would. `e2e/fixtures.ts` starts the simulator behind `tools/ws_bridge.py` for each test (`just sim-build` first; `ZENIT_SIM`, `ZENIT_WS_BRIDGE` and `ZENIT_PYTHON` name other files). Tests that need a board that refuses, falls silent or reports something exact use `e2e/mock-board.ts`, which answers the app's WebSocket from a script, and `e2e/fake-serial.ts`, a Web Serial port wired to it. Install the browser once: `cd web && npx playwright install chromium`.
+- **End to end (Playwright, Chromium):** `e2e/`. The built app is served by `e2e/serve-site.mjs` with a fixture firmware release under `firmware/`, as Pages would. `e2e/fixtures.ts` starts the simulator behind `tools/ws_bridge.py` for each test (`just sim-build` first; `ZENIT_SIM`, `ZENIT_WS_BRIDGE` and `ZENIT_PYTHON` name other files). `e2e/fixtures.ts` can also start the bridge with `--app web/dist` (the `servedSimulator` fixture), so a test opens the bridge's own `http://` address, as a page served by a board. Tests that need a board that refuses, falls silent, asks for a login or reports something exact use `e2e/mock-board.ts`, which answers the app's WebSocket from a script, and `e2e/fake-serial.ts`, a Web Serial port wired to it; its `scriptImprov` plays Improv frames (`e2e/improv-frames.ts` reads them from `conformance/improv/frames.json`). Install the browser once: `cd web && npx playwright install chromium`.
 - **Layout checks and reference screenshots:** `screenshots/`. Every state is scripted once in `screenshots/states.ts`; see [`screenshots/README.md`](screenshots/README.md).
 
 ## Layout
 
-- `src/protocol/`: CRC-32, the strict JSON reader, framing, the reply table, the client, the Web Serial and WebSocket transports, and the address rules. Nothing from the page.
+- `src/protocol/`: CRC-32, the strict JSON reader, framing, the reply table, the client, the Web Serial and WebSocket transports, the address rules, SHA-256 and HMAC (`sha256.ts`, `auth.ts`: the login), and Improv Wi-Fi Serial (`improv.ts`, `improv-client.ts`). Nothing from the page.
+- `src/device/` and `src/wifi/`: the limits and sentences of the board settings, the update status and the WiFi setup. Nothing from the page.
 - `src/light/`: the settings model, the limits and what each effect reads. Nothing from the page.
 - `src/release/`: semantic version precedence and the firmware manifest. Nothing from the page.
-- `src/board/`: the connection session (state, polling, errors) and the code that opens a port or a socket from the page.
+- `src/board/`: the connection session (state, polling, login, reconnection, errors), the code that opens a port or a socket from the page, and the probe for a board that served the page (`served.ts`).
 - `src/ui/`: React views and components; `src/ui/components/` holds the shadcn-style components on Radix primitives. ESP Web Tools loads only when the install starts.
 - `scripts/`: the third-party notices and the bundle size budget; `scripts/run-screenshots.sh` runs the screenshots in the container.

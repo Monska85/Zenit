@@ -223,7 +223,7 @@ void test_utf8_sequence_length()
 {
   auto length = [](const char *text)
   {
-    return proto::utf8_sequence_length(text, std::strlen(text), 0);
+    return zenit::net::utf8_sequence_length(text, std::strlen(text), 0);
   };
   TEST_ASSERT_EQUAL_size_t(1, length("a"));
   TEST_ASSERT_EQUAL_size_t(2, length("\xC3\xA9"));
@@ -374,7 +374,8 @@ proto::Failure apply(const char *json, zenit::LightSettings &settings)
 {
   JsonDocument doc;
   TEST_ASSERT_FALSE(deserializeJson(doc, json));
-  return proto::apply_settings_request(doc.as<JsonObjectConst>(), settings);
+  zenit::net::BoardSettings board;
+  return proto::apply_settings_request(doc.as<JsonObjectConst>(), settings, board);
 }
 } // namespace
 
@@ -463,13 +464,16 @@ void test_settings_request_rejects_and_keeps_the_settings()
 void test_write_settings_defaults()
 {
   JsonDocument doc;
-  proto::write_settings(doc.to<JsonObject>(), zenit::LightSettings());
+  proto::write_settings(doc.to<JsonObject>(), zenit::LightSettings(), zenit::net::BoardSettings(), false);
   std::string out;
   serializeJson(doc, out);
   TEST_ASSERT_EQUAL_STRING("{\"brightness\":60,\"effect\":\"static\",\"color\":\"white\","
                            "\"colors\":[\"red\",\"green\",\"blue\",\"white\"],\"color_set\":\"christmas\","
                            "\"hold_seconds\":30,\"period_seconds\":8,\"floor\":20,\"twinkle_strength\":20,"
-                           "\"timer_minutes\":0}",
+                           "\"timer_minutes\":0,\"wifi_power\":\"auto\",\"update_mode\":\"automatic\","
+                           "\"update_firmware\":true,\"check_hours\":6,\"install_start\":0,\"install_end\":0,"
+                           "\"timezone\":\"UTC0\",\"time_sync_hours\":6,\"ntp_server\":\"pool.ntp.org\","
+                           "\"network_login\":false}",
                            out.c_str());
 }
 
@@ -592,7 +596,7 @@ void test_core_wifi_cache_is_forgotten_when_a_connection_opens_or_closes()
   start();
   const std::string set = framed("{\"seq\":4,\"cmd\":\"settings_set\",\"brightness\":40}");
   send(set, protocol::Transport::Wifi);
-  protocol::wifi_opened();
+  protocol::wifi_opened(0);
   zenit::LightSettings other = settings::current();
   other.brightness = 90;
   settings::commit(other);
