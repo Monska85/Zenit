@@ -91,8 +91,6 @@ WebState judge_web_image(bool valid, uint8_t protocol_min, uint8_t protocol_max,
   return speaks(protocol_min, protocol_max, protocol) ? WebState::Ok : WebState::Incompatible;
 }
 
-bool is_failure(Result result) { return result >= Result::NoNetwork; }
-
 Candidate judge(const char *running, const char *published, const char *skipped)
 {
   Version have, offered;

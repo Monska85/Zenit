@@ -1,5 +1,5 @@
 {
-  "comment": "The third-party software of the firmware, for tools/firmware_notices.py (LICENSES/README.md). Every archive the firmware links must be named by a section, by a library, or be a library of the project's lib/ folder. A section's version is read from the build: 'esp-idf' and 'component:<name>' from versions.txt of the framework's library package, 'arduino' from its package.json, 'toolchain' from the compiler package. 'pins' are the versions the files in LICENSES/firmware/ were taken from: a build with other versions fails until the files are taken again.",
+  "comment": "The third-party software of the firmware, for tools/firmware_notices.py (LICENSES/README.md). Every archive the firmware links must be named by a section, by a library, or be a library of the project's lib/ folder. A section with 'always' and no archives is data the firmware embeds from the project (the certificate bundle). A section's version is read from the build: 'esp-idf' and 'component:<name>' from versions.txt of the framework's library package, 'arduino' from its package.json, 'toolchain' from the compiler package. 'pins' are the versions the files in LICENSES/firmware/ were taken from: a build with other versions fails until the files are taken again.",
   "pins": {
     "esp-idf": "v5.5.5",
     "arduino": "3.3.12",
@@ -150,6 +150,15 @@
       "source": "https://github.com/protobuf-c/protobuf-c",
       "files": ["protobuf-c.LICENSE"],
       "archives": ["libprotobuf-c.a"]
+    },
+    {
+      "name": "Mozilla CA certificate list (the roots in certs/x509_crt_bundle.bin, from ESP-IDF's cacrt_all.pem)",
+      "version": "esp-idf",
+      "license": "MPL-2.0",
+      "source": "https://github.com/espressif/esp-idf/blob/{version}/components/mbedtls/esp_crt_bundle/cacrt_all.pem",
+      "files": ["MPL-2.0.txt"],
+      "archives": [],
+      "always": true
     }
   ],
   "libraries": {

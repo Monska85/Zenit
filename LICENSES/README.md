@@ -6,7 +6,7 @@ The firmware links Arduino-ESP32 and ESP-IDF with their components (WiFi, lwIP, 
 
 `tools/firmware_notices.py` writes `THIRD_PARTY_NOTICES.txt` for a release, and `just check` builds it too. It reads the link map (`.pio/build/esp32c3/firmware.map`), so it lists what the firmware really links, and it:
 
-- names every linked archive with a section of [`firmware.json`](firmware.json), with its license, its source and the files of its license text. It fails if no section names an archive, so a new dependency cannot be shipped without its notice.
+- names every linked archive with a section of [`firmware.json`](firmware.json), with its license, its source and the files of its license text. It fails if no section names an archive, so a new dependency cannot be shipped without its notice. A section marked `always` names no archive: it is data the firmware embeds from this repository, the certificate roots of [`certs/`](../certs/README.md).
 - reads the versions from the build: ESP-IDF and the managed components from `versions.txt` of the framework's library package, Arduino-ESP32 from that package's `package.json`, the compiler from its own `package.json`, and each PlatformIO library from its `library.json` or `library.properties`.
 - fails when the build uses another ESP-IDF, Arduino-ESP32 or component version than `pins` in `firmware.json`: the texts in `firmware/` were taken from those versions.
 - takes the text of ArduinoJson from the library itself and those of newlib and of the GCC runtime from the compiler package (`share/licenses/`), so they always match the build.
@@ -26,6 +26,7 @@ The texts in `firmware/`, taken on 2026-11-22:
 | `http_parser.LICENSE`        | `components/http_parser/LICENSE.txt`, ESP-IDF v5.5.5                                                    |
 | `wpa_supplicant.LICENSE`     | `components/wpa_supplicant/COPYING` and the license terms of its `README`, ESP-IDF v5.5.5               |
 | `protobuf-c.LICENSE`         | `LICENSE` of protobuf-c/protobuf-c at the commit of ESP-IDF v5.5.5 (abc67a11c6db)                       |
+| `MPL-2.0.txt`                | <https://www.mozilla.org/media/MPL/2.0/index.txt>, for the Mozilla CA list in `certs/x509_crt_bundle.bin` |
 
 ## Web app
 

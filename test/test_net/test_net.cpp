@@ -527,7 +527,7 @@ void test_the_sha256_of_zeros_the_cases_use_is_right()
   net::Sha256 hash;
   hash.update(zeros.data(), zeros.size());
   uint8_t digest[net::SHA256_SIZE];
-  hash.finish(digest);
+  TEST_ASSERT_TRUE(hash.finish(digest));
   char hex[net::SHA256_HEX + 1];
   net::to_hex(digest, hex);
   TEST_ASSERT_EQUAL_STRING("de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31", hex);
@@ -849,7 +849,7 @@ std::vector<uint8_t> spec_image()
   net::Sha256 hash;
   hash.update(body.data(), body.size());
   uint8_t digest[net::SHA256_SIZE];
-  hash.finish(digest);
+  TEST_ASSERT_TRUE(hash.finish(digest));
   std::memcpy(image.data() + 32, digest, sizeof(digest));
   image.insert(image.end(), body.begin(), body.end());
   return image;
@@ -900,7 +900,7 @@ std::vector<uint8_t> rehashed(std::vector<uint8_t> image)
   net::Sha256 hash;
   hash.update(image.data() + net::WEB_HEADER_SIZE, image.size() - net::WEB_HEADER_SIZE);
   uint8_t digest[net::SHA256_SIZE];
-  hash.finish(digest);
+  TEST_ASSERT_TRUE(hash.finish(digest));
   std::memcpy(image.data() + 32, digest, sizeof(digest));
   return image;
 }
@@ -963,7 +963,7 @@ void publish_web(const char *version, int low, int high)
   net::Sha256 hash;
   hash.update(data, size);
   uint8_t digest[net::SHA256_SIZE];
-  hash.finish(digest);
+  TEST_ASSERT_TRUE(hash.finish(digest));
   char hex[net::SHA256_HEX + 1];
   net::to_hex(digest, hex);
   update_http::sim_set_manifest(update_http::Target::Web, web_manifest(version, size, hex, low, high).c_str());
@@ -1035,7 +1035,7 @@ void test_an_image_that_breaks_a_rule_does_not_read()
   net::Sha256 hash;
   hash.update(outside.data() + body, outside.size() - body);
   uint8_t digest[net::SHA256_SIZE];
-  hash.finish(digest);
+  TEST_ASSERT_TRUE(hash.finish(digest));
   std::memcpy(outside.data() + 32, digest, sizeof(digest));
   TEST_ASSERT_FALSE(reads(outside));
 }
@@ -1401,7 +1401,7 @@ void test_a_web_image_whose_header_is_not_the_offer_keeps_the_app()
   net::Sha256 hash;
   hash.update(data, size);
   uint8_t digest[net::SHA256_SIZE];
-  hash.finish(digest);
+  TEST_ASSERT_TRUE(hash.finish(digest));
   char hex[net::SHA256_HEX + 1];
   net::to_hex(digest, hex);
   update_http::sim_set_manifest(update_http::Target::Web, web_manifest("1.5.0", size, hex, 1, 1).c_str());

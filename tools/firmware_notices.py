@@ -174,6 +174,8 @@ class Notices:
             if name not in self.by_archive:
                 raise NoticesError(f"{path} is linked but no section of {CONFIG.relative_to(ROOT)} names {name}")
             used.update(self.by_archive[name])
+        # Data the firmware embeds from the project, not from an archive (the certificate bundle)
+        used.update(index for index, section in enumerate(self.config["sections"]) if section.get("always"))
         # A header-only library has no archive: it is compiled into the project library that depends on it
         for lib in sorted(linked_project_libs):
             for dependency in self.project_libs[lib].get("dependencies", []):

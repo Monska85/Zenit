@@ -55,14 +55,6 @@ BootAction decide_settled_boot(const UpdateRecord &record, const char *running_v
 // The record after the action.
 UpdateRecord apply_boot_action(const UpdateRecord &record, BootAction action);
 
-enum class TrialAction : uint8_t
-{
-  MarkValid,  // confirm the image
-  MarkInvalid // roll back at once
-};
-
-// What a trial boot does once the health check has run.
-TrialAction decide_trial(bool health_ok);
 // The record after the pending image started on trial: `booted` is set when the pending version is the running one.
 UpdateRecord apply_booted(const UpdateRecord &record, const char *running_version);
 // The record after a confirmed trial: the pending version is dropped, and the skip ends when it was the running

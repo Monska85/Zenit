@@ -221,10 +221,11 @@ Outcome download(install_target::Target target, const char *url, const zenit::up
     return outcome;
   }
   uint8_t digest[zenit::net::SHA256_SIZE];
-  hash.finish(digest);
   char hex[zenit::net::SHA256_HEX + 1];
-  zenit::net::to_hex(digest, hex);
-  if (std::strcmp(hex, sha256) != 0)
+  const bool hashed = hash.finish(digest);
+  if (hashed)
+    zenit::net::to_hex(digest, hex);
+  if (!hashed || std::strcmp(hex, sha256) != 0)
   {
     install_target::abort(target);
     return Outcome::BadDownload;

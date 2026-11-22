@@ -46,8 +46,8 @@ AuthSession::Verdict AuthSession::attempt(const char *token, const char *hmac)
   if (has_nonce_ && is_hmac_text(hmac) && std::strlen(token) > 0)
   {
     char expected[SHA256_HEX + 1];
-    hmac_sha256_hex(token, std::strlen(token), nonce_, NONCE_HEX, expected);
-    accepted = constant_time_equal(expected, hmac, SHA256_HEX);
+    accepted = hmac_sha256_hex(token, std::strlen(token), nonce_, NONCE_HEX, expected) &&
+               constant_time_equal(expected, hmac, SHA256_HEX);
   }
   has_nonce_ = false;
   nonce_[0] = '\0';

@@ -55,6 +55,15 @@ CONFIG = {
             "files": ["toolchain:share/licenses/libc/COPYING"],
             "archives": ["libc.a"],
         },
+        {
+            "name": "Embedded data",
+            "version": "esp-idf",
+            "license": "MPL-2.0",
+            "source": "https://example.org/data/{version}",
+            "files": ["data.txt"],
+            "archives": [],
+            "always": True,
+        },
     ],
     "libraries": {"Json": {"license": "MIT", "files": ["LICENSE.txt"]}},
 }
@@ -93,7 +102,7 @@ class FixtureTest(unittest.TestCase):
         self.write(self.tool / "package.json", json.dumps({"version": "9.9.9"}))
         self.write(self.tool / "share" / "licenses" / "libc" / "COPYING", "LIBC LICENSE TEXT")
         self.licenses = self.root / "LICENSES"
-        for name, text in {"core.txt": "CORE TEXT", "idf.txt": "IDF TEXT", "part.txt": "PART TEXT"}.items():
+        for name, text in {"core.txt": "CORE TEXT", "idf.txt": "IDF TEXT", "part.txt": "PART TEXT", "data.txt": "DATA TEXT"}.items():
             self.write(self.licenses / "firmware" / name, text)
         self.config_path = self.licenses / "firmware.json"
         self.write(self.config_path, json.dumps(CONFIG))
@@ -165,14 +174,15 @@ class BuildNoticesTest(FixtureTest):
         text = self.run_notices()
         self.assertTrue(text.startswith("Zenit firmware 1.2.3: third-party notices"))
         self.assertIn("https://example.org/source", text)
-        for name in ("Core", "IDF", "Shared", "Part", "C library", "Json"):
+        for name in ("Core", "IDF", "Shared", "Part", "C library", "Embedded data", "Json"):
             self.assertRegex(text, rf"\d+\. {name}\n")
         self.assertIn("   Version: 3.0.0\n   License: LGPL\n   Source: https://example.org/core/3.0.0", text)
         self.assertIn("   Version: v1.0.0\n   License: Apache-2.0\n   Source: https://example.org/idf/v1.0.0", text)
         self.assertIn("   Version: 2.0\n   License: MIT\n   Source: https://example.org/part/2.0", text)
         self.assertIn("   Version: 9.9.9\n   License: BSD", text)
+        self.assertIn("   Version: v1.0.0\n   License: MPL-2.0\n   Source: https://example.org/data/v1.0.0", text)
         self.assertIn("   Version: 7.0.0\n   License: MIT\n   Source: https://example.org/json", text)
-        for body in ("CORE TEXT", "IDF TEXT", "PART TEXT", "LIBC LICENSE TEXT", "JSON LICENSE TEXT"):
+        for body in ("CORE TEXT", "IDF TEXT", "PART TEXT", "LIBC LICENSE TEXT", "DATA TEXT", "JSON LICENSE TEXT"):
             self.assertEqual(text.count(body), 1, body)
 
     def test_a_text_shared_by_sections_is_printed_once_with_one_number(self):
@@ -267,7 +277,9 @@ class RepositoryConfigurationTest(unittest.TestCase):
             for key in ("name", "version", "license", "source", "files", "archives"):
                 self.assertIn(key, section, section.get("name"))
             self.assertTrue(section["version"] in kinds or section["version"].startswith("component:"), section["name"])
-            self.assertTrue(section["files"] and section["archives"], section["name"])
+            # A section names the archives it covers, or is data the firmware always embeds
+            self.assertTrue(section["files"], section["name"])
+            self.assertTrue(bool(section["archives"]) != bool(section.get("always")), section["name"])
 
     def test_component_versions_have_a_pin(self):
         for section in self.config["sections"]:

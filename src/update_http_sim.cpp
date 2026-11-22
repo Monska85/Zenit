@@ -87,10 +87,11 @@ Outcome download(Target target, const char *, const zenit::update::Manifest &man
       progress(static_cast<uint8_t>(static_cast<uint64_t>(sent) * 100 / size));
   }
   uint8_t digest[zenit::net::SHA256_SIZE];
-  hash.finish(digest);
   char hex[zenit::net::SHA256_HEX + 1];
-  zenit::net::to_hex(digest, hex);
-  if (sent != size || std::strcmp(hex, sha256) != 0)
+  const bool hashed = hash.finish(digest);
+  if (hashed)
+    zenit::net::to_hex(digest, hex);
+  if (sent != size || !hashed || std::strcmp(hex, sha256) != 0)
   {
     install_target::abort(target);
     return Outcome::BadDownload;
@@ -122,7 +123,8 @@ void sim_reset()
   zenit::net::Sha256 hash;
   hash.update(data, size);
   uint8_t digest[zenit::net::SHA256_SIZE];
-  hash.finish(digest);
+  // The simulator's portable hash cannot fail.
+  (void)hash.finish(digest);
   char hex[zenit::net::SHA256_HEX + 1];
   zenit::net::to_hex(digest, hex);
   char body[256];

@@ -113,7 +113,8 @@ std::string sha256_hex(const uint8_t *data, size_t size)
   zenit::net::Sha256 hash;
   hash.update(data, size);
   uint8_t digest[zenit::net::SHA256_SIZE];
-  hash.finish(digest);
+  // The simulator's portable hash cannot fail.
+  (void)hash.finish(digest);
   char hex[zenit::net::SHA256_HEX + 1];
   zenit::net::to_hex(digest, hex);
   return hex;

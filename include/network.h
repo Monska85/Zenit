@@ -88,8 +88,6 @@ void close_client(uint16_t code = zenit::proto::CLOSE_POLICY);
 // into `target`. False when the queue is full.
 bool request_manifest(install_target::Target target, const char *url);
 bool request_download(install_target::Target target, const char *manifest_url, const zenit::update::Manifest &manifest);
-// Whether a transfer is running (a TLS connection is open): nothing else asks for one meanwhile.
-bool transfer_running();
 
 // Whether the network task holds the large allocation (the HTTP server refuses new connections meanwhile).
 bool holds_large_allocation();

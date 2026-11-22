@@ -60,6 +60,28 @@ jobs:
           tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" actionlint
           "$RUNNER_TEMP/actionlint" -color
 
+  # The certificate bundle the firmware embeds is the one Espressif's generator makes from the pinned esp-idf files. It
+  # reads them from GitHub, so it is not a required check: a network failure must not block a merge.
+  certificates:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Make the bundle again and compare it with the committed one
+        run: |
+          set -eu
+          pip install "$(grep '^cryptography==' requirements-ci.txt)"
+          python tools/crt_bundle.py check
+
   # Formatting, the tool tests, the native tests with the conformance cases, and the firmware and simulator builds
   check:
     needs: changes

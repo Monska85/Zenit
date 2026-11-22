@@ -143,7 +143,6 @@ bool request_download(install_target::Target target, const char *manifest_url, c
   return true;
 }
 
-bool transfer_running() { return transfer; }
 bool holds_large_allocation() { return transfer; }
 
 void poll(uint64_t now)

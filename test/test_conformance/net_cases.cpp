@@ -92,7 +92,7 @@ void test_hash_cases()
       piece = piece * 3 + 1;
     }
     uint8_t digest[net::SHA256_SIZE];
-    hash.finish(digest);
+    TEST_ASSERT_TRUE(hash.finish(digest));
     TEST_ASSERT_EQUAL_STRING_MESSAGE(c["digest"].as<const char *>(), hex_of(digest, sizeof(digest)).c_str(),
                                      label("sha256", index++).c_str());
   }
@@ -102,7 +102,7 @@ void test_hash_cases()
     const std::vector<uint8_t> key = unhex(c["key_hex"].as<const char *>());
     const std::vector<uint8_t> message = unhex(c["message_hex"].as<const char *>());
     char out[net::SHA256_HEX + 1];
-    net::hmac_sha256_hex(key.data(), key.size(), message.data(), message.size(), out);
+    TEST_ASSERT_TRUE(net::hmac_sha256_hex(key.data(), key.size(), message.data(), message.size(), out));
     TEST_ASSERT_EQUAL_STRING_MESSAGE(c["digest"].as<const char *>(), out, label("hmac", index++).c_str());
   }
 }
@@ -312,7 +312,7 @@ std::vector<uint8_t> web_image_of(JsonObjectConst c)
     net::Sha256 hash;
     hash.update(body.data(), body.size());
     uint8_t digest[net::SHA256_SIZE];
-    hash.finish(digest);
+    TEST_ASSERT_TRUE(hash.finish(digest));
     std::memcpy(image.data() + 32, digest, sizeof(digest));
   }
   else

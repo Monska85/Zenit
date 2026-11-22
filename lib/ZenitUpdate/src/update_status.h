@@ -43,8 +43,6 @@ enum class Result : uint8_t
 
 const char *state_name(State state);
 const char *result_name(Result result);
-// A result that is a failed check: it is tried again after 30 minutes.
-bool is_failure(Result result);
 
 enum class Candidate : uint8_t
 {

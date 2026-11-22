@@ -124,7 +124,8 @@ bool read_web_image(const uint8_t *image, size_t size, WebImageInfo &info, Asset
   Sha256 hash;
   hash.update(body, info.body_size);
   uint8_t digest[SHA256_SIZE];
-  hash.finish(digest);
+  if (!hash.finish(digest))
+    return fail(why, "the SHA-256 of the body could not be computed");
   if (std::memcmp(digest, info.body_sha256, SHA256_SIZE) != 0)
     return fail(why, "the body does not match its SHA-256");
 

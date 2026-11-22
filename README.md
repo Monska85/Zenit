@@ -125,7 +125,7 @@ Open `http://localhost:5173`, type `ws://127.0.0.1:8765` in the address field an
 | ----------------------- | ----------------------------------------------------------------------------------------------- |
 | `lib/ZenitLight/`       | The light engine: curve, power limit, effects, transitions and timer. Plain C++, no hardware    |
 | `lib/ZenitProto/`       | The protocol: CRC-32, framing, strict JSON, request checks, settings as JSON, reply cache, WebSocket messages |
-| `lib/ZenitNet/`         | WiFi decisions, origin check, login, SHA-256 and HMAC, board settings and their record, the served app's answers, the web image and its writer |
+| `lib/ZenitNet/`         | WiFi decisions, origin check, login, HMAC-SHA256, board settings and their record, the served app's answers, the web image and its writer |
 | `lib/ZenitImprov/`      | Improv Wi-Fi Serial: frame codec and the splitter that tells frames from protocol lines         |
 | `lib/ZenitUpdate/`      | Semantic versions, the update manifest, the schedule and window, the update record and boot decisions |
 | `src/protocol.cpp`      | The commands, and the dispatch to the light and the settings                                    |
@@ -139,6 +139,8 @@ Open `http://localhost:5173`, type `ws://127.0.0.1:8765` in the address field an
 | `src/output_*.cpp`      | The LED outputs: LEDC PWM on the board (`_board`), a recorder in the simulator (`_sim`)         |
 | `src/settings*.cpp`     | The settings, in NVS on the board and in memory in the simulator                                |
 | `src/platform*.cpp`     | Clock, randomness, log and build identity                                                       |
+| `src/sha256_*.cpp`      | SHA-256: mbedTLS on the chip's SHA engine on the board, portable code in the simulator          |
+| `src/crt_bundle.S`, `certs/` | The certificate roots the board checks HTTPS servers with ([`certs/README.md`](certs/README.md)) |
 | `src/sim_main.cpp`      | Entry point of the simulator                                                                    |
 | `test/`                 | Native tests, run on the simulator                                                              |
 | `conformance/`          | Test cases worked out by hand from the specifications                                           |

@@ -91,8 +91,6 @@ UpdateRecord apply_boot_action(const UpdateRecord &record, BootAction action)
   return next;
 }
 
-TrialAction decide_trial(bool health_ok) { return health_ok ? TrialAction::MarkValid : TrialAction::MarkInvalid; }
-
 UpdateRecord apply_booted(const UpdateRecord &record, const char *running_version)
 {
   UpdateRecord next = record;

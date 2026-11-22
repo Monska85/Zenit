@@ -5,3 +5,6 @@ clang-format==23.1.5
 # Clients of the command protocol (tools/zenit.py, tools/ws_bridge.py)
 pyserial==3.5
 websockets==17.4
+
+# The certificate bundle: Espressif's generator (tools/crt_bundle.py) and the check of the GitHub Pages chain
+cryptography==50.0.2

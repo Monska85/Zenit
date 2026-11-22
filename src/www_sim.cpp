@@ -159,7 +159,8 @@ void sim_make_image(const char *version, uint8_t protocol_min, uint8_t protocol_
   zenit::net::Sha256 hash;
   hash.update(body.data(), body.size());
   uint8_t digest[zenit::net::SHA256_SIZE];
-  hash.finish(digest);
+  // The simulator's portable hash cannot fail.
+  (void)hash.finish(digest);
   std::memcpy(made.data() + 32, digest, sizeof(digest));
   made.insert(made.end(), body.begin(), body.end());
   data = made.data();
