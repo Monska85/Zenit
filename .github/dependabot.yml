@@ -33,15 +33,15 @@ updates:
     directory: "/web"
     schedule:
       interval: weekly
-    # Temporary caps. Each one names the condition that lifts it: when it is met, remove the cap in the same change
-    # that takes the new major.
+    # Majors Dependabot does not offer. A temporary cap names the condition that lifts it: when it is met, remove the cap
+    # in the same change that takes the new major. A lasting rule says why it stays.
     ignore:
       # Remove when a typescript-eslint release accepts TypeScript 7 (its peer range in 8.73.0: <6.1.0).
       - dependency-name: "typescript"
         versions: [">=7"]
-      # The types follow the Node major in web/package.json "engines" (24): move the cap with it, remove it at Node 26.
+      # Not a temporary cap: the major of the Node types follows "engines" in web/package.json and moves with it, by hand.
       - dependency-name: "@types/node"
-        versions: [">=25"]
+        update-types: ["version-update:semver-major"]
     groups:
       web:
         patterns:
