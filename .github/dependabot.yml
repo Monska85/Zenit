@@ -33,8 +33,8 @@ updates:
     directory: "/web"
     schedule:
       interval: weekly
-    # Temporary caps. Each one names the condition that lifts it: when it is met, remove the cap in the same change
-    # that takes the new major.
+    # Majors Dependabot does not offer. A temporary cap names the condition that lifts it: when it is met, remove the cap
+    # in the same change that takes the new major. A lasting rule says why it stays.
     ignore:
       # Remove when a typescript-eslint release accepts TypeScript 7 (its peer range in 8.73.0: <6.1.0).
       - dependency-name: "typescript"
