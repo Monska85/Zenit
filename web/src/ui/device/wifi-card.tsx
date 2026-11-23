@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { choiceOptions, WIFI_POWER_LABELS, WIFI_POWERS } from "../../device/settings";
-import { boardAddress, describeSignal, describeWifiState } from "../../wifi/model";
+import { boardAddress, describeSignal, describeWifiState, PHONE_ACCESS_HINT } from "../../wifi/model";
 import { useBoard } from "../board-context";
 import { Button } from "../components/button";
 import { Card, CardTitle } from "../components/card";
@@ -89,7 +89,7 @@ export function WifiCard() {
           {!served && (
             <p className="text-sm text-muted-foreground">
               Once Zenit is on your WiFi, control it from its own address, {boardAddress(wifi.hostname)}. A page from
-              the internet cannot reach it over WiFi.
+              the internet cannot reach it over WiFi. {PHONE_ACCESS_HINT}
             </p>
           )}
         </div>

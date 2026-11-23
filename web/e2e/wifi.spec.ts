@@ -67,7 +67,8 @@ test("connects, shows the progress and tells where to open the app", async ({ pa
   await page.getByLabel("Password", { exact: true }).fill("correct-horse");
   await page.getByRole("button", { name: "Connect Zenit to this network" }).click();
   await expect(page.getByTestId("wifi-done")).toHaveText(
-    "Connected as zenit-a1b2.local. Open http://zenit-a1b2.local/ on your phone or computer to control Zenit over WiFi.",
+    "Connected as zenit-a1b2.local. Open http://zenit-a1b2.local/ on your phone or computer to control Zenit over WiFi. " +
+      "If an Android phone cannot open it, allow Chrome to find devices on your network: Settings, Apps, Chrome, Permissions, Nearby devices.",
   );
   expect(improv.frames().map(rpcCommandOf)).toEqual([1]);
   // The password is not kept: not in the form, not in the browser's storage, not in the address

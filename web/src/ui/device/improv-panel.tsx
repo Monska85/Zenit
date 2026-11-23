@@ -3,7 +3,7 @@
 import { Eye, EyeOff, RefreshCw } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { ImprovClient, ImprovError, type ImprovNetwork } from "../../protocol/improv-client";
-import { boardAddress, describeSignal, passwordProblem, ssidProblem } from "../../wifi/model";
+import { boardAddress, describeSignal, passwordProblem, PHONE_ACCESS_HINT, ssidProblem } from "../../wifi/model";
 import { useBoard } from "../board-context";
 import { Banner } from "../components/banner";
 import { Button } from "../components/button";
@@ -194,7 +194,7 @@ export function ImprovPanel() {
         <Banner tone="info">
           <p role="status" data-testid="wifi-done">
             {progress.hostname
-              ? `Connected as ${progress.hostname}.local. Open ${boardAddress(progress.hostname)} on your phone or computer to control Zenit over WiFi.`
+              ? `Connected as ${progress.hostname}.local. Open ${boardAddress(progress.hostname)} on your phone or computer to control Zenit over WiFi. ${PHONE_ACCESS_HINT}`
               : "Connected. Zenit is on your WiFi."}
           </p>
         </Banner>

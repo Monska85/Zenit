@@ -75,3 +75,7 @@ export function describeSignal(rssi: number): string {
 
 /** The address to open on a phone or computer once the board is on WiFi. */
 export const boardAddress = (hostname: string): string => `http://${hostname}.local/`;
+
+/** Recent Android versions keep Chrome off the local network until it has the Nearby devices permission. */
+export const PHONE_ACCESS_HINT =
+  "If an Android phone cannot open it, allow Chrome to find devices on your network: Settings, Apps, Chrome, Permissions, Nearby devices.";
