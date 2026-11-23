@@ -33,10 +33,13 @@ updates:
     directory: "/web"
     schedule:
       interval: weekly
-    # typescript-eslint does not accept TypeScript 7 yet, and the types of Node follow the Node major in "engines"
+    # Temporary caps. Each one names the condition that lifts it: when it is met, remove the cap in the same change
+    # that takes the new major.
     ignore:
+      # Remove when a typescript-eslint release accepts TypeScript 7 (its peer range in 8.73.0: <6.1.0).
       - dependency-name: "typescript"
         versions: [">=7"]
+      # The types follow the Node major in web/package.json "engines" (24): move the cap with it, remove it at Node 26.
       - dependency-name: "@types/node"
         versions: [">=25"]
     groups:

@@ -107,6 +107,7 @@ Before adding or upgrading any dependency:
 3. **Avoid releases published within the last 5 days** to reduce supply chain risk.
 4. **Pin exact versions** and regenerate the lockfile after changing a manifest, then install from the lock.
 5. A new third-party dependency of the firmware or the web app gets its license notice in the same change.
+6. **A major version that cannot be taken yet is capped in `.github/dependabot.yml`,** with a comment that names the condition that lifts it. The caps live only there. When updating dependencies, check each condition and remove the caps that are met in the same change that takes the new major.
 
 ## Privacy
 

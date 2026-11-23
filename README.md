@@ -168,6 +168,8 @@ A web release attaches `zenit-web-X.Y.Z.tar.gz` (the built app, with its third-p
 
 `.github/workflows/ci.yml` runs on every pull request and every push to `main`: `actionlint` checks the workflows, `check` runs `make check` (tests, the firmware and simulator builds, tool tests and the notices), checks that the firmware leaves 64 KiB of its slot free and attaches a simulator trace of every effect, and `web` runs the web gate (types, lint, formatting, unit and conformance tests, the build with its size budget, the end-to-end tests against the simulator and the reference screenshots). On a pull request that changes only documentation (`docs/` and Markdown files), `check` and `web` are skipped and report success.
 
+Dependabot opens weekly pull requests for the GitHub Actions, the Python tools of CI and the web app. A major version the project cannot take yet is capped in [`.github/dependabot.yml`](.github/dependabot.yml), each cap with the condition that lifts it.
+
 ## Contributing
 
 Changes reach `main` through pull requests, merged by squashing: the commit on `main` takes the pull request title, a single-line [Conventional Commit](https://www.conventionalcommits.org/) (`<type>[(scope)][!]: <description>`). The rules for code and documentation are in [`AGENTS.md`](AGENTS.md).
