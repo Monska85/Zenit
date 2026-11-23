@@ -131,9 +131,7 @@ class BridgeTest(unittest.TestCase):
         self.process.stderr.close()
 
     def open(self, **kwargs):
-        socket = connect(self.url, compression=None, **kwargs)
-        self.addCleanup(socket.close)
-        return socket
+        return self.enterContext(connect(self.url, compression=None, **kwargs))
 
     def ask(self, socket, request):
         socket.send(zenit.frame(request).decode("utf-8"))
@@ -208,8 +206,8 @@ class BridgeTest(unittest.TestCase):
 
         for _ in range(50):
             try:
-                connect(self.url, compression=None).close()
-                return
+                with connect(self.url, compression=None):
+                    return
             except InvalidStatus:
                 time.sleep(0.1)
         self.fail("the slot was not freed")

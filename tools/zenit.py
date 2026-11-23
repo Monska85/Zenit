@@ -19,6 +19,7 @@ for --ws.
 """
 
 import argparse
+import contextlib
 import hashlib
 import hmac
 import json
@@ -169,8 +170,12 @@ class WebSocketLink:
             from websockets.sync.client import connect
         except ImportError:
             raise ClientError("--ws needs the websockets package, version 17 (pip install websockets)")
+        # The connection stays open for the client's lifetime, so its context is entered here and left in close()
+        self.context = contextlib.ExitStack()
         try:
-            self.socket = connect(url, origin=origin, compression=None, max_size=MAX_REPLY_LINE, open_timeout=5)
+            self.socket = self.context.enter_context(
+                connect(url, origin=origin, compression=None, max_size=MAX_REPLY_LINE, open_timeout=5)
+            )
         except Exception as error:  # the library raises many types for a refused or failed handshake
             raise ClientError(f"cannot connect to {url}: {error}")
 
@@ -187,7 +192,7 @@ class WebSocketLink:
         return message if isinstance(message, bytes) else message.encode("utf-8")
 
     def close(self):
-        self.socket.close()
+        self.context.close()
 
 
 # ---- What a reply must look like (docs/protocol/protocol-v1.md). A reply that does not match is unusable: the client
