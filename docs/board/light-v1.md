@@ -14,7 +14,7 @@ This document specifies what the board's LED shows: the channels and their PWM, 
 | `white` | 6    | 870 mW               |
 
 - Every channel is PWM, active high, on its own LEDC channel, all on one timer.
-- **PWM:** 1,000 Hz, 14 bits: a duty from 0 to 16,383. Firmware constants, not settings.
+- **PWM:** 1,000 Hz, 14 bits: a duty from 0 to 16,383. Firmware constants, not settings. The board writes a duty of 16,383 as 16,382: Arduino's `ledcWrite` turns the top value into 2^14 for "full on", which the ESP32-C3 outputs much dimmer than 16,382 (measured on the wired unit). The engine, the simulator and the conformance cases keep 16,383.
 - **One color at a time.** The engine lights at most one channel at any moment; the others have duty 0.
 - The full-scale power is the LED power at duty 16,383, from the [electrical values](../reference/hardware.md#electrical-values). Firmware constants.
 

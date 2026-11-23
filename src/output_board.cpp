@@ -16,6 +16,11 @@ namespace
 // GPIO of each channel, by zenit::Channel (docs/reference/hardware.md#pins).
 constexpr uint8_t CHANNEL_PINS[zenit::CHANNEL_COUNT] = {3, 4, 5, 6};
 constexpr uint8_t STATUS_LED_PIN = 8; // on when low
+// Arduino's ledcWrite turns the top duty (16,383 at 14 bits) into 2^14 for "full on", which this chip outputs much
+// dimmer than 16,382: the board never writes more than this, 0.006 % below full (docs/board/light-v1.md#channels).
+constexpr uint16_t BOARD_DUTY_MAX = zenit::DUTY_MAX - 1;
+
+uint32_t board_duty(uint16_t duty) { return duty > BOARD_DUTY_MAX ? BOARD_DUTY_MAX : duty; }
 bool attached[zenit::CHANNEL_COUNT] = {false, false, false, false};
 } // namespace
 
@@ -47,7 +52,7 @@ void write(const zenit::Duties &duties)
       ledcWrite(CHANNEL_PINS[i], 0);
   for (size_t i = 0; i < zenit::CHANNEL_COUNT; i++)
     if (attached[i] && duties.value[i] != 0)
-      ledcWrite(CHANNEL_PINS[i], duties.value[i]);
+      ledcWrite(CHANNEL_PINS[i], board_duty(duties.value[i]));
 }
 
 void status_led(bool on) { digitalWrite(STATUS_LED_PIN, on ? LOW : HIGH); }
