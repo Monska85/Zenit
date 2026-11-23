@@ -47,6 +47,9 @@ constexpr int KEEP_ALIVE_INTERVAL_S = 5;
 constexpr int KEEP_ALIVE_COUNT = 3;
 // A WebSocket connection that has not become the client by then is closed, so idle connections cannot fill the sockets.
 constexpr uint32_t UNCLAIMED_WAIT_MS = zenit::proto::LOGIN_WAIT_MS;
+// A page connection closes once its answer is out, so one still open by then has sent no request (a browser opens
+// connections ahead of time) and is closed, or a few of them would fill the sockets and turn every page away.
+constexpr uint32_t PAGE_IDLE_MS = 5000;
 constexpr uint32_t SWEEP_EVERY_MS = 1000;
 const char BUSY_RESPONSE[] = "HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
 
@@ -352,7 +355,8 @@ esp_err_t on_open(httpd_handle_t handle, int fd)
   return httpd_sess_set_recv_override(handle, fd, recv_scanning);
 }
 
-// The server task: closes the WebSocket connections that did not become the client in time.
+// The server task: closes the WebSocket connections that did not become the client in time, and the page connections
+// that stay idle. It runs between requests, so no answer is cut short.
 void sweep(void *)
 {
   httpd_handle_t handle = server.load();
@@ -360,9 +364,17 @@ void sweep(void *)
     return;
   const TickType_t now = xTaskGetTickCount();
   for (const Session &session : sessions)
-    if (session.fd >= 0 && session.fd != client_fd.load() && now - session.opened >= pdMS_TO_TICKS(UNCLAIMED_WAIT_MS) &&
-        httpd_ws_get_fd_info(handle, session.fd) == HTTPD_WS_CLIENT_WEBSOCKET)
-      httpd_sess_trigger_close(handle, session.fd);
+  {
+    if (session.fd < 0 || session.fd == client_fd.load())
+      continue;
+    const httpd_ws_client_info_t kind = httpd_ws_get_fd_info(handle, session.fd);
+    const uint32_t wait_ms = kind == HTTPD_WS_CLIENT_WEBSOCKET ? UNCLAIMED_WAIT_MS : PAGE_IDLE_MS;
+    if (kind == HTTPD_WS_CLIENT_INVALID || now - session.opened < pdMS_TO_TICKS(wait_ms))
+      continue;
+    // The server skips closing a session that never received a request (its use counter is still 0): mark it used first
+    httpd_sess_update_lru_counter(handle, session.fd);
+    httpd_sess_trigger_close(handle, session.fd);
+  }
 }
 
 // Runs for every session that ends, whoever ended it; closing the socket is left to this function.
