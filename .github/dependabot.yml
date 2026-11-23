@@ -33,6 +33,12 @@ updates:
     directory: "/web"
     schedule:
       interval: weekly
+    # typescript-eslint does not accept TypeScript 7 yet, and the types of Node follow the Node major in "engines"
+    ignore:
+      - dependency-name: "typescript"
+        versions: [">=7"]
+      - dependency-name: "@types/node"
+        versions: [">=25"]
     groups:
       web:
         patterns:
