@@ -9,7 +9,7 @@ name: Release
 # and its update manifest under web/, the firmware parts, the installer manifest (which writes the web image too) and
 # the firmware update manifest under firmware/. Boards on WiFi read both update manifests. A manual run
 # with dry_run builds the same files from the branch it runs on, publishes nothing and keeps them as workflow
-# artifacts for 14 days.
+# artifacts for 14 days. A manual run on main without dry_run publishes the site again from the latest releases.
 #
 # The repository setting "Allow GitHub Actions to create and approve pull requests" must be on, or release-please
 # cannot open the release pull request. release-please acts with the RELEASE_PLEASE_TOKEN secret of the release
@@ -21,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: Build the release files and publish nothing
+        description: Build the release files and publish nothing (off, on main, publishes the site again)
         type: boolean
         default: true
 
@@ -232,9 +232,10 @@ jobs:
   pages:
     needs: [release-please, publish, publish-web]
     if: >-
-      ${{ !cancelled() && github.event.repository.visibility == 'public' &&
-      needs.release-please.result == 'success' && !contains(needs.*.result, 'failure') &&
-      (needs.release-please.outputs.release_created == 'true' || needs.release-please.outputs.web_release_created == 'true') }}
+      ${{ !cancelled() && github.event.repository.visibility == 'public' && !contains(needs.*.result, 'failure') &&
+      ((needs.release-please.result == 'success' &&
+      (needs.release-please.outputs.release_created == 'true' || needs.release-please.outputs.web_release_created == 'true')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.dry_run == false && github.ref == 'refs/heads/main')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
@@ -257,11 +258,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          set -eu
-          # The newest release whose tag matches, by version; drafts and pre-releases do not count
+          set -euo pipefail
+          # The newest release whose tag matches, by version; drafts and pre-releases do not count. The pattern goes
+          # into a jq string, so its backslashes are doubled. A failed lookup stops the job instead of reading as "no
+          # release".
           latest() {
             gh release list --limit 200 --json tagName,isDraft,isPrerelease \
-              --jq ".[] | select(.isDraft | not) | select(.isPrerelease | not) | .tagName | select(test(\"$1\"))" \
+              --jq ".[] | select(.isDraft | not) | select(.isPrerelease | not) | .tagName | select(test(\"${1//\\/\\\\}\"))" \
               | sort -V | tail -n 1
           }
           web_tag=$(latest '^web-v[0-9]+\.[0-9]+\.[0-9]+$')
