@@ -8,7 +8,7 @@ Zenit is a star projector, a Christmas gift for about 10 children, due on 2026-1
 
 ## Hardware summary
 
-ESP32-C3 SuperMini, one CREE RGBW-1225 LED driven by four low-side MOSFET modules with series resistors, powered at 5 V from a USB-C panel socket. Channels on GPIO 3 (red), 4 (green), 5 (blue) and 6 (white), active high. Details, values and limits in [`docs/reference/hardware.md`](../reference/hardware.md).
+ESP32-C3 SuperMini, one CREE RGBW-1225 LED driven by four low-side MOSFET modules with series resistors, powered at 5 V from a USB-C panel socket. Channels on GPIO 3 (red), 4 (green), 5 (blue) and 10 (white), active high. Details, values and limits in [`docs/reference/hardware.md`](../reference/hardware.md).
 
 ## Constraints
 
