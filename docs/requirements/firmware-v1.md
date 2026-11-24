@@ -12,7 +12,7 @@ ESP32-C3 SuperMini, one CREE RGBW-1225 LED driven by four low-side MOSFET module
 
 ## Constraints
 
-- **Heat.** The total LED power never exceeds a limit, estimated at 1 to 1.5 W, with any combination of channels. The limit is one constant that is easy to change until the thermal test is done.
+- **Heat.** The total LED power never exceeds a limit, 1,000 mW, with any combination of channels. The thermal test set it; the limit is one constant.
 - **Pure colors.** Effects prefer red, green, blue or white alone, because mixed colors project fringed stars.
 - **USB and panel power are never connected together.** On USB alone the board runs and can be configured, but the LED stays off.
 - **WiFi.** The SuperMini antenna is weak: the transmit power is reduced.
@@ -44,7 +44,7 @@ ESP32-C3 SuperMini, one CREE RGBW-1225 LED driven by four low-side MOSFET module
 ## Decided with the user (2026-11-21)
 
 1. **Default brightness** of the white on first start: 60 %.
-2. **Power limit:** 1.0 W for now; the final value is decided after the thermal test. The firmware keeps the sum of each channel's duty times its full-scale power (red 0.61 W, green, blue and white 0.87 W) at or below the limit, scaling every channel by the same factor so the color stays the same.
+2. **Power limit:** 1.0 W, kept after the thermal test (closed base, about 23 K/W on the heat sink). The firmware keeps the sum of each channel's duty times its full-scale power (red 0.61 W, green, blue and white 0.87 W) at or below the limit, scaling every channel by the same factor so the color stays the same.
 3. **Effects:** static white (the default), static red, green and blue, and a color change that fades the current color down to a floor (not to zero), switches color and fades up. The light shows both starry skies and Christmas shapes. More effects are proposed below. Each effect is one C++ class in `lib/`, registered in one table.
 4. **Timer:** set in the app, from 1 minute to 6 hours, with a 30 s fade-out at the end.
 5. **Off is not saved:** off from the app, or the end of the timer, keeps the light off until the next power cycle; power-on always lights the saved configuration.

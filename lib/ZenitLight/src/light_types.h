@@ -38,7 +38,7 @@ constexpr uint16_t DUTY_MAX = (1u << PWM_BITS) - 1; // 16383
 // LED power at full duty of each channel, in mW, by Channel (docs/reference/hardware.md#electrical-values).
 constexpr uint32_t FULL_SCALE_MW[CHANNEL_COUNT] = {610, 870, 870, 870};
 
-// The power limit of the whole LED, in mW, until the thermal test fixes it.
+// The power limit of the whole LED, in mW, set by the thermal test (docs/reference/hardware.md).
 constexpr uint32_t POWER_LIMIT_MW = 1000;
 
 // The engine computes the outputs every TICK_MS.
