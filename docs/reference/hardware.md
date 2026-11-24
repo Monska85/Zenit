@@ -43,11 +43,12 @@ GPIO ── TRIG/PWM                                    ESP32 GND ── module 
 | Red channel                         | 3    |
 | Green channel                       | 4    |
 | Blue channel                        | 5    |
-| White channel                       | 6    |
+| White channel                       | 10   |
 | Board blue LED (on when driven low) | 8    |
 
 - Not used for channels: GPIO 2, 8 and 9 (boot strapping, board LED, BOOT button) and GPIO 18 to 21 (USB).
 - GPIO 9 would boot the chip into download mode if held low at power-on.
+- GPIO 6 (MTCK) has a weak pull-up from reset until the firmware sets the pin: on it, the white channel lit for a moment at every power-on. White is on GPIO 10 instead.
 - The pin order follows the board layout so that no wire crosses.
 
 ## Electrical values

@@ -14,7 +14,7 @@ namespace output
 namespace
 {
 // GPIO of each channel, by zenit::Channel (docs/reference/hardware.md#pins).
-constexpr uint8_t CHANNEL_PINS[zenit::CHANNEL_COUNT] = {3, 4, 5, 6};
+constexpr uint8_t CHANNEL_PINS[zenit::CHANNEL_COUNT] = {3, 4, 5, 10};
 constexpr uint8_t STATUS_LED_PIN = 8; // on when low
 // Arduino's ledcWrite turns the top duty (16,383 at 14 bits) into 2^14 for "full on", which this chip outputs much
 // dimmer than 16,382: the board never writes more than this, 0.006 % below full (docs/board/light-v1.md#channels).
