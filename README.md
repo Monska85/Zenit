@@ -162,7 +162,12 @@ Once the repository is public, each file carries a signed build provenance attes
 
 A web release attaches `zenit-web-X.Y.Z.tar.gz` (the built app, with its third-party notices), `zenit-web-X.Y.Z.bin` (the image of the board's `www` partition) and their `SHA256SUMS`. After either release the workflow assembles one GitHub Pages site from the latest of each (`tools/pages_site.py`): the web app at the root, the web image and its `update.json` under `web/`, and the latest firmware under `firmware/` (the ESP Web Tools manifest and the parts the Device page installs, the web image included, which keep the settings, and `update.json`). Boards on WiFi read both `update.json` files to update the firmware and the web app on their own. GitHub Pages on a private repository needs a paid plan, so the deploy job runs only when the repository is public; turn Pages on (Settings, Pages, source GitHub Actions) at that point.
 
-`just release-assets 1.2.3` builds the firmware files in `release/`. The repository needs the setting "Allow GitHub Actions to create and approve pull requests". A release pull request opened with the default token does not start the other workflows; a `RELEASE_PLEASE_TOKEN` secret (a fine-grained token with Contents, Pull requests and Issues read and write) makes the workflow use that token instead.
+`just release-assets 1.2.3` builds the firmware files in `release/`. The repository needs the setting "Allow GitHub Actions to create and approve pull requests". release-please acts with the `RELEASE_PLEASE_TOKEN` secret of the `release` environment, not with the default token, because a release pull request opened with the default token starts no workflows and cannot pass the required checks.
+
+- **The token:** a fine-grained personal access token for this repository only, with Contents, Pull requests and Issues read and write.
+- **The environment:** `release`, which only `main` can use; only the release-please job uses it.
+- **Setting it:** `gh secret set RELEASE_PLEASE_TOKEN --env release`, which asks for the value, or Settings, Environments, `release`, Add environment secret.
+- **When it is missing or expired:** the release workflow stops at its first release-please step and nothing is released. Renew the token on GitHub, set the secret again, then run the release workflow from `main` or push to `main`.
 
 ## Continuous integration
 
