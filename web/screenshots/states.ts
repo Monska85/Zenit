@@ -40,6 +40,11 @@ async function connectedLight(page: Page, fake: FakeBoard = board()): Promise<Mo
 
 const timerLine = (page: Page) => [page.getByTestId("timer-line")];
 
+// The privacy view shows the web app version, a Semantic Versioning 2.0.0 version
+const SCREENSHOT_VERSION_LABEL = "Version X.Y.Z";
+const SEMVER_VERSION =
+  /^Version (?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+
 /** A board from the WiFi and updates milestone, running an older release than the one it found. */
 function networkBoard(patch: (board: FakeBoard) => void = () => undefined): FakeBoard {
   return board((fake) => {
@@ -358,6 +363,12 @@ export const STATES: State[] = [
     reach: async (page) => {
       await page.goto("/#/privacy");
       await expect(page.getByRole("heading", { name: "Privacy", level: 1 })).toBeVisible();
+      // Release pull requests change the real version: check its form, then draw a neutral label
+      const version = page.getByTestId("app-version");
+      await expect(version).toHaveText(SEMVER_VERSION);
+      await version.evaluate((element, label) => {
+        element.textContent = label;
+      }, SCREENSHOT_VERSION_LABEL);
     },
   },
 ];
