@@ -2,4 +2,30 @@
 
 All notable changes to the firmware are listed here, in the format of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Release-please writes a section for each release from the commits on `main`.
 
+## 1.0.0 (2026-11-24)
+
+
+### Added
+
+* **light:** add light engine, firmware, simulator and tests ([72638c6](https://github.com/Monska85/Zenit/commit/72638c60bb11f1e8f11741d5b86ce28f3e000159))
+* **protocol:** add command protocol over usb, simulator transport, cli and releases ([6e188e2](https://github.com/Monska85/Zenit/commit/6e188e2d5a9550e39bd45b00e0c50cac7ecad44e))
+* **web:** add web app to control the light over usb or websocket ([b8ee982](https://github.com/Monska85/Zenit/commit/b8ee9821303a151c44149bc9cc08a656abaa45c8))
+* **web:** move the web app to its own flash partition with automatic updates and repair ([23ec0d2](https://github.com/Monska85/Zenit/commit/23ec0d2bb39f10be762d398e817e13dbbd6372d6))
+* **wifi:** add wifi, improv setup, board-served web app and updates with rollback ([a6d70ef](https://github.com/Monska85/Zenit/commit/a6d70ef2078fec0741e56c39e671bdf269781982))
+
+
+### Fixed
+
+* **firmware:** close page connections that stay idle ([19b615d](https://github.com/Monska85/Zenit/commit/19b615d99fe9cc520d2ac38f5e197d52dd0a9d1a))
+* **firmware:** keep brightness 100 at full instead of a dim output ([4b1d495](https://github.com/Monska85/Zenit/commit/4b1d4954c801670dec165726b966f044a1727159))
+* **firmware:** move the white channel to gpio10 ([#8](https://github.com/Monska85/Zenit/issues/8)) ([bcccf81](https://github.com/Monska85/Zenit/commit/bcccf8161879e44f48af7ebae7ec42584ae1b9bf))
+* **tools:** open the websocket connection as a context manager ([0c85662](https://github.com/Monska85/Zenit/commit/0c8566220e7bc621105c942524f1789dfd80af28))
+* **wifi:** accept websocket clients on their first message, as the server never shows the handshake ([bf776f3](https://github.com/Monska85/Zenit/commit/bf776f3f73b645ebe532d9e5c34b39c434c2aa65))
+* **wifi:** address review findings on scan timeout and signal range ([dc265dd](https://github.com/Monska85/Zenit/commit/dc265dd19e3cb00ad05eb46c5abdbe0cba5b32e2))
+
+
+### Changed
+
+* **firmware:** cut 70 KB with the common certificate bundle, the supermini variant and mbedtls sha-256 ([6bba65e](https://github.com/Monska85/Zenit/commit/6bba65ee128003691f7a05d021158af32063fe0b))
+
 ## [Unreleased]
