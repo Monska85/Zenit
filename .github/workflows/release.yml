@@ -12,9 +12,9 @@ name: Release
 # artifacts for 14 days.
 #
 # The repository setting "Allow GitHub Actions to create and approve pull requests" must be on, or release-please
-# cannot open the release pull request. A pull request opened with the default token does not start the other
-# workflows: to run CI on it, add a RELEASE_PLEASE_TOKEN secret (a fine-grained token with Contents, Pull requests and
-# Issues read and write), which this workflow uses when it exists.
+# cannot open the release pull request. release-please acts with the RELEASE_PLEASE_TOKEN secret of the release
+# environment (a fine-grained token with Contents, Pull requests and Issues read and write), because a pull request
+# opened with the default token does not start the other workflows. See Releases in README.md.
 on:
   push:
     branches: [main]
@@ -53,10 +53,10 @@ jobs:
       cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
+    # release-please acts with the RELEASE_PLEASE_TOKEN secret, not with this job's token. The secret belongs to the
+    # release environment, which only main can use, and no other job uses that environment.
+    environment: release
+    permissions: {}
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
@@ -66,10 +66,20 @@ jobs:
       web_tag_name: ${{ steps.release.outputs['web--tag_name'] }}
       web_version: ${{ steps.release.outputs['web--version'] }}
     steps:
+      # Without the secret the action would fall back to the default token: stop instead, and say what to do.
+      - name: Check that the release-please token is set
+        env:
+          RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_PLEASE_TOKEN" ]; then
+            echo "::error title=RELEASE_PLEASE_TOKEN is missing::Add RELEASE_PLEASE_TOKEN as a secret of the release environment, a fine-grained token for this repository with Contents, Pull requests and Issues read and write. See Releases in README.md."
+            exit 1
+          fi
+
       - id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 

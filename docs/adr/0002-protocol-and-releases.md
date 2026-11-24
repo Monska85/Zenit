@@ -37,5 +37,5 @@ The constraints that shape this decision:
 - The simulator, the bridge and the client are tested against each other, so the web app of the next milestone has a protocol endpoint to develop against and a CLI to set up its end-to-end tests.
 - A new protocol field or command needs its check in `lib/ZenitProto`, its specification text and its conformance cases in the same change.
 - Opening the board's serial port from a program must not clear DTR or RTS before the other, or the board restarts. The web app's Web Serial code has the same duty.
-- Releases need the repository setting "Allow GitHub Actions to create and approve pull requests". A release pull request opened with the default token does not start CI; a `RELEASE_PLEASE_TOKEN` secret fixes that.
+- Releases need the repository setting "Allow GitHub Actions to create and approve pull requests". A release pull request opened with the default token does not start CI, so release-please acts with a `RELEASE_PLEASE_TOKEN` secret of the `release` environment, which only `main` can use.
 - release-please inserts each new release above the `## [Unreleased]` heading of `CHANGELOG.md`, so that heading stays at the bottom and empty; the changelog is written from the commits.
