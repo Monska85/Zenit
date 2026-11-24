@@ -36,7 +36,7 @@ The duty before the power limit is `D = round(16383 * Y)`, computed in IEEE 754 
 
 ## Power limit
 
-`LIMIT_MW` is a firmware constant, 1,000 mW until the thermal test. For the duties `D_c` of the four channels and their full-scale powers `P_c`, the estimated power is `P = sum(D_c * P_c) / 16383`. When `P > LIMIT_MW`, every duty becomes `floor(D_c * LIMIT_MW / P)`, so the color is kept and the power never exceeds the limit. With one channel at a time and a limit of 1,000 mW, the limit does not bind; it is applied to every output anyway, and the tests cover it with lower limits.
+`LIMIT_MW` is a firmware constant, 1,000 mW, set by the thermal test. For the duties `D_c` of the four channels and their full-scale powers `P_c`, the estimated power is `P = sum(D_c * P_c) / 16383`. When `P > LIMIT_MW`, every duty becomes `floor(D_c * LIMIT_MW / P)`, so the color is kept and the power never exceeds the limit. With one channel at a time and a limit of 1,000 mW, the limit does not bind; it is applied to every output anyway, and the tests cover it with lower limits.
 
 ## Levels
 

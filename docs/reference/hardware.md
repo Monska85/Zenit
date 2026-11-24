@@ -62,8 +62,8 @@ GPIO ── TRIG/PWM                                    ESP32 GND ── module 
 ## Thermal limits
 
 - The base is printed in PLA, which softens at 55 to 60 degrees C.
-- Heat sink estimate: 20 to 25 K/W, about +25 degrees C at 1 W on the LED.
-- Normal use is white alone, about 1 W. The firmware limits the total LED power to about 1 to 1.5 W. The thermal test with the heat sink (one hour at full light in the closed base) is not done yet, so the limit is a constant that is easy to change.
+- Heat sink, measured: about 23 K/W. White at 100 % (0.87 W) for one hour in the closed base, with a 21 degrees C room, brought the side of the heat sink near the LED plate to 41 degrees C, 20 K over the room, steady after about 45 minutes.
+- Normal use is white alone, about 0.87 W at 100 %. The firmware limits the total LED power to 1,000 mW, which puts the heat sink about 23 K over the room: about 44 degrees C in a 21 degrees C room and about 53 degrees C in a 30 degrees C room. The PLA touches only the tips of the pins, which run cooler than the measured point.
 - The series resistors reach 60 to 80 degrees C at 0.6 to 0.8 W; they are mounted away from the plastic.
 - The ESP32-C3 runs at about 40 degrees C.
 

@@ -10,7 +10,7 @@ Zenit is a star projector: one CREE RGBW-1225 LED under a perforated dome, four 
 
 Constraints that shape the firmware:
 
-- **Heat.** The base is PLA, which softens at 55 to 60 degrees C. The total LED power must stay below a limit that the thermal test will fix, about 1 to 1.5 W.
+- **Heat.** The base is PLA, which softens at 55 to 60 degrees C. The total LED power must stay below a limit, about 1 to 1.5 W before the thermal test, 1,000 mW after it.
 - **Pure colors.** The four dies sit side by side, so two dies lit together project stars with colored fringes.
 - **One board model, ten units, one firmware,** delivered as Christmas gifts on 2026-12-25, controlled by families from a browser.
 - **LEDC on the ESP32-C3** has 6 channels, a 14-bit maximum duty resolution, and a timer clock that gives at most 4,882 Hz at 14 bits.
@@ -37,7 +37,7 @@ Constraints that shape the firmware:
 5. **Light model.** Specified in [`docs/board/light-v1.md`](../board/light-v1.md):
    - one color at a time, among `white`, `red`, `green` and `blue`: the engine never lights two dies together;
    - brightness is a perceptual level (CIE 1931 lightness) turned into a PWM duty, so fades and low levels look even;
-   - every output passes through a power limit, a firmware constant (1,000 mW until the thermal test) that scales every channel by the same factor; with one die at a time the limit does not bind at 100 %, but it is enforced on every output;
+   - every output passes through a power limit, a firmware constant (1,000 mW, kept after the thermal test) that scales every channel by the same factor; with one die at a time the limit does not bind at 100 %, but it is enforced on every output;
    - the engine computes the outputs every 10 ms from a monotonic clock, so it is deterministic and testable at any time step.
 6. **Effects are classes in one registry.** Each effect is one class in `lib/` that maps the elapsed time and its parameters to a color and a level; one table lists them with their names and parameters. Adding an effect is one file and one table row, plus its specification and conformance cases.
 7. **PWM is a firmware constant:** 1 kHz at 14 bits, the maximum resolution of the ESP32-C3 at that frequency. The earlier MicroPython test reported "16 bits" because its API scales a 16-bit value to the hardware resolution. If the first unit shows hum, camera flicker or visible steps, the fallback is 19.5 kHz at 12 bits.
@@ -54,4 +54,4 @@ Constraints that shape the firmware:
 - The light engine can be tested completely on the host, including fades, effects and the timer, because it depends only on time and settings.
 - Without a file system, adding user-defined content later (custom effects as data, for example) needs a layout change and a USB reflash of every unit. The effect registry keeps that need small.
 - Changing the partition table after the first release erases the settings of every unit.
-- The power limit constant is temporary; the thermal test sets its final value in a later change.
+- The thermal test (2026-11-24, closed base) kept the power limit at 1,000 mW: about 23 K over the room on the heat sink.
