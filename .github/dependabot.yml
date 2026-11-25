@@ -1,4 +1,5 @@
 version: 2
+# Every ecosystem waits 5 days after a release before it offers it (Dependency Safety in AGENTS.md)
 updates:
   # The actions are pinned to commit SHAs with the version in a comment: Dependabot updates both
   - package-ecosystem: github-actions
@@ -7,6 +8,8 @@ updates:
       - "/.github/actions/setup"
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 5
     groups:
       github-actions:
         patterns:
@@ -20,6 +23,8 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 5
     groups:
       python:
         patterns:
@@ -33,6 +38,8 @@ updates:
     directory: "/web"
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 5
     # Majors Dependabot does not offer. A temporary cap names the condition that lifts it: when it is met, remove the cap
     # in the same change that takes the new major. A lasting rule says why it stays.
     ignore:

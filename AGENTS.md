@@ -113,7 +113,13 @@ Before adding or upgrading any dependency:
 
 - The web app keeps user data local. A change that sends any private information (settings, WiFi details, the token, anything the user enters or the board stores) out of the browser or the board, or adds an outside service, request, analytics or third-party script, is called out to the user for approval and updates the privacy documentation in the same change.
 - Never write details of a contributor's machine into repository files: no local paths, device names, operating system names, user names or host names. Use synthetic values (WiFi names, board identifiers, tokens) in tests and documentation.
-- Before every commit, inspect the staged diff for secrets, credentials, tokens, real WiFi names, board identifiers and logs.
+- **Privacy check, mandatory, no exceptions.** It runs before every commit, every push and every text published on GitHub (pull request and issue titles and bodies, comments, release notes), and covers every file the change adds, including images and generated files. Skipping it is never allowed, also for a one-line change or when the user is in a hurry.
+  1. Read the whole staged diff (`git diff --cached`), not only its file list, and the full text to publish.
+  2. Search the added lines: `git diff --cached -U0 | grep -nE '^\+' | grep -nEi '([0-9]{1,3}\.){3}[0-9]{1,3}|([0-9a-f]{2}:){5}[0-9a-f]{2}|zenit-[0-9a-f]{4}|/home/|/Users/|\\Users\\|@[a-z0-9-]+\.[a-z]{2,}|[A-Za-z0-9+/=_-]{32,}'`.
+  3. Every match must be a synthetic value already used by the tests or the documentation (such as `zenit-a1b2`, `zenit-XXXX`, `10.0.0.5`, `192.168.1.20`) or public data (a release URL, a checksum, a pinned SHA). Compare each one with the real values seen during the work: the board names, addresses, WiFi names and tokens printed by the board, the client or the tools. A real one is replaced with a synthetic value before the commit.
+  4. Look at every added or changed image (reference screenshots, previews) in full: no real WiFi name, board name, address, token or personal data.
+  5. Never paste board logs, command output or `status`, `info` or `settings_get` replies into the repository or a GitHub text without replacing their real values.
+  6. Say in the reply to the user that the check ran and what it found. When in doubt, stop and ask before committing.
 
 ## Git Workflow
 
@@ -170,5 +176,5 @@ Single-line Conventional Commits: lowercase description, imperative, no period. 
 - Every protocol or format change updates its specification and conformance cases in the same change.
 - Run builds and tests only through the task runner, one at a time.
 - Verify every dependency version on the live registry; pin exact versions.
-- No secrets, real WiFi names or machine details in the repository.
+- No secrets, real WiFi names or machine details in the repository: run the privacy check before every commit, push and GitHub text.
 - Edit `AGENTS.md`, never `CLAUDE.md`, which is a link to it.
