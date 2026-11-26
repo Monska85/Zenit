@@ -83,6 +83,34 @@ test("says another page holds the board when the board closes the connection wit
   await expect(page.getByRole("heading", { name: "Connect to your Zenit" })).toBeVisible();
 });
 
+test("leaves the login screen for the Connect screen, by the header or the card", async ({ page }) => {
+  const mock = await mockBoard(page, protectedBoard());
+  await connectOverWifi(page);
+  await page.getByRole("button", { name: "Use another Zenit" }).click();
+  await expect(page.getByRole("heading", { name: "Connect to your Zenit" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Connect", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Log in to your Zenit" })).toBeVisible();
+  await page.getByRole("button", { name: "Disconnect" }).click();
+  await expect(page.getByRole("heading", { name: "Connect to your Zenit" })).toBeVisible();
+  expect(mock.connections()).toBe(2);
+});
+
+test("connects again from the Connect screen after the page reconnected by itself", async ({ page }) => {
+  const mock = await mockBoard(page, new FakeBoard().withNetwork());
+  await connectOverWifi(page);
+  await page.getByRole("link", { name: "Device" }).click();
+  await page.getByRole("switch", { name: /Ask for a token to log in/ }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Turn on" }).click();
+  // The board closed the connection and the page opened it again by itself: nothing stays "opening"
+  await expect(page.getByRole("heading", { name: "Log in to your Zenit" })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Use another Zenit" }).click();
+  await expect(page.getByRole("button", { name: "Connect", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Log in to your Zenit" })).toBeVisible();
+  expect(mock.connections()).toBe(3);
+});
+
 test("warns before the login is turned on over WiFi, then asks for the token after reconnecting", async ({ page }) => {
   const mock = await mockBoard(page, new FakeBoard().withNetwork());
   await connectOverWifi(page);
@@ -174,8 +202,10 @@ test("keeps the prompt and the typed text when the board closes the idle connect
   mock.drop(1008); // how the board closes a connection that did not log in
   await expect(page.getByText("Zenit closed the idle connection after 10 seconds.")).toBeVisible();
   await expect(page.getByLabel("Token")).toHaveValue(TOKEN.slice(0, 6));
-  // Nothing reconnects while the prompt sits idle
+  // Nothing reconnects while the prompt sits idle: an automatic try would come within a second
+  const connections = mock.connections();
   await page.waitForTimeout(1500);
+  expect(mock.connections()).toBe(connections);
   await expect(page.getByRole("heading", { name: "Log in to your Zenit" })).toBeVisible();
   await page.getByLabel("Token").fill(TOKEN);
   await page.getByRole("button", { name: "Log in" }).click();

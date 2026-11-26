@@ -5,9 +5,10 @@ import { useBoard } from "../board-context";
 import { Banner } from "../components/banner";
 import { Button } from "../components/button";
 import { Card, CardTitle } from "../components/card";
+import type { Route } from "../route";
 
 /** The token this Zenit asks for before it answers over WiFi. It stays in the page's memory and is never saved. */
-export function LoginView() {
+export function LoginView({ go }: { go: (route: Route) => void }) {
   const { board, session } = useBoard();
   const [token, setToken] = useState("");
   const [working, setWorking] = useState(false);
@@ -68,6 +69,19 @@ export function LoginView() {
             Log in
           </Button>
         </form>
+        {/* A page a Zenit served has only that Zenit to talk to */}
+        {!board.served && (
+          <Button
+            variant="outline"
+            className="mt-3"
+            onClick={() => {
+              void session.disconnect();
+              go("connect");
+            }}
+          >
+            Use another Zenit
+          </Button>
+        )}
       </Card>
     </>
   );

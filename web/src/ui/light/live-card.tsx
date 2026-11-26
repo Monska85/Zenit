@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { own } from "../../lib/own";
 import { COLOR_SWATCHES, colorLabel, effectInfo } from "../../light/model";
 import type { LightStatus } from "../../protocol/types";
 import { Card, CardTitle } from "../components/card";
@@ -20,7 +21,7 @@ export function LiveCard({ light }: { light: LightStatus }) {
               <span
                 aria-hidden
                 className="inline-block size-6 rounded-full border border-black/20"
-                style={{ background: COLOR_SWATCHES[light.color] ?? "var(--muted)" }}
+                style={{ background: own(COLOR_SWATCHES, light.color) ?? "var(--muted)" }}
               />
               {colorLabel(light.color)}
             </>

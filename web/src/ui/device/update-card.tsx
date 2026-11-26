@@ -10,6 +10,7 @@ import {
   describeWebResult,
   describeWebState,
   describeUpdateState,
+  firmwareUpdatesOn,
   formatCheckTime,
   installAction,
   updateBusy,
@@ -84,8 +85,10 @@ export function UpdateCard() {
   const [asking, setAsking] = useState(false);
   const { update, wifi } = board;
   if (!update || board.phase !== "connected") return null;
-  const action = installAction(update, wifi);
+  const action = installAction(update, wifi, board.settings);
   const progressText = describeUpdateState(update);
+  // The progress line is read out when the state changes, not at every percent: the bar carries the number
+  const progressWords = describeUpdateState({ ...update, progress: null });
   const checked = formatCheckTime(update.last_check);
   const found = update.available;
   return (
@@ -94,6 +97,10 @@ export function UpdateCard() {
       {!updatesOn(update) ? (
         <p className="text-base" data-testid="update-off">
           Updates are turned off. Zenit does not look for new firmware. You can turn them on below.
+        </p>
+      ) : !firmwareUpdatesOn(update, board.settings) ? (
+        <p className="text-base" data-testid="update-off">
+          Firmware updates are turned off in the settings below, so Zenit does not look for new firmware.
         </p>
       ) : (
         <>
@@ -112,7 +119,8 @@ export function UpdateCard() {
       {progressText && (
         <div className="mt-3" data-testid="update-progress">
           <p role="status" className="text-base font-medium">
-            {progressText}
+            <span aria-hidden>{progressText}</span>
+            <span className="sr-only">{progressWords}</span>
           </p>
           {update.state === "downloading" && (
             <div
@@ -143,13 +151,13 @@ export function UpdateCard() {
           Version {update.skipped} is set aside and is not installed by itself.
         </p>
       )}
-      {updatesOn(update) && wifi !== null && wifi.state !== "connected" && (
+      {firmwareUpdatesOn(update, board.settings) && wifi !== null && wifi.state !== "connected" && (
         <p className="mt-3 text-base text-muted-foreground">Zenit needs WiFi to look for and install updates.</p>
       )}
       <div className="mt-4 flex flex-wrap gap-2">
         <Button
           variant="outline"
-          disabled={!canCheck(update, wifi, webUpdatesOn(board.settings))}
+          disabled={!canCheck(update, wifi, webUpdatesOn(board.settings), board.settings)}
           onClick={() => void session.checkUpdate()}
         >
           Check now

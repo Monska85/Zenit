@@ -13,13 +13,19 @@ function validPort(port: string): boolean {
   return /^[0-9]{1,5}$/.test(port) && Number(port) >= 1 && Number(port) <= 65535;
 }
 
+/** The sentence for an address outside the person's own network: the app talks to nothing on the internet. */
+export const PRIVATE_ONLY_MESSAGE =
+  "This app connects only to a Zenit on your own network: a name that ends in .local, like zenit-1a2b.local, or a local address, like 192.168.1.20 or 10.0.0.5. For the simulator on this computer, use ws://127.0.0.1:8765.";
+
 /**
- * The WebSocket URL for what was typed. A full `ws://` or `wss://` URL is used as typed; a host name or address, with
- * an optional port, becomes `ws://<host>/ws`.
+ * The WebSocket URL for what was typed. A full `ws://` URL is used as typed; a host name or address, with an optional
+ * port, becomes `ws://<host>/ws`. Only an address on this computer or the local network is accepted (`localHost`), so the
+ * app never talks to a server on the internet; `wss://` is refused, since a Zenit has no encrypted connection.
  */
 export function boardUrl(typed: string): AddressResult {
   const text = typed.trim();
   if (text === "") return { error: "Type the address of your Zenit." };
+  let address: string;
   if (/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(text)) {
     let url: URL;
     try {
@@ -27,34 +33,63 @@ export function boardUrl(typed: string): AddressResult {
     } catch {
       return { error: "That is not a valid address." };
     }
-    if (url.protocol !== "ws:" && url.protocol !== "wss:")
-      return { error: "The address must start with ws:// or wss://." };
+    if (url.protocol !== "ws:") return { error: "The address must start with ws://." };
     if (url.username || url.password || url.hostname === "") return { error: "That is not a valid address." };
-    return { url: text };
+    address = text;
+  } else {
+    const split = /^(\[[^\]]*\]|[^:]*)(?::(.*))?$/.exec(text);
+    const host = split?.[1] ?? "";
+    const port = split?.[2];
+    if (!(HOST.test(host) || IPV6.test(host)) || (port !== undefined && !validPort(port))) {
+      return { error: "That does not look like an address. Try zenit-1a2b.local or 192.168.1.20." };
+    }
+    address = `ws://${host}${port === undefined ? "" : `:${port}`}/ws`;
   }
-  const split = /^(\[[^\]]*\]|[^:]*)(?::(.*))?$/.exec(text);
-  const host = split?.[1] ?? "";
-  const port = split?.[2];
-  if (!(HOST.test(host) || IPV6.test(host)) || (port !== undefined && !validPort(port))) {
-    return { error: "That does not look like an address. Try zenit-1a2b.local or 192.168.1.20." };
+  // The host as the browser will use it: other spellings of an IPv4 address (0x7f.1, 3232235796) are normalized first
+  let hostname: string;
+  try {
+    hostname = new URL(address).hostname;
+  } catch {
+    return { error: "That is not a valid address." };
   }
-  return { url: `ws://${host}${port === undefined ? "" : `:${port}`}/ws` };
+  if (!localHost(hostname)) return { error: PRIVATE_ONLY_MESSAGE };
+  return { url: address };
 }
 
 const SAME_COMPUTER = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
-const PRIVATE_IPV4 = /^(?:10|127|172\.(?:1[6-9]|2[0-9]|3[01])|192\.168)\./;
 const IPV4 = /^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$/;
+const LOCAL_NAME = /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.local\.?$/;
+
+/** A private, loopback or link-local IPv4 address: 10/8, 172.16/12, 192.168/16, 127/8, 169.254/16. */
+function privateIpv4(host: string): boolean {
+  if (!IPV4.test(host)) return false;
+  const [a, b] = host.split(".").map(Number) as [number, number];
+  return (
+    a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254)
+  );
+}
+
+/** The loopback, unique local or link-local IPv6 address in brackets: ::1, fc00::/7, fe80::/10. */
+function privateIpv6(host: string): boolean {
+  const inner = /^\[([0-9a-f:.]+)\]$/.exec(host)?.[1];
+  if (inner === undefined) return false;
+  if (inner === "::1") return true;
+  if (inner.startsWith(":")) return false;
+  const first = parseInt(inner.slice(0, inner.indexOf(":")), 16);
+  return (first & 0xfe00) === 0xfc00 || (first & 0xffc0) === 0xfe80;
+}
 
 /**
- * Whether a host is on this computer or the local network as Chrome's Local Network Access sees it from the address
- * alone: the same computer, a `.local` name, or a private or loopback IPv4 address.
+ * Whether a host is on this computer or the local network: `localhost`, a `.local` name, a private, loopback or
+ * link-local IPv4 address (10/8, 172.16/12, 192.168/16, 127/8, 169.254/16) or IPv6 address (::1, fc00::/7, fe80::/10).
+ * These are the only addresses the app connects to, and the ones Chrome's Local Network Access treats as local by the
+ * address alone.
  */
 export function localHost(hostname: string): boolean {
   const host = hostname.toLowerCase();
-  if (SAME_COMPUTER.has(host) || SAME_COMPUTER.has(`[${host}]`)) return true;
-  if (/\.local\.?$/.test(host)) return true;
-  return IPV4.test(host) && PRIVATE_IPV4.test(host);
+  if (host === "localhost" || LOCAL_NAME.test(host)) return true;
+  return privateIpv4(host) || privateIpv6(host) || privateIpv6(`[${host}]`);
 }
 
 /** The first Chromium release whose Local Network Access covers WebSockets (docs/web/web-app-v1.md#websocket). */

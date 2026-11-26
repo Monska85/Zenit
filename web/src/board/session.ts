@@ -141,6 +141,8 @@ export class BoardSession {
   private refusedTokens = 0;
   /** Bumped by every disconnection and every new automatic reconnection, so an older one stops. */
   private retryRun = 0;
+  /** An `open()` is running: `state.opening` shows it, and no second one may start. */
+  private openRunning = false;
   private readonly retryMs: number;
   private readonly retryAttempts: number;
   private readonly reload: () => void;
@@ -207,7 +209,7 @@ export class BoardSession {
     else {
       await this.teardown();
       this.generation++;
-      this.update(this.blank({ phase: "connecting", kind: transport.kind, label }));
+      this.update(this.blank({ phase: "connecting", kind: transport.kind, label, opening: this.openRunning }));
     }
     const generation = this.generation;
     const client = new Client(transport);
@@ -224,7 +226,7 @@ export class BoardSession {
       if (generation !== this.generation) return;
       this.client = null;
       await client.close().catch(() => undefined);
-      this.update(silent ? { opening: false } : this.blank({ error: describeError(error) }));
+      if (!silent) this.update(this.blank({ opening: this.openRunning, error: describeError(error) }));
     }
   }
 
@@ -232,11 +234,11 @@ export class BoardSession {
    * The rest of the handshake: the settings and the status. A board that wants a login first answers `unauthorized`: the
    * stored token is tried, and when there is none, or it is refused, the phase is `login` until `submitToken` succeeds.
    */
-  private async complete(client: Client, info: BoardInfo, generation: number): Promise<void> {
+  private async complete(client: Client, info: BoardInfo, generation: number, retried = false): Promise<void> {
     try {
       const settings = toSettings(await client.call("settings_get"));
       const problem = settingsProblem(settings, info);
-      if (problem) throw new ClientError("protocol", problem);
+      if (problem) throw new ClientError("invalid_reply", problem);
       const status = toStatus(await client.call("status"));
       if (generation !== this.generation) return;
       if (settings.token !== undefined) this.token = settings.token;
@@ -253,8 +255,9 @@ export class BoardSession {
     } catch (error) {
       if (generation !== this.generation) return;
       if (!isUnauthorized(error) || client.kind !== "websocket") throw error;
-      if (this.token !== null && (await this.tryLogin(client, this.token))) {
-        if (generation === this.generation) await this.complete(client, info, generation);
+      // A board that accepts the login and still refuses gets one more try, not a loop
+      if (!retried && this.token !== null && (await this.tryLogin(client, this.token))) {
+        if (generation === this.generation) await this.complete(client, info, generation, true);
         return;
       }
       if (generation !== this.generation) return;
@@ -282,21 +285,24 @@ export class BoardSession {
    * cancelled open changes nothing but the banner: a live connection, and the board's one slot it holds, stay as they are.
    */
   async open(opener: Opener, label: string, silent = false): Promise<void> {
-    if (this.state.opening || this.state.phase === "connecting") return;
+    if (this.openRunning || this.state.phase === "connecting") return;
+    this.openRunning = true;
     this.update({ opening: true });
-    let transport: LineTransport | null;
     try {
-      transport = await opener(!silent);
-    } catch (error) {
-      const message = error instanceof OpenFailed ? error.message : describeError(error);
-      this.update(silent ? { opening: false } : { opening: false, error: message });
-      return;
+      let transport: LineTransport | null;
+      try {
+        transport = await opener(!silent);
+      } catch (error) {
+        const message = error instanceof OpenFailed ? error.message : describeError(error);
+        if (!silent) this.update({ error: message });
+        return;
+      }
+      if (transport !== null) await this.connect(transport, label, { opener, label }, silent);
+    } finally {
+      // Whatever path the open took, silent or not, it is over: Connect and Reconnect work again
+      this.openRunning = false;
+      if (this.state.opening) this.update({ opening: false });
     }
-    if (transport === null) {
-      this.update({ opening: false });
-      return;
-    }
-    await this.connect(transport, label, { opener, label }, silent);
   }
 
   /** Opens the connection that was lost the same way: the same address, or the same port when it is still there. */
@@ -322,7 +328,7 @@ export class BoardSession {
     let released = true;
     if (client) await client.close().catch(() => (released = false));
     if (this.state.phase !== "disconnected" || this.state.auto !== null)
-      this.update(this.blank({ opening: this.state.opening }));
+      this.update(this.blank({ opening: this.openRunning }));
     return released;
   }
 
@@ -336,7 +342,7 @@ export class BoardSession {
       try {
         const settings = toSettings(await client.call("settings_set", patch));
         const problem = settingsProblem(settings, info);
-        if (problem) throw new ClientError("protocol", problem);
+        if (problem) throw new ClientError("invalid_reply", problem);
         // The board closes a WiFi connection after the reply that turns network login on: it opens again by itself
         if (patch.network_login === true && settings.network_login === true && client.kind === "websocket")
           this.expectDrop = true;
@@ -361,7 +367,7 @@ export class BoardSession {
     await this.run(async (client, info) => {
       const settings = toSettings(await client.call("settings_reset"));
       const problem = settingsProblem(settings, info);
-      if (problem) throw new ClientError("protocol", problem);
+      if (problem) throw new ClientError("invalid_reply", problem);
       this.show(client, { settings, ...statusPatch(toStatus(await client.call("status"))), error: null });
     });
   }
@@ -385,7 +391,8 @@ export class BoardSession {
   async regenerateToken(): Promise<void> {
     await this.run(async (client) => {
       const token = (await client.call("token_regenerate"))["token"];
-      if (typeof token !== "string" || !isToken(token)) throw new ClientError("protocol", "the token is not valid");
+      if (typeof token !== "string" || !isToken(token))
+        throw new ClientError("invalid_reply", "the token is not valid");
       this.token = token;
       const settings = this.state.settings;
       this.show(client, { settings: settings ? { ...settings, token } : settings, error: null });
@@ -554,7 +561,9 @@ export class BoardSession {
     this.stopPolling();
     this.client = null;
     void client.close().catch(() => undefined);
-    const restarting = RESTARTING_STATES.includes(this.state.update?.state ?? "");
+    // A web app install does not restart the board: only a firmware one does
+    const update = this.state.update;
+    const restarting = update !== null && update.target !== "web" && RESTARTING_STATES.includes(update.state);
     const drop = this.expectDrop;
     this.expectDrop = false;
     const auto = restarting ? "restarting" : drop ? "reconnecting" : null;

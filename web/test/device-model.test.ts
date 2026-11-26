@@ -46,6 +46,8 @@ import { toInfo, toSettings } from "../src/protocol/types";
 import type { JsonObject } from "../src/protocol/strict-json";
 import { BOARD_SETTINGS, DEFAULT_SETTINGS, INFO, UPDATE_STATUS, WIFI_STATUS } from "./helpers";
 
+const SETTINGS = toSettings({ settings: { ...DEFAULT_SETTINGS, ...BOARD_SETTINGS } } as unknown as JsonObject);
+
 describe("the limits of the board settings", () => {
   it("equal the protocol's table", () => {
     expect(BOARD_LIMITS).toEqual({
@@ -279,6 +281,28 @@ describe("the update sentences", () => {
     expect(installAction(update({ ...found, last_result: "unreachable" }), wifi)).toBe("none");
     expect(installAction(update(found), { ...wifi, state: "connecting" })).toBe("none");
     expect(installAction(update(found), null)).toBe("install");
+  });
+
+  it("offers no firmware install while the firmware switch is off", () => {
+    const found = { available: "1.2.0", last_result: "available" };
+    const settings = (update_firmware: boolean) => ({ ...SETTINGS, update_firmware });
+    expect(installAction(update(found), WIFI_STATUS, settings(true))).toBe("install");
+    expect(installAction(update(found), WIFI_STATUS, settings(false))).toBe("none");
+    expect(
+      installAction(update({ ...found, last_result: "skipped", skipped: "1.2.0" }), WIFI_STATUS, settings(false)),
+    ).toBe("none");
+  });
+
+  it("allows a check with the firmware switch off only when the app's updates are on", () => {
+    const settings = { ...SETTINGS, update_firmware: false };
+    expect(canCheck(update(), WIFI_STATUS, false, settings)).toBe(false);
+    expect(canCheck(update(), WIFI_STATUS, true, settings)).toBe(true);
+    expect(canCheck(update(), WIFI_STATUS, false, { ...SETTINGS, update_firmware: true })).toBe(true);
+  });
+
+  it("names a result or a state that is a member of every object, instead of breaking", () => {
+    expect(describeResult("constructor")).toContain("(constructor)");
+    expect(describeWebState({ ...UPDATE_STATUS.web, state: "toString" } as WebAppStatus)).toContain("(toString)");
   });
 
   it("allows a check only when updates are on, the board is idle and it is connected", () => {

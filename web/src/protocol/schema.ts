@@ -3,6 +3,7 @@
 // What a reply must look like (docs/protocol/protocol-v1.md): the same table as `REPLIES` in tools/zenit.py. A reply
 // that does not match is unusable and the client asks again. Unknown fields are ignored; every known one has its type.
 
+import { own } from "../lib/own";
 import { JsonFloat, type JsonObject } from "./strict-json";
 
 export type Check = (value: unknown) => boolean;
@@ -216,7 +217,7 @@ export const isSeq: Check = (value) => isInt(value) && (value as number) >= 0 &&
 /** Whether `ok`, the error fields and the command's known fields of a reply have their types. */
 export function validBody(command: string, reply: JsonObject): boolean {
   if (reply["ok"] === false) return isText(reply["error"]) && isText(reply["message"]);
-  return reply["ok"] === true && (REPLIES[command] ?? (() => true))(reply);
+  return reply["ok"] === true && (own(REPLIES, command) ?? (() => true))(reply);
 }
 
 /** The reply to a line the board could not read: no `seq`, an error `bad_frame`. */

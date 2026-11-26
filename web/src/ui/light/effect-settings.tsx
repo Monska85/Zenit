@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { own } from "../../lib/own";
 import { Check } from "lucide-react";
+import { useId, useState } from "react";
 import {
   COLOR_SET_COLORS,
   COLOR_SWATCHES,
@@ -28,7 +30,7 @@ function Swatch({ color }: { color: string }) {
     <span
       aria-hidden
       className="inline-block size-6 shrink-0 rounded-full border border-black/20"
-      style={{ background: COLOR_SWATCHES[color] ?? "var(--muted)" }}
+      style={{ background: own(COLOR_SWATCHES, color) ?? "var(--muted)" }}
     />
   );
 }
@@ -55,17 +57,28 @@ function ColorChoice({ info, settings, commit }: { info: BoardInfo; settings: Se
   );
 }
 
+/** Why a color box cannot change now, or null: the last colors cannot be unticked, nor a color added past the limit. */
+export function colorsLimit(colors: readonly string[], color: string): string | null {
+  if (colors.includes(color))
+    return colors.length <= LIMITS.colors.min ? `Keep at least ${LIMITS.colors.min} colors.` : null;
+  return colors.length >= LIMITS.colors.max ? `Pick at most ${LIMITS.colors.max} colors.` : null;
+}
+
 /** Two to four colors for Color change, in the order they are picked. */
 function ColorsChoice({ info, settings, commit }: { info: BoardInfo; settings: Settings; commit: Commit }) {
   const { colors } = settings;
+  const [refused, setRefused] = useState<string | null>(null);
+  const hintId = useId();
   const toggle = (color: string): void => {
-    const next = colors.includes(color) ? colors.filter((name) => name !== color) : [...colors, color];
-    if (next.length >= LIMITS.colors.min && next.length <= LIMITS.colors.max) void commit({ colors: next });
+    const limit = colorsLimit(colors, color);
+    setRefused(limit);
+    if (limit !== null) return;
+    void commit({ colors: colors.includes(color) ? colors.filter((name) => name !== color) : [...colors, color] });
   };
   return (
-    <fieldset className="min-w-0">
+    <fieldset className="min-w-0" aria-describedby={hintId}>
       <legend className="mb-1 text-base font-medium">Colors</legend>
-      <p className="mb-2 text-sm text-muted-foreground">
+      <p id={hintId} className="mb-2 text-sm text-muted-foreground">
         Pick {LIMITS.colors.min} to {LIMITS.colors.max}. They show in the order you pick them.
       </p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -78,6 +91,7 @@ function ColorsChoice({ info, settings, commit }: { info: BoardInfo; settings: S
                 type="checkbox"
                 checked={chosen}
                 onChange={() => toggle(color)}
+                aria-disabled={colorsLimit(colors, color) !== null || undefined}
                 aria-label={chosen ? `${colorLabel(color)}, number ${position + 1}` : colorLabel(color)}
                 className="peer sr-only"
               />
@@ -102,6 +116,7 @@ function ColorsChoice({ info, settings, commit }: { info: BoardInfo; settings: S
           );
         })}
       </div>
+      <div role="status">{refused && <p className="mt-2 text-sm">{refused}</p>}</div>
     </fieldset>
   );
 }
@@ -116,7 +131,7 @@ function PaletteChoice({ info, settings, commit }: { info: BoardInfo; settings: 
       options={info.color_sets.map((set) => ({
         value: set,
         label: colorSetLabel(set),
-        hint: COLOR_SET_COLORS[set]?.map(colorLabel).join(", "),
+        hint: own(COLOR_SET_COLORS, set)?.map(colorLabel).join(", "),
       }))}
     />
   );

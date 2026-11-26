@@ -76,6 +76,21 @@ describe("ImprovClient", () => {
     expect(await client.scan()).toHaveLength(MAX_NETWORKS);
   });
 
+  it.each([
+    ["a damaged request", ImprovErrorCode.InvalidRpc, "invalid_rpc"],
+    ["an unknown request", ImprovErrorCode.UnknownRpc, "unknown_rpc"],
+  ])("fails a scan at once when the board answers %s", async (_, code, failure) => {
+    const { link, client, play } = setup();
+    link.respond = () => play(error(code));
+    await expect(client.scan()).rejects.toMatchObject({ failure });
+  });
+
+  it("goes on scanning after an error frame that says nothing is wrong", async () => {
+    const { link, client, play } = setup();
+    link.respond = () => play(error(ImprovErrorCode.None), result(4, ["Home", "-60", "YES"]), result(4, []));
+    await expect(client.scan()).resolves.toEqual([{ ssid: "Home", rssi: -60, secure: true }]);
+  });
+
   it("times out a scan that never ends", async () => {
     const { client } = setup({ scan: 1000 });
     const scan = client.scan();

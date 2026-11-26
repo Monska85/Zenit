@@ -15,7 +15,17 @@ async function dragTo(page: Page, name: string, fraction: number): Promise<void>
   await page.mouse.up();
 }
 
+/** The `settings_set` lines the page sent to the simulator in this test. */
+let saves: string[] = [];
+
 test.beforeEach(async ({ page, simulator }) => {
+  saves = [];
+  page.on("websocket", (socket) =>
+    socket.on("framesent", (frame) => {
+      if (typeof frame.payload === "string" && frame.payload.includes('"cmd":"settings_set"'))
+        saves.push(frame.payload);
+    }),
+  );
   await connectByAddress(page, simulator.url);
 });
 
@@ -58,8 +68,10 @@ test("sends a slider moved with the keyboard after a pause", async ({ page }) =>
   await page.keyboard.press("ArrowLeft");
   await page.keyboard.press("ArrowLeft");
   await expect(slider).toHaveAttribute("aria-valuenow", "57");
-  // nothing is sent while the keys are still being pressed: the pause after the last one sends it
-  await page.waitForTimeout(900);
+  // nothing is sent while the keys are still being pressed: the pause after the last one sends it, once
+  expect(saves).toHaveLength(0);
+  await expect.poll(() => saves.length).toBe(1);
+  expect(saves[0]).toContain('"brightness":57');
   await page.getByRole("button", { name: "Disconnect" }).click();
   await page.getByRole("button", { name: "Connect", exact: true }).click();
   await expect(page.getByRole("slider", { name: "Brightness" })).toHaveAttribute("aria-valuenow", "57");

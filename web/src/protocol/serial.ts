@@ -12,6 +12,8 @@ export interface SerialPortLike {
   close(): Promise<void>;
   readonly readable: ReadableStream<Uint8Array> | null;
   readonly writable: WritableStream<Uint8Array> | null;
+  /** The USB vendor of the port; missing on a stand-in that does not know it. */
+  getInfo?(): { usbVendorId?: number };
 }
 
 export const BAUD_RATE = 115200;
@@ -19,26 +21,44 @@ export const BAUD_RATE = 115200;
 export const BUFFER_SIZE = 8192;
 /** Espressif's USB vendor id: the ESP32-C3's own USB serial port. */
 export const ESPRESSIF_VENDOR_ID = 0x303a;
-/** Bytes without a newline after which the reader gives up on them: the bytes are not a line of ours. */
-const MAX_PENDING = 2 * MAX_REPLY_LINE;
-
-/** Cuts a byte stream into lines at `\n`. */
+/**
+ * Cuts a byte stream into lines at `\n`. A line longer than MAX_REPLY_LINE is not a reply the client accepts: it is
+ * thrown away, and once the unfinished part passes the limit the reader drops what follows up to the next newline, so it
+ * never keeps more than the limit.
+ */
 export class LineSplitter {
   private pending: Uint8Array = new Uint8Array(0);
+  /** The unfinished line is over the limit: the bytes up to the next newline are thrown away. */
+  private skipping = false;
 
   /** The complete lines in `chunk` and what came before it, without their newlines. */
   push(chunk: Uint8Array): Uint8Array[] {
-    const joined = new Uint8Array(this.pending.length + chunk.length);
-    joined.set(this.pending);
-    joined.set(chunk, this.pending.length);
     const lines: Uint8Array[] = [];
     let start = 0;
-    for (let at = joined.indexOf(0x0a, start); at >= 0; at = joined.indexOf(0x0a, start)) {
-      lines.push(joined.slice(start, at));
+    for (let at = chunk.indexOf(0x0a); at >= 0; at = chunk.indexOf(0x0a, start)) {
+      const length = this.pending.length + at - start;
+      if (!this.skipping && length <= MAX_REPLY_LINE) {
+        const line = new Uint8Array(length);
+        line.set(this.pending);
+        line.set(chunk.subarray(start, at), this.pending.length);
+        lines.push(line);
+      }
+      this.pending = new Uint8Array(0);
+      this.skipping = false;
       start = at + 1;
     }
-    this.pending = joined.slice(start);
-    if (this.pending.length > MAX_PENDING) this.pending = new Uint8Array(0);
+    if (!this.skipping) {
+      const rest = chunk.subarray(start);
+      if (this.pending.length + rest.length > MAX_REPLY_LINE) {
+        this.pending = new Uint8Array(0);
+        this.skipping = true;
+      } else if (rest.length > 0) {
+        const joined = new Uint8Array(this.pending.length + rest.length);
+        joined.set(this.pending);
+        joined.set(rest, this.pending.length);
+        this.pending = joined;
+      }
+    }
     return lines;
   }
 }

@@ -10,6 +10,7 @@ import {
   mixedContentBlocked,
   PERMISSION_CONNECT_TIMEOUT_MS,
   permissionNameFor,
+  PRIVATE_ONLY_MESSAGE,
 } from "../src/protocol/address";
 import { CONNECT_TIMEOUT_MS } from "../src/protocol/websocket";
 
@@ -22,7 +23,11 @@ describe("boardUrl", () => {
     ["[::1]", "ws://[::1]/ws"],
     ["[fe80::1]:81", "ws://[fe80::1]:81/ws"],
     ["ws://127.0.0.1:8765", "ws://127.0.0.1:8765"],
-    ["wss://zenit.example/ws", "wss://zenit.example/ws"],
+    ["[fd12:3456::1]:8080", "ws://[fd12:3456::1]:8080/ws"],
+    ["169.254.10.20", "ws://169.254.10.20/ws"],
+    ["172.31.0.1", "ws://172.31.0.1/ws"],
+    ["ws://127.0.0.2:9000/ws", "ws://127.0.0.2:9000/ws"],
+    ["ws://[::1]:8765", "ws://[::1]:8765"],
     ["ws://zenit-1a2b.local/ws", "ws://zenit-1a2b.local/ws"],
   ])("turns %s into %s", (typed, url) => {
     expect(boardUrl(typed)).toEqual({ url });
@@ -51,6 +56,49 @@ describe("boardUrl", () => {
     expect(result).toHaveProperty("error");
     expect((result as { error: string }).error).toMatch(/\.$/);
   });
+
+  it("refuses an encrypted address: a Zenit has none", () => {
+    expect(boardUrl("wss://zenit-1a2b.local/ws")).toEqual({ error: "The address must start with ws://." });
+  });
+
+  it.each([
+    "8.8.8.8",
+    "203.0.113.5:8765",
+    "172.32.0.1",
+    "172.15.255.255",
+    "192.169.1.1",
+    "169.255.0.1",
+    "11.0.0.1",
+    "ws://134744072/ws",
+    "ws://0x08080808/ws",
+    "zenit",
+    "zenit-1a2b",
+    "zenit.lan",
+    "zenit.example.com",
+    "local",
+    "localhost.example.com",
+    "zenit.local.example.com",
+    "[2001:db8::1]",
+    "[::ffff:192.168.1.20]",
+    "[fbff::1]",
+    "[fec0::1]",
+    "ws://zenit.example/ws",
+  ])("refuses %j: it is not on this computer or the local network", (typed) => {
+    expect(boardUrl(typed)).toEqual({ error: PRIVATE_ONLY_MESSAGE });
+  });
+
+  it("reads other spellings of a local IPv4 address the way the browser does", () => {
+    expect(boardUrl("ws://0x7f.1:8765/ws")).toEqual({ url: "ws://0x7f.1:8765/ws" });
+    // 192.168.1.20 and 8.8.8.8 written as one number
+    expect(boardUrl("ws://3232235796/ws")).toEqual({ url: "ws://3232235796/ws" });
+    expect(boardUrl("134744072")).toEqual({ error: PRIVATE_ONLY_MESSAGE });
+  });
+
+  it("names the forms it accepts in its sentence", () => {
+    expect(PRIVATE_ONLY_MESSAGE).toContain(".local");
+    expect(PRIVATE_ONLY_MESSAGE).toContain("192.168.1.20");
+    expect(PRIVATE_ONLY_MESSAGE).toContain("ws://127.0.0.1:8765");
+  });
 });
 
 describe("localHost", () => {
@@ -65,6 +113,13 @@ describe("localHost", () => {
     "172.16.0.1",
     "172.31.255.254",
     "192.168.1.20",
+    "169.254.10.1",
+    "[fe80::1]",
+    "fe80::1",
+    "[febf::1]",
+    "[fc00::1]",
+    "[fd12:3456::1]",
+    "::1",
   ])("%s is on the local network", (host) => expect(localHost(host)).toBe(true));
 
   it.each([
@@ -80,8 +135,13 @@ describe("localHost", () => {
     "11.0.0.1",
     "192.168.1",
     "192.168.1.256",
-    "169.254.10.1",
-    "[fe80::1]",
+    "169.255.10.1",
+    "[fec0::1]",
+    "[fe7f::1]",
+    "[fbff::1]",
+    "[2001:db8::1]",
+    "[::]",
+    "[::ffff:c0a8:114]",
   ])("%s is not", (host) => expect(localHost(host)).toBe(false));
 });
 
@@ -112,7 +172,6 @@ describe("mixedContentBlocked", () => {
   });
 
   it("lets an encrypted socket through, and any socket from a page that is not secure", () => {
-    expect(mixedContentBlocked("https:", "wss://zenit.example/ws", false)).toBe(false);
     expect(mixedContentBlocked("http:", "ws://192.168.1.20/ws", false)).toBe(false);
     expect(mixedContentBlocked("http:", "ws://zenit/ws", true)).toBe(false);
   });
@@ -175,7 +234,6 @@ describe("connectTimeoutFor", () => {
   it("keeps the normal window once the permission is answered, and everywhere else", () => {
     expect(connectTimeoutFor("https:", SITE, "ws://192.168.1.20/ws", "granted")).toBe(CONNECT_TIMEOUT_MS);
     expect(connectTimeoutFor("https:", SITE, "ws://192.168.1.20/ws", "denied")).toBe(CONNECT_TIMEOUT_MS);
-    expect(connectTimeoutFor("https:", SITE, "wss://zenit.example/ws", "prompt")).toBe(CONNECT_TIMEOUT_MS);
     expect(connectTimeoutFor("https:", SITE, "ws://zenit.example/ws", "prompt")).toBe(CONNECT_TIMEOUT_MS);
     expect(connectTimeoutFor("https:", "localhost", "ws://192.168.1.20/ws", "prompt")).toBe(CONNECT_TIMEOUT_MS);
     expect(connectTimeoutFor("http:", "zenit-1a2b.local", "ws://zenit-1a2b.local/ws", "prompt")).toBe(

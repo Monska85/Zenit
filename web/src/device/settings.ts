@@ -3,6 +3,7 @@
 // The board settings as the app shows and checks them (docs/protocol/protocol-v1.md#settings_get-settings_set). The
 // limits equal the protocol's; a change to one changes both.
 
+import { own } from "../lib/own";
 import type { BoardSettings } from "../protocol/types";
 
 export const BOARD_LIMITS = {
@@ -125,7 +126,7 @@ export function choiceOptions(
   labels: Record<string, string>,
   current: string | undefined,
 ): Array<{ value: string; label: string }> {
-  const options = values.map((value) => ({ value, label: labels[value] ?? value }));
+  const options = values.map((value) => ({ value, label: own(labels, value) ?? value }));
   if (current !== undefined && !values.includes(current))
     options.push({ value: current, label: `${current} (new in this Zenit)` });
   return options;

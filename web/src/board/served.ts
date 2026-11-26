@@ -4,6 +4,7 @@
 // `/board.json` and, when the answer is a Zenit's, connects to that board's WebSocket by itself. The only request is to
 // the page's own origin.
 
+import { parseStrictObject } from "../protocol/strict-json";
 import { openWebSocket } from "../protocol/websocket";
 import { OpenFailed, type BoardSession, type Opener } from "./session";
 
@@ -17,21 +18,48 @@ const HOSTNAME = /^zenit-[0-9a-f]{4}$/;
 const MAX_BODY = 256;
 export const PROBE_TIMEOUT_MS = 2000;
 
-/** The board in `/board.json`, or null unless it is exactly `{"zenit":true,"hostname":"zenit-xxxx","ws":"/ws"}`. */
-export function readBoardJson(text: string): ServedBoard | null {
-  if (text.length > MAX_BODY) return null;
-  let value: unknown;
+/**
+ * The board in the bytes of `/board.json`, or null unless they are strict JSON of at most 256 bytes and exactly
+ * `{"zenit":true,"hostname":"zenit-xxxx","ws":"/ws"}`.
+ */
+export function readBoardJson(body: Uint8Array): ServedBoard | null {
+  if (body.length > MAX_BODY) return null;
+  let value: Record<string, unknown>;
   try {
-    value = JSON.parse(text);
+    value = parseStrictObject(body);
   } catch {
     return null;
   }
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
   const keys = Object.keys(value).sort();
   if (keys.join(",") !== "hostname,ws,zenit") return null;
-  const { zenit, hostname, ws } = value as Record<string, unknown>;
+  const { zenit, hostname, ws } = value;
   if (zenit !== true || ws !== "/ws" || typeof hostname !== "string" || !HOSTNAME.test(hostname)) return null;
   return { hostname };
+}
+
+/** The bytes of `stream`, or null once it passes `limit`: a long answer is not read to its end. */
+async function readAtMost(stream: ReadableStream<Uint8Array>, limit: number): Promise<Uint8Array | null> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > limit) return null;
+      chunks.push(value);
+    }
+  } finally {
+    void reader.cancel().catch(() => undefined);
+  }
+  const bytes = new Uint8Array(size);
+  let at = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, at);
+    at += chunk.length;
+  }
+  return bytes;
 }
 
 export interface ProbeEnvironment {
@@ -57,7 +85,9 @@ export async function probeServed(
       credentials: "omit",
       redirect: "error",
     });
-    return response.ok ? readBoardJson(await response.text()) : null;
+    if (!response.ok || response.body === null) return null;
+    const body = await readAtMost(response.body, MAX_BODY + 1);
+    return body === null ? null : readBoardJson(body);
   } catch {
     return null;
   } finally {

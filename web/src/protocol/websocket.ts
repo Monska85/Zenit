@@ -33,6 +33,8 @@ class WebSocketTransport implements LineTransport {
     socket.onmessage = (event) => {
       // A binary message is not ours, and neither is a line over the limit.
       if (typeof event.data !== "string") return;
+      // Every UTF-16 unit is at least one byte: a longer text is over the limit before it is encoded
+      if (event.data.length > MAX_REPLY_LINE) return;
       const line = encoder.encode(event.data);
       if (line.length <= MAX_REPLY_LINE) this.onLine?.(line);
     };

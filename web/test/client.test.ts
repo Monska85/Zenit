@@ -213,9 +213,30 @@ describe("Client.call and handshake", () => {
     expect(board.requests[0]?.["cmd"]).toBe("info");
   });
 
-  it("refuses a board of another protocol", async () => {
+  it("refuses a board of another protocol: a newer one as such, an older one as a reply it cannot use", async () => {
+    for (const [protocol, failure] of [
+      [2, "protocol"],
+      [0, "invalid_reply"],
+    ] as const) {
+      const transport = new ScriptedTransport();
+      transport.respond = (request) => [{ ...info(request["seq"] as number), protocol }];
+      await expect(new Client(transport, { seq: 1 }).handshake()).rejects.toMatchObject({ failure });
+    }
+  });
+});
+
+describe("the reply deadline", () => {
+  it("follows a clock that does not jump: a wall clock set back does not stretch the wait", async () => {
+    vi.useRealTimers();
+    // The wall clock goes back a quarter of an hour once the first deadline is set
+    const now = vi.spyOn(Date, "now").mockReturnValueOnce(1_000_000).mockReturnValue(100_000);
     const transport = new ScriptedTransport();
-    transport.respond = (request) => [{ ...info(request["seq"] as number), protocol: 2 }];
-    await expect(new Client(transport, { seq: 1 }).handshake()).rejects.toMatchObject({ failure: "protocol" });
+    transport.respond = () => [];
+    const started = performance.now();
+    await expect(new Client(transport, { seq: 1, timeoutMs: 20, attempts: 2 }).request("info")).rejects.toMatchObject({
+      failure: "no_reply",
+    });
+    expect(performance.now() - started).toBeLessThan(1000);
+    now.mockRestore();
   });
 });

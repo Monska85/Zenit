@@ -3,14 +3,18 @@
 import { describe, expect, it } from "vitest";
 import {
   addressOpener,
-  LOCAL_ADDRESS_MESSAGE,
+  connectAddress,
   MIXED_CONTENT_MESSAGE,
   UNREACHABLE_FROM_SITE,
+  usbOpener,
   type AddressEnvironment,
+  type SerialApi,
 } from "../src/board/connect";
-import { OpenFailed } from "../src/board/session";
-import type { LocalPermission } from "../src/protocol/address";
+import { BoardSession, OpenFailed } from "../src/board/session";
+import { PRIVATE_ONLY_MESSAGE, type LocalPermission } from "../src/protocol/address";
+import { ESPRESSIF_VENDOR_ID, type SerialPortLike } from "../src/protocol/serial";
 import type { LineTransport } from "../src/protocol/transport";
+import { FakeBoard } from "./helpers";
 
 /** The published site in a browser with Local Network Access, recording what the opener asks the socket for. */
 function site(permission: LocalPermission, overrides: Partial<AddressEnvironment> = {}) {
@@ -65,7 +69,6 @@ describe("addressOpener", () => {
 
   it("reads no permission where the browser cannot ask: an encrypted socket, a local page, no Local Network Access", async () => {
     for (const [typed, overrides] of [
-      ["wss://zenit.example/ws", {}],
       ["192.168.1.20", { hostname: "localhost" }],
       ["ws://127.0.0.1:8765", { localNetworkAccess: false, hostname: "localhost" }],
     ] as const) {
@@ -84,7 +87,7 @@ describe("addressOpener", () => {
   });
 
   it("refuses a name outside the local network, and every address in a browser without Local Network Access", () => {
-    expect(addressOpener("zenit.lan", site("prompt").environment)).toBe(LOCAL_ADDRESS_MESSAGE);
+    expect(addressOpener("zenit.lan", site("prompt").environment)).toBe(PRIVATE_ONLY_MESSAGE);
     expect(addressOpener("192.168.1.20", site("prompt", { localNetworkAccess: false }).environment)).toBe(
       MIXED_CONTENT_MESSAGE,
     );
@@ -95,5 +98,122 @@ describe("addressOpener", () => {
     const opener = addressOpener("192.168.1.20", environment);
     if (typeof opener === "string") throw new Error(opener);
     await expect(opener(true)).rejects.toEqual(new OpenFailed(UNREACHABLE_FROM_SITE));
+  });
+});
+
+/** A port that opens or not, as the test says, with streams that carry nothing. */
+class Port implements SerialPortLike {
+  opens = true;
+  opened = 0;
+  readable: ReadableStream<Uint8Array> | null = null;
+  writable: WritableStream<Uint8Array> | null = null;
+  constructor(private readonly vendor = ESPRESSIF_VENDOR_ID) {}
+  open(): Promise<void> {
+    if (!this.opens) return Promise.reject(new Error("not there"));
+    this.opened++;
+    this.readable = new ReadableStream<Uint8Array>();
+    this.writable = new WritableStream<Uint8Array>();
+    return Promise.resolve();
+  }
+  close(): Promise<void> {
+    return Promise.resolve();
+  }
+  getInfo(): { usbVendorId?: number } {
+    return { usbVendorId: this.vendor };
+  }
+}
+
+function serial(chosen: Port, granted: Port[] = [chosen]) {
+  const calls = { request: 0 };
+  const api: SerialApi = {
+    requestPort: () => {
+      calls.request++;
+      return Promise.resolve(chosen);
+    },
+    getPorts: () => Promise.resolve(granted),
+  };
+  return { api: () => api, calls };
+}
+
+describe("usbOpener", () => {
+  it("keeps the port through tries the page makes by itself, and opens it once it is back", async () => {
+    const port = new Port();
+    const { api, calls } = serial(port, []);
+    const opener = usbOpener(api);
+    await opener(true);
+    port.opens = false;
+    for (let i = 0; i < 3; i++) await expect(opener(false)).rejects.toBeInstanceOf(OpenFailed);
+    port.opens = true;
+    await expect(opener(false)).resolves.toBeTruthy();
+    expect(port.opened).toBe(2);
+    expect(calls.request).toBe(1);
+  });
+
+  it("falls back to the one granted Espressif port when the browser gives a new port object", async () => {
+    const first = new Port();
+    const again = new Port();
+    const { api } = serial(first, [again, new Port(0x1234)]);
+    const opener = usbOpener(api);
+    await opener(true);
+    first.opens = false;
+    await expect(opener(false)).resolves.toBeTruthy();
+    expect(again.opened).toBe(1);
+  });
+
+  it("does not guess between two granted Espressif ports", async () => {
+    const first = new Port();
+    const { api } = serial(first, [new Port(), new Port()]);
+    const opener = usbOpener(api);
+    await opener(true);
+    first.opens = false;
+    await expect(opener(false)).rejects.toBeInstanceOf(OpenFailed);
+  });
+
+  it("asks again on a click when the port it had does not open", async () => {
+    const port = new Port();
+    const { api, calls } = serial(port);
+    const opener = usbOpener(api);
+    await opener(true);
+    port.opens = false;
+    await expect(opener(true)).rejects.toBeInstanceOf(OpenFailed);
+    expect(calls.request).toBe(2);
+  });
+});
+
+describe("connectAddress", () => {
+  const local = (open: AddressEnvironment["open"]): AddressEnvironment => ({
+    protocol: "http:",
+    hostname: "localhost",
+    localNetworkAccess: false,
+    permission: () => Promise.resolve("unknown"),
+    open,
+  });
+
+  it("says the address was reached only when the board answered", async () => {
+    const session = new BoardSession();
+    const board = new FakeBoard();
+    const reached = await connectAddress(
+      session,
+      " 192.168.1.20 ",
+      local(() => Promise.resolve(board.transport())),
+    );
+    expect(reached).toEqual({ problem: null, reached: true });
+    await session.disconnect();
+    const failed = await connectAddress(
+      session,
+      "192.168.1.21",
+      local(() => Promise.reject(new Error("no"))),
+    );
+    expect(failed).toEqual({ problem: null, reached: false });
+    expect(session.getState().error).not.toBeNull();
+  });
+
+  it("gives the sentence of an address it refuses", async () => {
+    const result = await connectAddress(
+      new BoardSession(),
+      "8.8.8.8",
+      local(() => Promise.reject(new Error("no"))),
+    );
+    expect(result).toEqual({ problem: PRIVATE_ONLY_MESSAGE, reached: false });
   });
 });

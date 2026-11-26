@@ -18,7 +18,11 @@ export const PROTOCOL_MAX: number = speaks.protocol_max;
 /** Lines that arrive while no request waits (events, late replies) are kept up to this many, then the oldest go. */
 const QUEUE_LIMIT = 64;
 
-export type ClientFailure = "no_reply" | "closed" | "protocol";
+/**
+ * `protocol`: the board speaks a newer protocol than this app. `invalid_reply`: the board answered something this app
+ * cannot show (an older protocol, settings out of their limits, a token of the wrong shape).
+ */
+export type ClientFailure = "no_reply" | "closed" | "protocol" | "invalid_reply";
 
 /** The board could not be reached, or answered nothing usable. */
 export class ClientError extends Error {
@@ -164,7 +168,7 @@ export class Client {
     const protocol = reply["protocol"];
     if (typeof protocol !== "number" || protocol < PROTOCOL_MIN || protocol > PROTOCOL_MAX) {
       throw new ClientError(
-        "protocol",
+        typeof protocol === "number" && protocol > PROTOCOL_MAX ? "protocol" : "invalid_reply",
         `the board speaks protocol ${String(protocol)}, this app protocols ${PROTOCOL_MIN} to ${PROTOCOL_MAX}`,
       );
     }
@@ -185,9 +189,10 @@ export class Client {
       await this.transport.send(line).catch((error: unknown) => {
         throw new ClientError("closed", `cannot send: ${error instanceof Error ? error.message : String(error)}`);
       });
-      const deadline = Date.now() + this.timeoutMs;
+      // A clock that cannot jump: a wall clock set back would stretch the wait
+      const deadline = performance.now() + this.timeoutMs;
       for (;;) {
-        const remaining = deadline - Date.now();
+        const remaining = deadline - performance.now();
         if (remaining <= 0) break;
         const raw = await this.queue.next(remaining);
         if (raw === null) break;

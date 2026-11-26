@@ -4,11 +4,21 @@ import { describe, expect, it, vi } from "vitest";
 import { probeServed, readBoardJson } from "../src/board/served";
 
 const GOOD = '{"zenit":true,"hostname":"zenit-a1b2","ws":"/ws"}';
+const bytes = (text: string): Uint8Array => new TextEncoder().encode(text);
 
 describe("readBoardJson", () => {
   it("accepts exactly the object a board serves", () => {
-    expect(readBoardJson(GOOD)).toEqual({ hostname: "zenit-a1b2" });
-    expect(readBoardJson('{"ws":"/ws","hostname":"zenit-0000","zenit":true}')).toEqual({ hostname: "zenit-0000" });
+    expect(readBoardJson(bytes(GOOD))).toEqual({ hostname: "zenit-a1b2" });
+    expect(readBoardJson(bytes('{"ws":"/ws","hostname":"zenit-0000","zenit":true}'))).toEqual({
+      hostname: "zenit-0000",
+    });
+  });
+
+  it("takes at most 256 bytes", () => {
+    // Spaces between the members are allowed JSON
+    const padded = (size: number): string => GOOD.replace(",", `,${" ".repeat(size - GOOD.length)}`);
+    expect(readBoardJson(bytes(padded(256)))).toEqual({ hostname: "zenit-a1b2" });
+    expect(readBoardJson(bytes(padded(257)))).toBeNull();
   });
 
   it.each([
@@ -24,8 +34,10 @@ describe("readBoardJson", () => {
     ["another name", '{"zenit":true,"hostname":"printer-a1b2","ws":"/ws"}'],
     ["a hostname that is not text", '{"zenit":true,"hostname":1,"ws":"/ws"}'],
     ["a body that is too long", `{"zenit":true,"hostname":"zenit-a1b2","ws":"/ws","pad":"${"x".repeat(300)}"}`],
+    ["a key named twice", '{"zenit":true,"hostname":"printer-a1b2","hostname":"zenit-a1b2","ws":"/ws"}'],
+    ["a trailing comma", '{"zenit":true,"hostname":"zenit-a1b2","ws":"/ws",}'],
   ])("refuses %s", (_, text) => {
-    expect(readBoardJson(text)).toBeNull();
+    expect(readBoardJson(bytes(text))).toBeNull();
   });
 });
 
@@ -51,6 +63,19 @@ describe("probeServed", () => {
   it("is not served when the answer is an error or another page", async () => {
     await expect(probeServed({ protocol: "http:", fetch: respond("Not found", 404) })).resolves.toBeNull();
     await expect(probeServed({ protocol: "http:", fetch: respond("<html></html>") })).resolves.toBeNull();
+  });
+
+  it("stops reading a long answer once it passes the limit", async () => {
+    let pulled = 0;
+    const endless = new ReadableStream<Uint8Array>({
+      pull: (controller) => {
+        pulled++;
+        controller.enqueue(new Uint8Array(100).fill(0x20));
+      },
+    });
+    const fetcher = vi.fn(() => Promise.resolve(new Response(endless))) as unknown as typeof fetch;
+    await expect(probeServed({ protocol: "http:", fetch: fetcher })).resolves.toBeNull();
+    expect(pulled).toBeLessThan(10);
   });
 
   it("is not served when the request fails", async () => {
