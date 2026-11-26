@@ -1,0 +1,138 @@
+{
+  "description": "A read error of the settings memory is not a missing record: the board starts on the default settings with a token made in RAM, writes nothing (a change, a request that changes nothing and a new token are storage_error), and the stored settings are still there at the next start that reads them, the token included.",
+  "steps": [
+    {
+      "control": "!token abcdefghij012345"
+    },
+    {
+      "control": "!store-wifi ssid=HomeNet password=correct-horse"
+    },
+    {
+      "event": "storage_read_fail"
+    },
+    {
+      "control": "!restart"
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "settings_set",
+        "brightness": 30
+      },
+      "expect": {
+        "seq": 2,
+        "ok": false,
+        "error": "storage_error"
+      }
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "token_regenerate"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": false,
+        "error": "storage_error"
+      }
+    },
+    {
+      "send": {
+        "seq": 31,
+        "cmd": "settings_set",
+        "brightness": 60
+      },
+      "expect": {
+        "seq": 31,
+        "ok": false,
+        "error": "storage_error"
+      }
+    },
+    {
+      "event": "storage_read_ok"
+    },
+    {
+      "control": "!restart"
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": "abcdefghij012345"
+        }
+      }
+    }
+  ]
+}

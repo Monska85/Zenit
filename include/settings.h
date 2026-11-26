@@ -17,7 +17,10 @@
 namespace settings
 {
 
-// Loads the stored settings. A missing or invalid value takes its default.
+// Loads the stored settings. A missing or invalid value takes its default. A record the memory fails to read is never
+// written over: after a failed read of the settings the board runs on the defaults (and a token made in RAM) and every
+// commit of the settings fails until a restart reads them; after a failed read of the update record that record is
+// not written either.
 void begin();
 
 const zenit::LightSettings &current();
@@ -27,6 +30,9 @@ const zenit::update::UpdateRecord &update_record();
 bool memory_ok();
 // Whether the update record was read without an error (a missing record is readable and empty).
 bool update_record_readable();
+// Whether every record was read without an I/O error at begin() (a missing or damaged record counts as read). Part of
+// the trial's health check.
+bool read_ok();
 
 enum class Commit
 {
@@ -58,6 +64,12 @@ void sim_fail_writes(bool fail);
 void sim_fail_key(const char *key);
 // Simulator: stores these bytes as the record `key`, for tests of damaged records.
 void sim_write_raw(const char *key, const std::vector<uint8_t> &bytes);
+// Simulator: the bytes stored as the record `key`, empty when there is none.
+std::vector<uint8_t> sim_read_raw(const char *key);
+// Simulator: makes every read fail with an I/O error, or reading work again.
+void sim_fail_reads(bool fail);
+// Simulator: makes the reads of one record fail ("settings", "update"); an empty name ends it.
+void sim_fail_read_key(const char *key);
 // Simulator: puts the current settings back to the defaults without touching the memory.
 void sim_reset_current();
 // Simulator: the number of writes that reached the memory (failed ones excluded).

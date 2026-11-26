@@ -86,6 +86,8 @@ void setUp()
   sim_control::set_quiet(true);
   settings::sim_fail_writes(false);
   settings::sim_fail_key("");
+  settings::sim_fail_reads(false);
+  settings::sim_fail_read_key("");
   settings::sim_clear();
   settings::begin();
   firmware::sim_reset();
@@ -502,6 +504,88 @@ void test_improv_refuses_a_network_or_password_the_board_would_not_use()
   }
 }
 
+void test_an_improv_try_queued_behind_a_long_transfer_fails_without_touching_the_radio()
+{
+  // The network task is busy (a download) for longer than the try's 30 s: Improv must not wait forever, and the radio
+  // must never join the tried network after Improv gave up
+  network::sim_hold(true);
+  improv_link::handle_frame(3, rpc(1, wifi_args("HomeNet", "correct-horse")), now);
+  run_ms(now, net::PROVISION_MS + 500);
+  TEST_ASSERT_TRUE(improv_link::connecting()); // the loop task waits 2 s longer than the network task
+  network::sim_hold(false);
+  frames.clear();
+  run_ms(now, 100);
+  // The network task took the request after its time: it failed at once, and the radio stayed where it was
+  TEST_ASSERT_FALSE(improv_link::connecting());
+  TEST_ASSERT_EQUAL_size_t(2, frames.size());
+  TEST_ASSERT_EQUAL_STRING(improv::error_packet(improv::Error::UnableToConnect).c_str(), frames[0].c_str());
+  TEST_ASSERT_EQUAL_STRING(STATE_READY.c_str(), frames[1].c_str());
+  TEST_ASSERT_EQUAL_STRING("", network::sim_radio_ssid());
+  TEST_ASSERT_EQUAL_STRING("", settings::board().wifi_ssid);
+  // A new try is accepted and works
+  frames.clear();
+  improv_link::handle_frame(3, rpc(1, wifi_args("HomeNet", "correct-horse")), now);
+  run_ms(now, 1500);
+  TEST_ASSERT_EQUAL_STRING("HomeNet", settings::board().wifi_ssid);
+  TEST_ASSERT_EQUAL_STRING("HomeNet", network::sim_radio_ssid());
+}
+
+void test_an_improv_try_taken_late_keeps_the_time_it_has_left()
+{
+  network::sim_hold(true);
+  improv_link::handle_frame(3, rpc(1, wifi_args("HomeNet", "correct-horse")), now);
+  run_ms(now, 20000);
+  network::sim_hold(false);
+  run_ms(now, 1500); // the simulated connection takes 1 s, inside the 10 s left
+  TEST_ASSERT_FALSE(improv_link::connecting());
+  TEST_ASSERT_EQUAL_STRING("HomeNet", settings::board().wifi_ssid);
+  TEST_ASSERT_EQUAL_STRING(improv::result_packet(improv::Command::WifiSettings, {}).c_str(), frames.back().c_str());
+}
+
+void test_an_improv_try_that_runs_into_its_deadline_fails_and_the_radio_goes_back()
+{
+  // The try started, then the network task got busy until after the deadline: the connection it may have made is not
+  // a success, and the radio returns to the stored network
+  sim_control::handle("!store-wifi ssid=OldNet password=old-password", now);
+  improv_link::handle_frame(3, rpc(1, wifi_args("HomeNet", "correct-horse")), now);
+  run_ms(now, 50);
+  TEST_ASSERT_EQUAL_STRING("HomeNet", network::sim_radio_ssid());
+  network::sim_hold(true);
+  run_ms(now, net::PROVISION_MS);
+  network::sim_hold(false);
+  run_ms(now, 100);
+  TEST_ASSERT_FALSE(improv_link::connecting());
+  TEST_ASSERT_EQUAL_STRING("OldNet", settings::board().wifi_ssid);
+  TEST_ASSERT_EQUAL_STRING("OldNet", network::sim_radio_ssid());
+  TEST_ASSERT_EQUAL_STRING(STATE_READY.c_str(), frames.back().c_str());
+}
+
+void test_a_success_that_comes_after_improv_gave_up_sends_the_radio_back_to_the_stored_network()
+{
+  // A backstop: should the network task ever report success for a try the loop task no longer waits for, the radio
+  // must not stay on a network that was never stored. The success is injected, since the network task's own deadline
+  // comes first.
+  sim_control::handle("!store-wifi ssid=OldNet password=old-password", now);
+  network::sim_hold(true);
+  improv_link::handle_frame(3, rpc(1, wifi_args("HomeNet", "correct-horse")), now);
+  const uint32_t id = network::sim_requested_provision_id();
+  TEST_ASSERT_NOT_EQUAL(0, id);
+  run_ms(now, net::PROVISION_REPLY_MS + 100);
+  TEST_ASSERT_FALSE(improv_link::connecting());
+  network::Snapshot late = network::snapshot();
+  late.provision = network::Provision::Succeeded;
+  late.provision_id = id;
+  network::sim_set_snapshot(late);
+  const size_t applies = network::sim_apply_count();
+  run_ms(now, 100);
+  TEST_ASSERT_EQUAL_size_t(applies + 1, network::sim_apply_count());
+  TEST_ASSERT_EQUAL_STRING("OldNet", network::sim_applied().wifi_ssid);
+  TEST_ASSERT_EQUAL_STRING("OldNet", settings::board().wifi_ssid);
+  // and only once
+  run_ms(now, 500);
+  TEST_ASSERT_EQUAL_size_t(applies + 1, network::sim_apply_count());
+}
+
 // ---- The update flow ----
 
 namespace
@@ -595,6 +679,132 @@ void test_the_pending_image_stores_that_it_ran_before_it_confirms()
   TEST_ASSERT_TRUE(firmware::sim_marked_valid());
   TEST_ASSERT_EQUAL_STRING("", settings::update_record().pending);
   TEST_ASSERT_FALSE(settings::update_record().booted);
+}
+
+void test_a_mismatched_image_that_fails_its_trial_is_rolled_back_and_skipped()
+{
+  // The release said 0.2.0, the image reports 0.1.5 and crashes on trial: the evidence that it ran is stored all the
+  // same, so the bootloader's rollback puts 0.2.0 on the skip list instead of installing it again and again
+  zenit::update::UpdateRecord record;
+  zenit::update::set_version(record.pending, "0.2.0");
+  TEST_ASSERT_TRUE(settings::commit_update(record) == settings::Commit::Ok);
+  firmware::sim_set_trial(true);
+  firmware::sim_fail("mark_valid"); // the trial never confirms
+  platform::sim_set_version("0.1.5");
+  settings::begin();
+  app::begin(now, 1);
+  app::tick(now);
+  updates::protocol_ready();
+  updates::tick(1000);
+  TEST_ASSERT_TRUE(settings::update_record().booted);
+  // The bootloader goes back to the previous firmware
+  firmware::sim_reset();
+  firmware::sim_set_other_invalid(true);
+  platform::sim_set_version("0.1.0");
+  settings::begin();
+  app::begin(now, 1);
+  TEST_ASSERT_EQUAL_STRING("", settings::update_record().pending);
+  TEST_ASSERT_EQUAL_STRING("0.2.0", settings::update_record().skipped);
+  TEST_ASSERT_EQUAL_STRING("0.2.0", settings::update_record().rolled_back);
+}
+
+void test_a_mismatched_image_that_passes_its_trial_skips_the_version_it_was_installed_as()
+{
+  zenit::update::UpdateRecord record;
+  zenit::update::set_version(record.pending, "0.2.0");
+  TEST_ASSERT_TRUE(settings::commit_update(record) == settings::Commit::Ok);
+  firmware::sim_set_trial(true);
+  platform::sim_set_version("0.1.5");
+  settings::begin();
+  app::begin(now, 1);
+  app::tick(now);
+  updates::protocol_ready();
+  updates::tick(1000);
+  TEST_ASSERT_TRUE(firmware::sim_marked_valid());
+  TEST_ASSERT_FALSE(updates::status().trial);
+  TEST_ASSERT_EQUAL_STRING("", settings::update_record().pending);
+  TEST_ASSERT_EQUAL_STRING("0.2.0", settings::update_record().skipped);
+  TEST_ASSERT_EQUAL_STRING("", settings::update_record().rolled_back);
+  TEST_ASSERT_FALSE(settings::update_record().booted);
+}
+
+// ---- Read errors of the settings memory ----
+
+void test_a_failed_settings_read_never_overwrites_the_stored_settings()
+{
+  net::BoardSettings next = settings::board();
+  std::strcpy(next.wifi_ssid, "HomeNet");
+  std::strcpy(next.wifi_password, "correct-horse");
+  TEST_ASSERT_TRUE(settings::commit_board(next) == settings::Commit::Ok);
+  const std::string token = settings::board().token;
+  const std::vector<uint8_t> stored = settings::sim_read_raw("settings");
+  settings::sim_fail_read_key("settings");
+  settings::begin();
+  // The board runs on the defaults with a token of its own in RAM, and writes nothing
+  TEST_ASSERT_FALSE(settings::read_ok());
+  TEST_ASSERT_EQUAL_STRING("", settings::board().wifi_ssid);
+  TEST_ASSERT_TRUE(net::valid_token(settings::board().token));
+  TEST_ASSERT_TRUE(settings::sim_read_raw("settings") == stored);
+  zenit::LightSettings light = settings::current();
+  light.brightness = 30;
+  TEST_ASSERT_TRUE(settings::commit(light) == settings::Commit::Failed);
+  TEST_ASSERT_TRUE(settings::commit_board(next) == settings::Commit::Failed);
+  TEST_ASSERT_TRUE(settings::commit_both(light, next) == settings::Commit::Failed);
+  TEST_ASSERT_TRUE(settings::sim_read_raw("settings") == stored);
+  // The next start that reads them finds them
+  settings::sim_fail_read_key("");
+  settings::begin();
+  TEST_ASSERT_TRUE(settings::read_ok());
+  TEST_ASSERT_EQUAL_STRING("HomeNet", settings::board().wifi_ssid);
+  TEST_ASSERT_EQUAL_STRING(token.c_str(), settings::board().token);
+}
+
+void test_a_failed_update_record_read_is_never_written_over()
+{
+  zenit::update::UpdateRecord record;
+  zenit::update::set_version(record.skipped, "0.2.0");
+  TEST_ASSERT_TRUE(settings::commit_update(record) == settings::Commit::Ok);
+  const std::vector<uint8_t> stored = settings::sim_read_raw("update");
+  settings::sim_fail_read_key("update");
+  settings::begin();
+  TEST_ASSERT_FALSE(settings::read_ok());
+  TEST_ASSERT_FALSE(settings::update_record_readable());
+  TEST_ASSERT_TRUE(settings::commit_update(zenit::update::UpdateRecord()) == settings::Commit::Failed);
+  app::begin(now, 1); // a settled boot does not settle an unread record
+  run_ms(now, 2000);
+  TEST_ASSERT_TRUE(settings::sim_read_raw("update") == stored);
+  settings::sim_fail_read_key("");
+  settings::begin();
+  TEST_ASSERT_EQUAL_STRING("0.2.0", settings::update_record().skipped);
+}
+
+void test_a_missing_record_is_not_a_read_error()
+{
+  settings::sim_clear();
+  settings::begin();
+  TEST_ASSERT_TRUE(settings::read_ok());
+  TEST_ASSERT_TRUE(settings::update_record_readable());
+  // The first start writes its token
+  TEST_ASSERT_FALSE(settings::sim_read_raw("settings").empty());
+}
+
+void test_a_trial_fails_its_health_check_when_a_record_cannot_be_read()
+{
+  for (const char *key : {"settings", "update"})
+  {
+    firmware::sim_reset();
+    firmware::sim_set_trial(true);
+    settings::sim_fail_read_key(key);
+    settings::begin();
+    app::begin(now, 1);
+    app::tick(now);
+    updates::protocol_ready();
+    updates::tick(now + 1000);
+    TEST_ASSERT_TRUE_MESSAGE(firmware::sim_marked_invalid(), key);
+    TEST_ASSERT_TRUE_MESSAGE(firmware::sim_restarted(), key);
+    TEST_ASSERT_FALSE_MESSAGE(firmware::sim_marked_valid(), key);
+  }
+  settings::sim_fail_read_key("");
 }
 
 void test_a_trial_waits_for_the_protocol_too()
@@ -1480,10 +1690,20 @@ int main()
   RUN_TEST(test_a_scan_during_a_connection_gets_the_empty_result_and_the_connection_is_kept);
   RUN_TEST(test_a_connection_during_a_scan_is_refused_and_the_scan_goes_on);
   RUN_TEST(test_improv_refuses_a_network_or_password_the_board_would_not_use);
+  RUN_TEST(test_an_improv_try_queued_behind_a_long_transfer_fails_without_touching_the_radio);
+  RUN_TEST(test_an_improv_try_taken_late_keeps_the_time_it_has_left);
+  RUN_TEST(test_an_improv_try_that_runs_into_its_deadline_fails_and_the_radio_goes_back);
+  RUN_TEST(test_a_success_that_comes_after_improv_gave_up_sends_the_radio_back_to_the_stored_network);
   RUN_TEST(test_the_sha256_of_zeros_the_cases_use_is_right);
   RUN_TEST(test_a_trial_boot_confirms_after_the_health_check_and_never_before_the_first_output);
   RUN_TEST(test_a_rollback_needs_the_evidence_that_the_pending_image_ran);
   RUN_TEST(test_the_pending_image_stores_that_it_ran_before_it_confirms);
+  RUN_TEST(test_a_mismatched_image_that_fails_its_trial_is_rolled_back_and_skipped);
+  RUN_TEST(test_a_mismatched_image_that_passes_its_trial_skips_the_version_it_was_installed_as);
+  RUN_TEST(test_a_failed_settings_read_never_overwrites_the_stored_settings);
+  RUN_TEST(test_a_failed_update_record_read_is_never_written_over);
+  RUN_TEST(test_a_missing_record_is_not_a_read_error);
+  RUN_TEST(test_a_trial_fails_its_health_check_when_a_record_cannot_be_read);
   RUN_TEST(test_a_trial_waits_for_the_protocol_too);
   RUN_TEST(test_a_confirmation_that_cannot_be_marked_is_tried_again);
   RUN_TEST(test_no_install_starts_during_a_trial);

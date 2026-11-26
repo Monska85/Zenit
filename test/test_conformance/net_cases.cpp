@@ -4,6 +4,8 @@
 
 #include <unity.h>
 
+#include <cstdint>
+
 #include <ArduinoJson.h>
 #include <board_settings.h>
 #include <improv_frame.h>
@@ -461,6 +463,12 @@ void test_boot_cases()
     update::set_version(record.pending, c["pending"].as<const char *>());
     update::set_version(record.skipped, c["skipped"].as<const char *>());
     update::set_version(record.rolled_back, c["rolled_back"].as<const char *>());
+    const update::BootAction action = update::decide_confirmed_trial(record, c["running"].as<const char *>());
+    const char *got = action == update::BootAction::Nothing       ? "nothing"
+                      : action == update::BootAction::DropPending ? "drop"
+                      : action == update::BootAction::SkipPending ? "skip"
+                                                                  : "other";
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(c["action"].as<const char *>(), got, name.c_str());
     const update::UpdateRecord after = update::apply_confirmed(record, c["running"].as<const char *>());
     TEST_ASSERT_EQUAL_STRING_MESSAGE(c["pending_after"].as<const char *>(), after.pending, name.c_str());
     TEST_ASSERT_EQUAL_STRING_MESSAGE(c["skipped_after"].as<const char *>(), after.skipped, name.c_str());
@@ -470,8 +478,7 @@ void test_boot_cases()
   {
     update::UpdateRecord record;
     update::set_version(record.pending, c["pending"].as<const char *>());
-    TEST_ASSERT_EQUAL(c["booted_after"].as<bool>(),
-                      update::apply_booted(record, c["running"].as<const char *>()).booted);
+    TEST_ASSERT_EQUAL(c["booted_after"].as<bool>(), update::apply_booted(record).booted);
   }
   // The record survives its stored form, and a damaged one is empty.
   update::UpdateRecord record;
@@ -559,13 +566,25 @@ void test_ws_message_cases()
     for (JsonObjectConst f : c["frames"].as<JsonArrayConst>())
     {
       const std::string kind = f["kind"].as<const char *>();
+      const proto::FrameKind frame_kind = kind == "text"     ? proto::FrameKind::Text
+                                          : kind == "binary" ? proto::FrameKind::Binary
+                                                             : proto::FrameKind::Continuation;
+      if (!f["announced"].isNull())
+      {
+        // A header that claims a length with no payload behind it: the assembler must refuse it before any read
+        const size_t announced = f["announced"].is<const char *>() && std::string(f["announced"]) == "max"
+                                     ? SIZE_MAX
+                                     : f["announced"].as<size_t>();
+        last = assembler.begin_frame(frame_kind, announced);
+        TEST_ASSERT_EQUAL_STRING_MESSAGE(f["begin"].as<const char *>(), word(last, assembler.code()).c_str(),
+                                         name.c_str());
+        TEST_ASSERT_TRUE_MESSAGE(last == proto::MessageAssembler::Result::Close, name.c_str());
+        break;
+      }
       std::vector<uint8_t> payload =
           f["hex"].is<const char *>()
               ? unhex(f["hex"].as<const char *>())
               : std::vector<uint8_t>(f["size"].as<size_t>(), unhex(f["fill"].as<const char *>())[0]);
-      const proto::FrameKind frame_kind = kind == "text"     ? proto::FrameKind::Text
-                                          : kind == "binary" ? proto::FrameKind::Binary
-                                                             : proto::FrameKind::Continuation;
       last = assembler.begin_frame(frame_kind, payload.size());
       TEST_ASSERT_EQUAL_STRING_MESSAGE(f["begin"].as<const char *>(), word(last, assembler.code()).c_str(),
                                        name.c_str());
@@ -581,6 +600,16 @@ void test_ws_message_cases()
           c["line_hex"].as<const char *>(),
           hex_of(reinterpret_cast<const uint8_t *>(assembler.line()), assembler.line_size()).c_str(), name.c_str());
   }
+  // A caller that hands end_frame a longer payload than begin_frame accepted gets 1009, and nothing is copied
+  proto::MessageAssembler assembler;
+  const std::vector<uint8_t> long_payload(proto::MAX_LINE + 1, 'a');
+  TEST_ASSERT_TRUE(assembler.begin_frame(proto::FrameKind::Text, 1) == proto::MessageAssembler::Result::More);
+  TEST_ASSERT_TRUE(assembler.end_frame(true, long_payload.data(), long_payload.size()) ==
+                   proto::MessageAssembler::Result::Close);
+  TEST_ASSERT_EQUAL_UINT16(proto::CLOSE_TOO_BIG, assembler.code());
+  // and so does end_frame with no frame begun
+  proto::MessageAssembler idle;
+  TEST_ASSERT_TRUE(idle.end_frame(true, long_payload.data(), 1) == proto::MessageAssembler::Result::Close);
 }
 
 void test_improv_cases()

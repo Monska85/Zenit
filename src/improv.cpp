@@ -23,8 +23,6 @@ using zenit::improv::Command;
 using zenit::improv::Error;
 using zenit::improv::State;
 
-// A connection started by "send WiFi settings" answers within this time.
-constexpr uint32_t CONNECT_TIMEOUT_MS = 30000;
 // A scan answers within this time, with what it has.
 constexpr uint32_t SCAN_TIMEOUT_MS = 15000;
 constexpr size_t MAX_RESULTS = 16;
@@ -42,6 +40,10 @@ uint64_t pending_since = 0;
 std::string try_ssid, try_password;
 // The id of the network task request that tries them: only a result with this id is theirs.
 uint32_t try_id = 0;
+// The id of a try this side stopped waiting for, until the network task reports how it ended. The network task decides
+// first by design (zenit::net::PROVISION_REPLY_MS); if a success still comes, the radio goes back to the stored
+// network.
+uint32_t abandoned_id = 0;
 
 void to_nowhere(const std::string &) {}
 Sink sink = to_nowhere;
@@ -154,6 +156,7 @@ void set_sink(Sink replacement) { sink = replacement ? replacement : Sink(to_now
 void begin()
 {
   pending = Pending::None;
+  abandoned_id = 0;
   forget_attempt();
 }
 
@@ -205,8 +208,25 @@ void handle_frame(uint8_t type, const std::string &data, uint64_t now)
 
 void handle_bad_checksum() { send(zenit::improv::error_packet(Error::InvalidRpc)); }
 
+// A try this side gave up on: once the network task ends it, a success sends the radio back to the stored network, so
+// the board never stays on a network that was not saved.
+void settle_abandoned()
+{
+  const network::Snapshot net = network::snapshot();
+  if (net.provision_id != abandoned_id || net.provision == network::Provision::Trying)
+    return;
+  if (net.provision == network::Provision::Succeeded)
+  {
+    platform::log("a WiFi try ended after its time: back to the stored network");
+    network::apply(settings::board());
+  }
+  abandoned_id = 0;
+}
+
 void poll(uint64_t now)
 {
+  if (abandoned_id != 0)
+    settle_abandoned();
   if (pending == Pending::None)
     return;
   const uint64_t waited = now - pending_since;
@@ -217,8 +237,10 @@ void poll(uint64_t now)
     const network::Provision provision = net.provision_id == try_id ? net.provision : network::Provision::Trying;
     if (provision == network::Provision::Succeeded)
       finish_connect();
-    else if (provision == network::Provision::Failed || waited >= CONNECT_TIMEOUT_MS)
+    else if (provision == network::Provision::Failed || waited >= zenit::net::PROVISION_REPLY_MS)
     {
+      if (provision != network::Provision::Failed)
+        abandoned_id = try_id;
       forget_attempt();
       pending = Pending::None;
       send(zenit::improv::error_packet(Error::UnableToConnect));

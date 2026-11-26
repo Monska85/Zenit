@@ -73,7 +73,7 @@ class AssetsTest(unittest.TestCase):
         self.build.mkdir()
         (self.build / "bootloader.bin").write_bytes(b"BOOT")
         (self.build / "partitions.bin").write_bytes(b"TABLE")
-        (self.build / "firmware.bin").write_bytes(b"APP-1.2.3-APP")
+        (self.build / "firmware.bin").write_bytes(b"APP-ZENIT_VERSION=1.2.3\0-APP")
         self.boot_app0 = root / "boot_app0.bin"
         self.boot_app0.write_bytes(b"OTADATA")
         self.partitions = root / "partitions.csv"
@@ -106,9 +106,9 @@ class AssetsTest(unittest.TestCase):
         self.assertEqual(factory[0:4], b"BOOT")
         self.assertEqual(factory[0x8000 : 0x8000 + 5], b"TABLE")
         self.assertEqual(factory[0xE000 : 0xE000 + 7], b"OTADATA")
-        self.assertEqual(factory[0x10000:], b"APP-1.2.3-APP")
+        self.assertEqual(factory[0x10000:], b"APP-ZENIT_VERSION=1.2.3\0-APP")
         self.assertEqual(set(factory[4:0x8000]), {0xFF})
-        self.assertEqual((self.out / "zenit-esp32c3-firmware.bin").read_bytes(), b"APP-1.2.3-APP")
+        self.assertEqual((self.out / "zenit-esp32c3-firmware.bin").read_bytes(), b"APP-ZENIT_VERSION=1.2.3\0-APP")
         self.assertEqual((self.out / "THIRD_PARTY_NOTICES.txt").read_text(), "NOTICES")
         # The parts of the factory image, each to be written at its own offset by the web app's installer
         self.assertEqual((self.out / "zenit-esp32c3-bootloader.bin").read_bytes(), b"BOOT")
@@ -141,6 +141,15 @@ class AssetsTest(unittest.TestCase):
     def test_an_application_without_the_version_fails(self):
         with self.assertRaisesRegex(assets.ReleaseError, "does not carry the version 9.9.9"):
             self.make("9.9.9")
+
+    def test_the_version_text_elsewhere_in_the_application_does_not_count(self):
+        # The bare number, a longer version behind the marker, or the marker without its NUL is not the release version
+        wrong = (b"APP-1.2.3\0-APP", b"ZENIT_VERSION=1.2.3-rc.1\0", b"ZENIT_VERSION=1.2.30\0", b"ZENIT_VERSION=1.2.3")
+        for app in wrong:
+            with self.subTest(app=app):
+                (self.build / "firmware.bin").write_bytes(app)
+                with self.assertRaisesRegex(assets.ReleaseError, "does not carry the version 1.2.3"):
+                    self.make("1.2.3")
 
     def test_an_application_too_big_for_its_slot_fails(self):
         (self.build / "firmware.bin").write_bytes(b"APP-1.2.3-" + b"x" * 0x100)

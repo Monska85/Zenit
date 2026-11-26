@@ -45,7 +45,8 @@ enum class BootAction : uint8_t
 {
   Nothing,
   DropPending, // forget the pending installation (power lost before the switch, or after the confirmation)
-  Rollback     // the pending version failed its trial: skip it and report it
+  Rollback,    // the pending version failed its trial: skip it and report it
+  SkipPending  // the installed image confirmed itself but reports another version than the one installed: skip it
 };
 
 // What a boot that is not on trial does with the record. `other_slot_invalid` says the other slot is marked invalid:
@@ -55,10 +56,15 @@ BootAction decide_settled_boot(const UpdateRecord &record, const char *running_v
 // The record after the action.
 UpdateRecord apply_boot_action(const UpdateRecord &record, BootAction action);
 
-// The record after the pending image started on trial: `booted` is set when the pending version is the running one.
-UpdateRecord apply_booted(const UpdateRecord &record, const char *running_version);
-// The record after a confirmed trial: the pending version is dropped, and the skip ends when it was the running
-// version.
+// The record after the pending image started on trial: `booted` is set whenever a version is pending. A trial boot
+// happens only after the installed image was activated, so the image on trial is the installed one, whatever version
+// it reports.
+UpdateRecord apply_booted(const UpdateRecord &record);
+// What a confirmed trial does with the pending version: nothing when none is pending, DropPending when it is the
+// running version, SkipPending when the image reports another version (a release whose image and manifest disagree,
+// which would otherwise be offered and installed again and again).
+BootAction decide_confirmed_trial(const UpdateRecord &record, const char *running_version);
+// The record after a confirmed trial: the action above, then the skip ends when it was the running version.
 UpdateRecord apply_confirmed(const UpdateRecord &record, const char *running_version);
 
 } // namespace update

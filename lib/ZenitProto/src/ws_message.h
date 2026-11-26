@@ -50,7 +50,8 @@ public:
   Result begin_frame(FrameKind kind, size_t payload_size);
 
   // Adds the payload of the frame `begin_frame` accepted. `final` is the FIN bit. A complete text message must be
-  // valid UTF-8 (1007) and hold no newline (1008); a complete binary message is refused (1003).
+  // valid UTF-8 (1007) and hold no newline (1008); a complete binary message is refused (1003). A payload that would
+  // take the message over the limit, or a call with no frame begun, closes with 1009 and copies nothing.
   Result end_frame(bool final, const uint8_t *payload, size_t payload_size);
 
   const char *line() const { return reinterpret_cast<const char *>(buffer_); }

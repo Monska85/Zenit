@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <string>
 
 #include "mailbox.h"
 #include "net_time.h"
@@ -32,8 +33,17 @@ ScanState scan = ScanState::Idle;
 bool scan_requested = false;
 bool provision_ok = true;
 uint32_t last_provision_id = 0;
+// A request queued for the network task, which takes it at its next pass unless it is held (busy).
 uint32_t requested_provision_id = 0;
+uint32_t requested_queued_at = 0;
+std::string requested_ssid;
+// The try that runs: when it was queued (its deadline counts from there) and when the network task started it.
+uint32_t provision_queued_at = 0;
 uint64_t provision_started = 0;
+bool held = false;
+size_t apply_count = 0;
+// The network the radio works on: the stored one, or the one being tried.
+std::string radio_network;
 uint16_t close_code = 0;
 bool transfer = false;
 Mailbox<UpdateEvent, 8> events;
@@ -55,6 +65,9 @@ void begin(const zenit::net::BoardSettings &settings)
   transfer = false;
   check_pending = download_pending = false;
   events.clear();
+  held = false;
+  requested_provision_id = 0;
+  radio_network.clear();
   apply(settings);
 }
 
@@ -65,6 +78,11 @@ void apply(const zenit::net::BoardSettings &settings)
   const bool network_changed = std::strcmp(applied.wifi_ssid, settings.wifi_ssid) != 0 ||
                                std::strcmp(applied.wifi_password, settings.wifi_password) != 0;
   applied = settings;
+  apply_count++;
+  // As the board's network task: the radio takes the stored network, unless an Improv try runs (it goes back to the
+  // stored network when the try ends)
+  if (state.provision != Provision::Trying)
+    radio_network = settings.wifi_ssid;
   net_time::set_zone(settings.timezone);
   if (!network_changed)
   {
@@ -86,13 +104,15 @@ Snapshot snapshot()
   return copy;
 }
 
-uint32_t provision(const char *, const char *)
+uint32_t provision(const char *ssid, const char *)
 {
   if (state.provision == Provision::Trying || requested_provision_id != 0)
     return 0;
   // As on the board, the request only queues: the snapshot keeps the result of the earlier try until the network task
   // runs at its next pass (poll).
   requested_provision_id = ++last_provision_id;
+  requested_queued_at = static_cast<uint32_t>(platform::now_ms());
+  requested_ssid = ssid;
   return requested_provision_id;
 }
 
@@ -152,15 +172,34 @@ void poll(uint64_t now)
     scan_requested = false;
     scan = ScanState::Done;
   }
-  if (requested_provision_id != 0)
+  // The Improv try, on the board's rules: its 30 s count from the queueing, a request taken after them fails without
+  // touching the radio, and a try that would end after them fails. A held network task (busy with a long transfer)
+  // neither takes the request nor ends the try.
+  const uint32_t now32 = static_cast<uint32_t>(now);
+  if (!held && requested_provision_id != 0)
   {
-    state.provision = Provision::Trying;
     state.provision_id = requested_provision_id;
     requested_provision_id = 0;
-    provision_started = now;
+    if (zenit::net::provision_expired(requested_queued_at, now32))
+      state.provision = Provision::Failed;
+    else
+    {
+      state.provision = Provision::Trying;
+      provision_queued_at = requested_queued_at;
+      provision_started = now;
+      radio_network = requested_ssid;
+    }
   }
-  else if (state.provision == Provision::Trying && now - provision_started >= 1000)
-    state.provision = provision_ok ? Provision::Succeeded : Provision::Failed;
+  else if (!held && state.provision == Provision::Trying)
+  {
+    const bool expired = zenit::net::provision_expired(provision_queued_at, now32);
+    if (expired || now - provision_started >= 1000)
+    {
+      state.provision = provision_ok && !expired ? Provision::Succeeded : Provision::Failed;
+      if (state.provision == Provision::Failed)
+        radio_network = applied.wifi_ssid;
+    }
+  }
   // The transfers run here, as the network task would, then their events are handled like the board's. A check that
   // asks for the web manifest after the firmware one finishes in the same pass, as a quick network would.
   for (int pass = 0; pass < 4; pass++)
@@ -229,6 +268,10 @@ size_t sim_scan_list(Network *out, size_t capacity)
   return count;
 }
 void sim_set_provision_succeeds(bool succeeds) { provision_ok = succeeds; }
+void sim_hold(bool hold) { held = hold; }
+uint32_t sim_requested_provision_id() { return requested_provision_id; }
+size_t sim_apply_count() { return apply_count; }
+const char *sim_radio_ssid() { return radio_network.c_str(); }
 const zenit::net::BoardSettings &sim_applied() { return applied; }
 uint16_t sim_take_close_client()
 {

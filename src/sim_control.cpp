@@ -272,8 +272,9 @@ void announce(const char *line)
 
 // `how` is empty for a restart into the installed image (it boots on trial and reports its version), "rollback" for one
 // where the bootloader went back to the running image because the new one failed its trial, and "lost" for a power cut
-// before the new image became the boot image.
-void restart(uint64_t now, const std::string &how = "")
+// before the new image became the boot image. `reports` is the version the installed image reports instead of the
+// pending one (`!restart as X.Y.Z`, a release whose image and manifest disagree).
+void restart(uint64_t now, const std::string &how = "", const std::string &reports = "")
 {
   const bool new_image = firmware::sim_activated() && how.empty();
   const std::string pending = settings::update_record().pending;
@@ -285,7 +286,9 @@ void restart(uint64_t now, const std::string &how = "")
   if (new_image)
   {
     firmware::sim_set_trial(true);
-    if (!pending.empty())
+    if (!reports.empty())
+      platform::sim_set_version(reports.c_str());
+    else if (!pending.empty())
       platform::sim_set_version(pending.c_str());
   }
   else if (how == "rollback")
@@ -319,6 +322,14 @@ bool handle(const std::string &line, uint64_t now)
     restart(now);
   else if (line == "!restart rollback" || line == "!restart lost")
     restart(now, rest_after(line, "!restart "));
+  else if (line.rfind("!restart as ", 0) == 0)
+  {
+    const std::string version = rest_after(line, "!restart as ");
+    zenit::update::Version parsed;
+    if (!zenit::update::parse_version(version.c_str(), parsed))
+      return complain(line, "expected a semantic version of at most 47 characters"), true;
+    restart(now, "", version);
+  }
   else if (line.rfind("!version ", 0) == 0)
   {
     const std::string version = rest_after(line, "!version ");

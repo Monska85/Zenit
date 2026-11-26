@@ -1,5 +1,5 @@
 {
-  "description": "What the boot does with the update record: a settled boot (not on trial) from the pending version, whether the pending image started (booted), the running version and whether the other slot is invalid (it may be so from an earlier rollback), the record after the pending image started on trial, and the record after a confirmed trial.",
+  "description": "What the boot does with the update record: a settled boot (not on trial) from the pending version, whether the pending image started (booted), the running version and whether the other slot is invalid (it may be so from an earlier rollback); the record after the pending image started on trial (booted is set whenever a version is pending, whatever version the image reports, since a trial boot runs the installed image); and the action and record after a confirmed trial (a pending version that is not the running one is skipped: the installed image reports another version than its release said).",
   "settled": [
     {
       "pending": "",
@@ -86,7 +86,8 @@
       "running": "1.1.0",
       "pending_after": "",
       "skipped_after": "",
-      "rolled_back_after": "1.1.0"
+      "rolled_back_after": "1.1.0",
+      "action": "drop"
     },
     {
       "pending": "",
@@ -95,16 +96,28 @@
       "running": "1.0.0",
       "pending_after": "",
       "skipped_after": "1.1.0",
-      "rolled_back_after": ""
+      "rolled_back_after": "",
+      "action": "nothing"
     },
     {
       "pending": "1.2.0",
       "skipped": "1.1.0",
       "rolled_back": "",
       "running": "1.0.0",
-      "pending_after": "1.2.0",
+      "pending_after": "",
+      "skipped_after": "1.2.0",
+      "rolled_back_after": "",
+      "action": "skip"
+    },
+    {
+      "pending": "1.1.0",
+      "skipped": "",
+      "rolled_back": "1.0.5",
+      "running": "1.0.9",
+      "pending_after": "",
       "skipped_after": "1.1.0",
-      "rolled_back_after": ""
+      "rolled_back_after": "1.0.5",
+      "action": "skip"
     }
   ],
   "ran": [
@@ -116,7 +129,7 @@
     {
       "pending": "1.1.0",
       "running": "1.0.0",
-      "booted_after": false
+      "booted_after": true
     },
     {
       "pending": "",

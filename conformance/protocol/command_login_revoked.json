@@ -1,0 +1,264 @@
+{
+  "description": "A new token and network login turned on end the WiFi client's login at once, before its connection closes: the next WiFi request is unauthorized, and a request resent with the seq of one served before the new token gets unauthorized too, not the remembered reply; the reply of the request that turned the login on is not remembered either. The HMAC is the one of command_auth.json (token abcdefghij012345, nonce ffeeddccbbaa99887766554433221100). The token's random bytes are those of command_token_regenerate.json.",
+  "steps": [
+    {
+      "control": "!token abcdefghij012345"
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "settings_set",
+        "network_login": true
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": true,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      },
+      "transport": "usb",
+      "close": true
+    },
+    {
+      "event": "wifi_open"
+    },
+    {
+      "control": "!random ffeeddccbbaa99887766554433221100"
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "auth_challenge"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": true,
+        "nonce": "ffeeddccbbaa99887766554433221100"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "auth",
+        "hmac": "b447900eef2763115d1c10add754ed0542d884a5a7b5d0eb895ea497e9c827f4"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": true
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "light",
+        "bogus": 1
+      },
+      "expect": {
+        "seq": 4,
+        "ok": false,
+        "error": "bad_request"
+      },
+      "transport": "wifi"
+    },
+    {
+      "control": "!random fffc000102030405060708090a0b0c0d2425000000000000000000000000000000"
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "token_regenerate"
+      },
+      "expect": {
+        "seq": 5,
+        "ok": true,
+        "token": "abcdefghijklmnab"
+      },
+      "close": true
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "light",
+        "bogus": 1
+      },
+      "expect": {
+        "seq": 6,
+        "ok": false,
+        "error": "unauthorized"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "light",
+        "bogus": 1
+      },
+      "expect": {
+        "seq": 4,
+        "ok": false,
+        "error": "unauthorized"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 10,
+        "cmd": "settings_set",
+        "network_login": false
+      },
+      "expect": {
+        "seq": 10,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": "abcdefghijklmnab"
+        }
+      },
+      "transport": "usb",
+      "close": false
+    },
+    {
+      "event": "wifi_close"
+    },
+    {
+      "event": "wifi_open"
+    },
+    {
+      "send": {
+        "seq": 8,
+        "cmd": "light",
+        "bogus": 1
+      },
+      "expect": {
+        "seq": 8,
+        "ok": false,
+        "error": "bad_request"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 11,
+        "cmd": "settings_set",
+        "network_login": true
+      },
+      "expect": {
+        "seq": 11,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": true
+        }
+      },
+      "transport": "wifi",
+      "close": true
+    },
+    {
+      "send": {
+        "seq": 11,
+        "cmd": "settings_set",
+        "network_login": true
+      },
+      "expect": {
+        "seq": 11,
+        "ok": false,
+        "error": "unauthorized"
+      },
+      "transport": "wifi"
+    },
+    {
+      "send": {
+        "seq": 12,
+        "cmd": "light",
+        "bogus": 1
+      },
+      "expect": {
+        "seq": 12,
+        "ok": false,
+        "error": "unauthorized"
+      },
+      "transport": "wifi"
+    }
+  ]
+}
