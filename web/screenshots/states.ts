@@ -110,7 +110,7 @@ export const STATES: State[] = [
     },
   },
   {
-    // The published site: a page loaded over https, where an address cannot reach a Zenit
+    // The published site: a page loaded over https, where Chrome asks before the page reaches the local network
     name: "connect-secure-site",
     reach: async (page) => {
       const base = test.info().project.use.baseURL;
@@ -120,7 +120,7 @@ export const STATES: State[] = [
         await route.fulfill({ response: await route.fetch({ url: `${base}${path}` }) });
       });
       await page.goto("https://zenit-site.test/");
-      await expect(page.getByText("From this page a Zenit is reached with the USB cable.")).toBeVisible();
+      await expect(page.getByText("The first time, Chrome asks to let this page find devices")).toBeVisible();
     },
   },
   {

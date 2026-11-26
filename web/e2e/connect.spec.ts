@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import type { Page } from "@playwright/test";
 import { connectByAddress, expect, test } from "./fixtures.ts";
+import { FakeBoard } from "../test/helpers.ts";
 import { MOCK_URL, mockBoard } from "./mock-board.ts";
 
 test("connects to the simulator by address and lands on the Light view", async ({ page, simulator }) => {
@@ -103,25 +105,74 @@ test("refuses a board of another protocol with a sentence", async ({ page }) => 
   await expect(page.getByRole("heading", { name: "Connect to your Zenit" })).toBeVisible();
 });
 
-test("on a secure page of another site, says only USB reaches a Zenit and turns the address off", async ({
-  page,
-  baseURL,
-}) => {
-  // The app served from https://zenit-site.test, as the published site is: its files come from the test server
+/** Serves the app from https://zenit-site.test, as the published site is: its files come from the test server. */
+async function openSecureSite(page: Page, baseURL: string | undefined): Promise<void> {
   await page.route("https://zenit-site.test/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     await route.fulfill({ response: await route.fetch({ url: `${baseURL}${path}` }) });
   });
   await page.goto("https://zenit-site.test/");
-  await expect(page.getByText("From this page a Zenit is reached with the USB cable.")).toBeVisible();
-  await expect(page.getByText("Over WiFi, open the Zenit's own address in the browser.")).toBeVisible();
+}
+
+const ASKS_FIRST = "The first time, Chrome asks to let this page find devices on your local network: allow it.";
+
+test("on a secure page of another site in Chrome, reaches a Zenit by its .local name", async ({ page, baseURL }) => {
+  await mockBoard(page, new FakeBoard().withNetwork(), ["ws://zenit-a1b2.local/ws"]);
+  await openSecureSite(page, baseURL);
+  await expect(page.getByText(ASKS_FIRST)).toBeVisible();
+  await expect(page.getByText("This browser does not let this page reach a Zenit over WiFi.")).toHaveCount(0);
+  await page.getByLabel("Address of your Zenit").fill("zenit-a1b2.local");
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(page.getByTestId("connection")).toHaveText("Connected over WiFi");
+});
+
+test("on a secure page of another site in Chrome, refuses a name that is not on the local network", async ({
+  page,
+  baseURL,
+}) => {
+  const sockets: string[] = [];
+  page.on("websocket", (socket) => sockets.push(socket.url()));
+  await openSecureSite(page, baseURL);
+  await page.getByLabel("Address of your Zenit").fill("zenit.lan");
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveText(
+    "From this page, use the Zenit's .local name or its address on your network, like zenit-1a2b.local or 192.168.1.20.",
+  );
+  expect(sockets).toEqual([]);
+});
+
+test("on a secure page of another site in Chrome, a failed connection says to allow the local network", async ({
+  page,
+  baseURL,
+}) => {
+  await page.routeWebSocket("ws://192.168.1.20/ws", (socket) => void socket.close({ code: 1006, reason: "" }));
+  await openSecureSite(page, baseURL);
+  await page.getByLabel("Address of your Zenit").fill("192.168.1.20");
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    "If Chrome asked to let this page find devices on your local network, allow it and connect again.",
+  );
+});
+
+test("on a secure page of another site in a browser without Local Network Access, turns the address off", async ({
+  page,
+  baseURL,
+}) => {
+  // Firefox and Safari: no navigator.userAgentData
+  await page.addInitScript(() => {
+    delete (Navigator.prototype as { userAgentData?: unknown }).userAgentData;
+  });
+  await openSecureSite(page, baseURL);
+  await expect(page.getByText("This browser does not let this page reach a Zenit over WiFi.")).toBeVisible();
+  await expect(page.getByText(ASKS_FIRST)).toHaveCount(0);
   await expect(page.getByLabel("Address of your Zenit")).toBeDisabled();
   await expect(page.getByRole("button", { name: "Connect", exact: true })).toBeDisabled();
 });
 
 test("on this computer, the address stays on and the note is not shown", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByText("From this page a Zenit is reached with the USB cable.")).toHaveCount(0);
+  await expect(page.getByText("This browser does not let this page reach a Zenit over WiFi.")).toHaveCount(0);
+  await expect(page.getByText(ASKS_FIRST)).toHaveCount(0);
   await expect(page.getByLabel("Address of your Zenit")).toBeEnabled();
 });
 

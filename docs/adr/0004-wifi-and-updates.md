@@ -6,7 +6,7 @@ Status: accepted; decision 1 and the slot budget of the consequences amended by 
 
 ## Context
 
-[ADR 0001](0001-architecture.md) fixed two tasks, A/B over-the-air updates with rollback and one command protocol for every transport; [ADR 0003](0003-web-app.md) built the web app and found that an `https://` page cannot open `ws://` to a board on the home network. Milestone 4 adds WiFi, the protocol over it, WiFi setup, and updates. The units go to families who will never type an address or run a command.
+[ADR 0001](0001-architecture.md) fixed two tasks, A/B over-the-air updates with rollback and one command protocol for every transport; [ADR 0003](0003-web-app.md) built the web app and found that an `https://` page cannot open `ws://` to a board on the home network in browsers without Local Network Access. Milestone 4 adds WiFi, the protocol over it, WiFi setup, and updates. The units go to families who will never type an address or run a command.
 
 ## Decision
 

@@ -117,7 +117,7 @@ just serve                 # the simulator on ws://127.0.0.1:8765 (needs the web
 just web-dev               # in a second terminal: the app on http://localhost:5173
 ```
 
-Open `http://localhost:5173`, type `ws://127.0.0.1:8765` in the address field and press Connect. A browser lets a page on `localhost` reach the simulator; a page loaded over `https://` cannot open an unencrypted WebSocket to a board on the network, so the published site connects over USB and sets WiFi up, and a board on WiFi is used from its own `http://` address, which serves this app. The commands, the test suites (Vitest, Playwright, reference screenshots) and the layout of `web/` are described in [`web/README.md`](web/README.md).
+Open `http://localhost:5173`, type `ws://127.0.0.1:8765` in the address field and press Connect. A browser lets a page on `localhost` reach the simulator; from the published `https://` site, Chrome and Edge reach a board on WiFi by its `.local` name or its address after asking once for local network access, while other browsers (Firefox, Safari, Chrome before release 147) use the board's own `http://` address, which serves this app (see [the WebSocket rules](docs/web/web-app-v1.md#websocket)). The commands, the test suites (Vitest, Playwright, reference screenshots) and the layout of `web/` are described in [`web/README.md`](web/README.md).
 
 ## Project layout
 

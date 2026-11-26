@@ -2,9 +2,15 @@
 
 import { Usb, Wifi } from "lucide-react";
 import { useEffect, useId, useState, type FormEvent } from "react";
-import { connectAddress, connectUsb, serialSupported } from "../../board/connect";
+import {
+  connectAddress,
+  connectUsb,
+  localNetworkAccess,
+  MIXED_CONTENT_MESSAGE,
+  serialSupported,
+} from "../../board/connect";
 import { servedOpener } from "../../board/served";
-import { addressUnavailableHere } from "../../protocol/address";
+import { addressUnavailableHere, localHost } from "../../protocol/address";
 import { loadAddress, saveAddress } from "../../lib/storage";
 import { useBoard } from "../board-context";
 import { Banner } from "../components/banner";
@@ -20,7 +26,10 @@ export function ConnectView({ go }: { go: (route: Route) => void }) {
   const hintId = useId();
   // From click to answer, no second connection may start: the board has one slot
   const connecting = board.phase === "connecting" || board.opening;
-  const noAddress = addressUnavailableHere(location.protocol, location.hostname);
+  const lna = localNetworkAccess();
+  const noAddress = addressUnavailableHere(location.protocol, location.hostname, lna);
+  // A secure page of the site: Chrome asks once before this page may reach the local network
+  const asksFirst = location.protocol === "https:" && lna && !localHost(location.hostname);
   const usbSupported = serialSupported();
 
   useEffect(() => {
@@ -100,8 +109,7 @@ export function ConnectView({ go }: { go: (route: Route) => void }) {
         </CardTitle>
         {noAddress && (
           <Banner tone="info" className="mb-3">
-            From this page a Zenit is reached with the USB cable. Over WiFi, open the Zenit's own address in the
-            browser.
+            {MIXED_CONTENT_MESSAGE}
           </Banner>
         )}
         <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3">
@@ -125,6 +133,8 @@ export function ConnectView({ go }: { go: (route: Route) => void }) {
             />
             <p id={hintId} className="mt-1 text-sm text-muted-foreground">
               For example zenit-1a2b.local, 192.168.1.20 or ws://127.0.0.1:8765 for the simulator.
+              {asksFirst &&
+                " The first time, Chrome asks to let this page find devices on your local network: allow it."}
             </p>
           </div>
           {problem && <Banner tone="error">{problem}</Banner>}
