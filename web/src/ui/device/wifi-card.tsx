@@ -88,8 +88,8 @@ export function WifiCard() {
           {wifi.ssid !== null && <ForgetNetwork />}
           {!served && (
             <p className="text-sm text-muted-foreground">
-              Once Zenit is on your WiFi, control it from its own address, {boardAddress(wifi.hostname)}. A page from
-              the internet cannot reach it over WiFi. {PHONE_ACCESS_HINT}
+              Once Zenit is on your WiFi, control it from its own address, {boardAddress(wifi.hostname)}. In an
+              up-to-date Chrome or Edge, this page can also connect to it by that name. {PHONE_ACCESS_HINT}
             </p>
           )}
         </div>

@@ -1,7 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { describe, expect, it } from "vitest";
-import { addressUnavailableHere, boardUrl, mixedContentBlocked } from "../src/protocol/address";
+import {
+  addressUnavailableHere,
+  boardUrl,
+  connectTimeoutFor,
+  localHost,
+  localNetworkAccessFor,
+  mixedContentBlocked,
+  PERMISSION_CONNECT_TIMEOUT_MS,
+  permissionNameFor,
+} from "../src/protocol/address";
+import { CONNECT_TIMEOUT_MS } from "../src/protocol/websocket";
 
 describe("boardUrl", () => {
   it.each([
@@ -43,35 +53,143 @@ describe("boardUrl", () => {
   });
 });
 
+describe("localHost", () => {
+  it.each([
+    "localhost",
+    "127.0.0.1",
+    "[::1]",
+    "zenit-a1b2.local",
+    "ZENIT-A1B2.LOCAL",
+    "zenit-a1b2.local.",
+    "10.0.0.5",
+    "172.16.0.1",
+    "172.31.255.254",
+    "192.168.1.20",
+  ])("%s is on the local network", (host) => expect(localHost(host)).toBe(true));
+
+  it.each([
+    "zenit",
+    "zenit.lan",
+    "zenit.example",
+    "local",
+    "notlocal",
+    "8.8.8.8",
+    "172.15.0.1",
+    "172.32.0.1",
+    "192.169.1.1",
+    "11.0.0.1",
+    "192.168.1",
+    "192.168.1.256",
+    "169.254.10.1",
+    "[fe80::1]",
+  ])("%s is not", (host) => expect(localHost(host)).toBe(false));
+});
+
 describe("mixedContentBlocked", () => {
-  it("blocks an unencrypted socket to another computer from a secure page", () => {
-    expect(mixedContentBlocked("https:", "ws://zenit-1a2b.local/ws")).toBe(true);
-    expect(mixedContentBlocked("https:", "ws://192.168.1.20/ws")).toBe(true);
+  it("blocks an unencrypted socket to another computer from a secure page without Local Network Access", () => {
+    expect(mixedContentBlocked("https:", "ws://zenit-1a2b.local/ws", false)).toBe(true);
+    expect(mixedContentBlocked("https:", "ws://192.168.1.20/ws", false)).toBe(true);
+  });
+
+  it("lets a .local name or a private address through with Local Network Access", () => {
+    expect(mixedContentBlocked("https:", "ws://zenit-1a2b.local/ws", true)).toBe(false);
+    expect(mixedContentBlocked("https:", "ws://192.168.1.20/ws", true)).toBe(false);
+    expect(mixedContentBlocked("https:", "ws://10.0.0.5:8080/ws", true)).toBe(false);
+  });
+
+  it("blocks other names and public addresses even with Local Network Access", () => {
+    expect(mixedContentBlocked("https:", "ws://zenit/ws", true)).toBe(true);
+    expect(mixedContentBlocked("https:", "ws://zenit.lan/ws", true)).toBe(true);
+    expect(mixedContentBlocked("https:", "ws://8.8.8.8/ws", true)).toBe(true);
   });
 
   it("lets the same computer through", () => {
-    expect(mixedContentBlocked("https:", "ws://127.0.0.1:8765")).toBe(false);
-    expect(mixedContentBlocked("https:", "ws://localhost:8765/ws")).toBe(false);
-    expect(mixedContentBlocked("https:", "ws://[::1]:8765")).toBe(false);
+    for (const lna of [false, true]) {
+      expect(mixedContentBlocked("https:", "ws://127.0.0.1:8765", lna)).toBe(false);
+      expect(mixedContentBlocked("https:", "ws://localhost:8765/ws", lna)).toBe(false);
+      expect(mixedContentBlocked("https:", "ws://[::1]:8765", lna)).toBe(false);
+    }
   });
 
   it("lets an encrypted socket through, and any socket from a page that is not secure", () => {
-    expect(mixedContentBlocked("https:", "wss://zenit.example/ws")).toBe(false);
-    expect(mixedContentBlocked("http:", "ws://192.168.1.20/ws")).toBe(false);
+    expect(mixedContentBlocked("https:", "wss://zenit.example/ws", false)).toBe(false);
+    expect(mixedContentBlocked("http:", "ws://192.168.1.20/ws", false)).toBe(false);
+    expect(mixedContentBlocked("http:", "ws://zenit/ws", true)).toBe(false);
   });
 });
 
 describe("addressUnavailableHere", () => {
-  it("is true on a secure page of another site, where only USB reaches a Zenit", () => {
-    expect(addressUnavailableHere("https:", "monska85.github.io")).toBe(true);
-    expect(addressUnavailableHere("https:", "192.168.1.5")).toBe(true);
+  it("is true on a secure page of another site in a browser without Local Network Access", () => {
+    expect(addressUnavailableHere("https:", "monska85.github.io", false)).toBe(true);
+    expect(addressUnavailableHere("https:", "192.168.1.5", false)).toBe(true);
   });
 
-  it("is false on this computer, and on a page that is not secure", () => {
-    expect(addressUnavailableHere("https:", "localhost")).toBe(false);
-    expect(addressUnavailableHere("https:", "127.0.0.1")).toBe(false);
-    expect(addressUnavailableHere("https:", "[::1]")).toBe(false);
-    expect(addressUnavailableHere("http:", "zenit-1a2b.local")).toBe(false);
-    expect(addressUnavailableHere("http:", "monska85.github.io")).toBe(false);
+  it("is false with Local Network Access, on this computer, and on a page that is not secure", () => {
+    expect(addressUnavailableHere("https:", "monska85.github.io", true)).toBe(false);
+    expect(addressUnavailableHere("https:", "localhost", false)).toBe(false);
+    expect(addressUnavailableHere("https:", "127.0.0.1", false)).toBe(false);
+    expect(addressUnavailableHere("https:", "[::1]", false)).toBe(false);
+    expect(addressUnavailableHere("http:", "zenit-1a2b.local", false)).toBe(false);
+    expect(addressUnavailableHere("http:", "monska85.github.io", false)).toBe(false);
+  });
+});
+
+describe("localNetworkAccessFor", () => {
+  const brands = (version: string) => [
+    { brand: "Google Chrome", version },
+    { brand: "Not/A)Brand", version: "8" },
+    { brand: "Chromium", version },
+  ];
+
+  it("is true for Chromium 147 and later", () => {
+    expect(localNetworkAccessFor(brands("147"))).toBe(true);
+    expect(localNetworkAccessFor(brands("159"))).toBe(true);
+  });
+
+  it("is false for older Chromium, a browser without the Chromium brand, and no brands at all", () => {
+    expect(localNetworkAccessFor(brands("146"))).toBe(false);
+    expect(localNetworkAccessFor([{ brand: "Firefox", version: "200" }])).toBe(false);
+    expect(localNetworkAccessFor([])).toBe(false);
+    expect(localNetworkAccessFor(undefined)).toBe(false);
+  });
+
+  it("is false for a version that is not a whole number", () => {
+    expect(localNetworkAccessFor([{ brand: "Chromium", version: "147.0" }])).toBe(false);
+    expect(localNetworkAccessFor([{ brand: "Chromium", version: "" }])).toBe(false);
+  });
+});
+
+describe("connectTimeoutFor", () => {
+  const SITE = "monska85.github.io";
+
+  it("waits longer from a secure page of another site to the local network or this computer while the browser may ask", () => {
+    for (const permission of ["prompt", "unknown"] as const) {
+      expect(connectTimeoutFor("https:", SITE, "ws://zenit-1a2b.local/ws", permission)).toBe(
+        PERMISSION_CONNECT_TIMEOUT_MS,
+      );
+      expect(connectTimeoutFor("https:", SITE, "ws://192.168.1.20/ws", permission)).toBe(PERMISSION_CONNECT_TIMEOUT_MS);
+      expect(connectTimeoutFor("https:", SITE, "ws://127.0.0.1:8765", permission)).toBe(PERMISSION_CONNECT_TIMEOUT_MS);
+    }
+  });
+
+  it("keeps the normal window once the permission is answered, and everywhere else", () => {
+    expect(connectTimeoutFor("https:", SITE, "ws://192.168.1.20/ws", "granted")).toBe(CONNECT_TIMEOUT_MS);
+    expect(connectTimeoutFor("https:", SITE, "ws://192.168.1.20/ws", "denied")).toBe(CONNECT_TIMEOUT_MS);
+    expect(connectTimeoutFor("https:", SITE, "wss://zenit.example/ws", "prompt")).toBe(CONNECT_TIMEOUT_MS);
+    expect(connectTimeoutFor("https:", SITE, "ws://zenit.example/ws", "prompt")).toBe(CONNECT_TIMEOUT_MS);
+    expect(connectTimeoutFor("https:", "localhost", "ws://192.168.1.20/ws", "prompt")).toBe(CONNECT_TIMEOUT_MS);
+    expect(connectTimeoutFor("http:", "zenit-1a2b.local", "ws://zenit-1a2b.local/ws", "prompt")).toBe(
+      CONNECT_TIMEOUT_MS,
+    );
+  });
+});
+
+describe("permissionNameFor", () => {
+  it("asks about loopback for this computer and about the local network otherwise, never the older name", () => {
+    expect(permissionNameFor("127.0.0.1")).toBe("loopback-network");
+    expect(permissionNameFor("[::1]")).toBe("loopback-network");
+    expect(permissionNameFor("localhost")).toBe("loopback-network");
+    expect(permissionNameFor("zenit-1a2b.local")).toBe("local-network");
+    expect(permissionNameFor("192.168.1.20")).toBe("local-network");
   });
 });

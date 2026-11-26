@@ -2,7 +2,7 @@
 
 Date: 2026-11-22
 
-Status: accepted
+Status: accepted; the consequence on mixed content amended 2026-11-26 (Chrome's Local Network Access)
 
 ## Context
 
@@ -11,7 +11,7 @@ Status: accepted
 The constraints that shape this decision:
 
 - The client must follow the protocol exactly as `tools/zenit.py` does: framing, CRC, strict reply JSON, reply validation, retries.
-- Browsers differ from the Python client: `JSON.parse` accepts duplicate keys and hides whether a number was written `1` or `1.0`; Web Serial has its own port rules; an `https://` page cannot open `ws://` to a LAN host.
+- Browsers differ from the Python client: `JSON.parse` accepts duplicate keys and hides whether a number was written `1` or `1.0`; Web Serial has its own port rules; an `https://` page cannot open `ws://` to a LAN host, except in Chromium browsers from release 147 after Chrome's Local Network Access prompt.
 - The ESP32-C3's USB serial port restarts the chip when DTR and RTS are driven in the wrong order.
 - The site is static, on GitHub Pages, and sends nothing anywhere else.
 - Firmware and web app are released separately, and one site holds the latest of each.
@@ -36,7 +36,7 @@ The constraints that shape this decision:
 
 - A family member can control a unit with a phone or laptop without knowing a protocol term; the cost is a UI of our own for each effect parameter, kept in step with `docs/board/light-v1.md` by hand and by the limits tests.
 - The client code duplicates the Python client's rules. The conformance cases and the shared reply table keep them equal; a change to a reply field changes both.
-- From the published HTTPS site, a board on the home network cannot be reached by an unencrypted WebSocket. The Connect screen says so up front and turns the address field off there. USB works everywhere, and the simulator works from `localhost`. The WiFi milestone has the board serve this app over HTTP at `http://zenit-XXXX.local/`, where the app connects over WiFi.
+- From the published HTTPS site, Chromium browsers from release 147 reach a board on the home network by its `.local` name or private address after Chrome asks for local network access (amended 2026-11-26). Firefox, Safari and older Chromium releases block the unencrypted WebSocket, so there the Connect screen says so up front and turns the address field off. USB works in the browsers with Web Serial (Chrome and Edge), the board's own `http://` page works over WiFi in every browser, and the simulator works from `localhost`. The WiFi milestone has the board serve this app over HTTP at `http://zenit-XXXX.local/`, where the app connects over WiFi.
 - Installing from the web app keeps the settings unless the user chooses the full erase, which resets them. The factory image stays a release file for a blank board and for manual flashing.
 - Web Serial exists in Chrome and Edge only (and Chrome on Android), so a family on a phone with another browser can use WiFi only.
 - Release tooling now has two packages; the Pages job depends on both release assets, and so a web-only or a firmware-only release rebuilds the whole site.
