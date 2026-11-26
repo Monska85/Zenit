@@ -44,7 +44,6 @@ private:
   Mailbox() { queue_ = xQueueCreateStatic(N, sizeof(T), storage_, &control_); }
   bool send(const T &item, uint32_t wait_ms = 0) { return xQueueSend(queue_, &item, pdMS_TO_TICKS(wait_ms)) == pdTRUE; }
   bool receive(T &out, uint32_t wait_ms = 0) { return xQueueReceive(queue_, &out, pdMS_TO_TICKS(wait_ms)) == pdTRUE; }
-  void clear() { xQueueReset(queue_); }
 
 private:
   StaticQueue_t control_;

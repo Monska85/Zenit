@@ -4,7 +4,6 @@
 
 #include <board_settings.h>
 #include <improv_frame.h>
-#include <scan_list.h>
 
 #include <algorithm>
 #include <cstring>
@@ -25,7 +24,6 @@ using zenit::improv::State;
 
 // A scan answers within this time, with what it has.
 constexpr uint32_t SCAN_TIMEOUT_MS = 15000;
-constexpr size_t MAX_RESULTS = 16;
 
 enum class Pending : uint8_t
 {
@@ -74,16 +72,10 @@ void forget_attempt()
 
 void send_scan()
 {
-  network::Network taken[network::MAX_SCAN];
-  const size_t taken_count = network::take_scan(taken, network::MAX_SCAN);
-  // One result per network name, for its strongest access point, strongest first
+  // network::take_scan gives one result per network name, for its strongest access point, strongest first
   network::Network found[network::MAX_SCAN];
-  size_t count = 0;
-  for (size_t i = 0; i < taken_count; i++)
-    zenit::net::scan_add(found, count, network::MAX_SCAN, taken[i].ssid, std::strlen(taken[i].ssid), taken[i].rssi,
-                         taken[i].secure);
-  zenit::net::scan_sort(found, count);
-  for (size_t i = 0; i < count && i < MAX_RESULTS; i++)
+  const size_t count = network::take_scan(found, network::MAX_SCAN);
+  for (size_t i = 0; i < count; i++)
     send(zenit::improv::result_packet(Command::ScanNetworks,
                                       {found[i].ssid, std::to_string(found[i].rssi), found[i].secure ? "YES" : "NO"}));
   send(zenit::improv::result_packet(Command::ScanNetworks, {}));

@@ -74,7 +74,6 @@ public:
   bool write(const uint8_t *data, size_t size);
   // Writes the header once every byte arrived; false when bytes are missing or the write fails.
   bool finish();
-  uint32_t received() const { return received_; }
   // Whether the image was refused by its header (nothing was erased).
   bool refused() const { return refused_; }
 

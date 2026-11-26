@@ -4,12 +4,12 @@ import { Eye, EyeOff, RefreshCw } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { ImprovClient, ImprovError, type ImprovNetwork } from "../../protocol/improv-client";
 import { boardAddress, describeSignal, passwordProblem, PHONE_ACCESS_HINT, ssidProblem } from "../../wifi/model";
-import { useBoard } from "../board-context";
+import { useSession } from "../board-context";
 import { Banner } from "../components/banner";
 import { Button } from "../components/button";
 
 /** The sentence for a failed WiFi request over USB. A password is never in it. */
-export function describeImprovError(error: unknown, request: "scan" | "provision" = "provision"): string {
+function describeImprovError(error: unknown, request: "scan" | "provision" = "provision"): string {
   if (error instanceof ImprovError) {
     if (request === "scan" && error.failure === "invalid_rpc") return "Zenit could not look for networks. Try again.";
     switch (error.failure) {
@@ -39,7 +39,7 @@ type Progress =
 
 /** Setting up the WiFi of a board connected by USB, with Improv Wi-Fi Serial: scan, choose, type the password, connect. */
 export function ImprovPanel() {
-  const { session } = useBoard();
+  const session = useSession();
   const client = useRef<ImprovClient | null>(null);
   const [networks, setNetworks] = useState<ImprovNetwork[] | null>(null);
   const [ssid, setSsid] = useState("");

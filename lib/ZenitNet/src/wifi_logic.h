@@ -39,8 +39,6 @@ constexpr uint8_t REASON_NO_AP_FOUND_IN_AUTHMODE_THRESHOLD = 211;
 constexpr uint8_t REASON_NO_AP_FOUND_IN_RSSI_THRESHOLD = 212;
 constexpr uint8_t REASON_MIC_FAILURE = 14;
 constexpr uint8_t REASON_802_1X_AUTH_FAILED = 23;
-constexpr uint8_t REASON_AUTH_EXPIRE = 2;
-constexpr uint8_t REASON_CONNECTION_FAIL = 205;
 
 // The state a failed try leaves, from the disconnect reason.
 WifiState state_for_disconnect(uint8_t reason);

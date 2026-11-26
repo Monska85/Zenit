@@ -98,7 +98,3 @@ export function hmacSha256(key: Uint8Array, message: Uint8Array): Uint8Array {
 /** Lowercase hexadecimal digits of `bytes`. */
 export const toHex = (bytes: Uint8Array): string =>
   Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-
-/** The bytes of hexadecimal digits (an even number of them). */
-export const fromHex = (digits: string): Uint8Array =>
-  Uint8Array.from(digits.match(/../g) ?? [], (pair) => parseInt(pair, 16));

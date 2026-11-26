@@ -29,8 +29,15 @@ export default defineConfig(
     },
   },
   {
-    // The protocol and the light model run in Node too (tests): nothing from the page, except what a transport is given.
-    files: ["src/protocol/**/*.ts", "src/light/**/*.ts", "src/release/**/*.ts"],
+    // The protocol, the light model, the release, device and WiFi models run in Node too (tests): nothing from the
+    // page, except what a transport is given.
+    files: [
+      "src/protocol/**/*.ts",
+      "src/light/**/*.ts",
+      "src/release/**/*.ts",
+      "src/device/**/*.ts",
+      "src/wifi/**/*.ts",
+    ],
     rules: {
       "no-restricted-globals": [
         "error",

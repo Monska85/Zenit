@@ -42,14 +42,6 @@ const zenit::LightFrame &tick(uint64_t now)
 
 bool first_output_written() { return written; }
 
-settings::Commit change_settings(const zenit::LightSettings &next, uint64_t now)
-{
-  settings::Commit result = settings::commit(next);
-  if (result == settings::Commit::Ok)
-    engine.apply(next, now);
-  return result;
-}
-
 settings::Commit change_settings(const zenit::LightSettings &light, const zenit::net::BoardSettings &board,
                                  uint64_t now)
 {

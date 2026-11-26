@@ -40,7 +40,12 @@ Failure read_colors(JsonVariantConst value, ColorList &list)
     return bad_value("colors", "expected an array of colors");
   JsonArrayConst array = value.as<JsonArrayConst>();
   if (array.size() < MIN_COLORS || array.size() > MAX_COLORS)
-    return bad_value("colors", "expected 2 to 4 colors");
+  {
+    char why[32];
+    std::snprintf(why, sizeof(why), "expected %u to %u colors", static_cast<unsigned>(MIN_COLORS),
+                  static_cast<unsigned>(MAX_COLORS));
+    return bad_value("colors", why);
+  }
   ColorList result;
   result.count = 0;
   for (JsonVariantConst item : array)
@@ -53,6 +58,29 @@ Failure read_colors(JsonVariantConst value, ColorList &list)
   if (!valid_colors(result))
     return bad_value("colors", "a color is listed twice");
   list = result;
+  return {};
+}
+
+// One light setting of a request, checked by its row of the light-field table.
+Failure apply_light_field(const LightField &field, JsonVariantConst value, LightSettings &next)
+{
+  if (field.kind == FieldKind::Colors)
+    return read_colors(value, next.colors);
+  if (field.kind == FieldKind::Name)
+  {
+    if (!value.is<const char *>() || !field.store(next, 0, value.as<const char *>()))
+      return bad_value(field.name, field.refused);
+    return {};
+  }
+  uint32_t number = 0;
+  if (!read_integer(value, field.min, field.max, number))
+  {
+    char why[48];
+    std::snprintf(why, sizeof(why), "expected a whole number from %u to %u", static_cast<unsigned>(field.min),
+                  static_cast<unsigned>(field.max));
+    return bad_value(field.name, why);
+  }
+  field.store(next, number, "");
   return {};
 }
 
@@ -151,65 +179,11 @@ Failure apply_settings_request(JsonObjectConst request, LightSettings &settings,
       return failure;
     if (handled)
       continue;
-    uint32_t number = 0;
-    if (std::strcmp(name, "brightness") == 0)
-    {
-      if (!read_integer(value, MIN_BRIGHTNESS, MAX_BRIGHTNESS, number))
-        return bad_value(name, "expected a whole number from 1 to 100");
-      next.brightness = static_cast<uint8_t>(number);
-    }
-    else if (std::strcmp(name, "effect") == 0)
-    {
-      if (!value.is<const char *>() || !effect_from_name(value.as<const char *>(), next.effect))
-        return bad_value(name, "not an effect of the board");
-    }
-    else if (std::strcmp(name, "color") == 0)
-    {
-      if (!value.is<const char *>() || !color_from_name(value.as<const char *>(), next.color))
-        return bad_value(name, "not a color the board can light");
-    }
-    else if (std::strcmp(name, "colors") == 0)
-    {
-      if (Failure failure = read_colors(value, next.colors))
-        return failure;
-    }
-    else if (std::strcmp(name, "color_set") == 0)
-    {
-      if (!value.is<const char *>() || !color_set_from_name(value.as<const char *>(), next.color_set))
-        return bad_value(name, "not a color set of the board");
-    }
-    else if (std::strcmp(name, "hold_seconds") == 0)
-    {
-      if (!read_integer(value, MIN_HOLD_SECONDS, MAX_HOLD_SECONDS, number))
-        return bad_value(name, "expected a whole number from 5 to 600");
-      next.hold_seconds = static_cast<uint16_t>(number);
-    }
-    else if (std::strcmp(name, "period_seconds") == 0)
-    {
-      if (!read_integer(value, MIN_PERIOD_SECONDS, MAX_PERIOD_SECONDS, number))
-        return bad_value(name, "expected a whole number from 4 to 20");
-      next.period_seconds = static_cast<uint8_t>(number);
-    }
-    else if (std::strcmp(name, "floor") == 0)
-    {
-      if (!read_integer(value, MIN_FLOOR, MAX_FLOOR, number))
-        return bad_value(name, "expected a whole number from 5 to 80");
-      next.floor = static_cast<uint8_t>(number);
-    }
-    else if (std::strcmp(name, "twinkle_strength") == 0)
-    {
-      if (!read_integer(value, MIN_TWINKLE_STRENGTH, MAX_TWINKLE_STRENGTH, number))
-        return bad_value(name, "expected a whole number from 5 to 50");
-      next.twinkle_strength = static_cast<uint8_t>(number);
-    }
-    else if (std::strcmp(name, "timer_minutes") == 0)
-    {
-      if (!read_integer(value, 0, MAX_TIMER_MINUTES, number))
-        return bad_value(name, "expected a whole number from 0 to 360");
-      next.timer_minutes = static_cast<uint16_t>(number);
-    }
-    else
+    const LightField *light = find_light_field(name);
+    if (!light)
       return fail_field("bad_request", "unknown field", name);
+    if (Failure failure = apply_light_field(*light, value, next))
+      return failure;
   }
   if (!any)
     return fail("bad_request", "settings_set needs at least one setting");

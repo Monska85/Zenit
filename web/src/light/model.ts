@@ -69,7 +69,7 @@ export function effectInfo(name: string): EffectInfo {
   return own(EFFECTS, name) ?? { label: words(name), description: "", params: [] };
 }
 
-export const COLOR_LABELS: Record<string, string> = { white: "Warm white", red: "Red", green: "Green", blue: "Blue" };
+const COLOR_LABELS: Record<string, string> = { white: "Warm white", red: "Red", green: "Green", blue: "Blue" };
 /** What a color looks like as a swatch on screen. */
 export const COLOR_SWATCHES: Record<string, string> = {
   white: "#fff1cf",
@@ -78,7 +78,7 @@ export const COLOR_SWATCHES: Record<string, string> = {
   blue: "#2f6fe0",
 };
 
-export const COLOR_SET_LABELS: Record<string, string> = { christmas: "Christmas", ice: "Ice" };
+const COLOR_SET_LABELS: Record<string, string> = { christmas: "Christmas", ice: "Ice" };
 export const COLOR_SET_COLORS: Record<string, readonly string[]> = {
   christmas: ["red", "green", "white"],
   ice: ["blue", "white"],

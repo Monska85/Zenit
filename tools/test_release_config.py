@@ -128,8 +128,10 @@ class WorkflowTest(unittest.TestCase):
         job = text[text.index("\n  web:") :]
         self.assertIn("needs: changes", job)
         self.assertIn("needs.changes.outputs.code == 'true'", job)
-        for step in ["web-test", "web-size", "web-e2e", "web-screenshots"]:
-            self.assertIn(step, job)
+        # One make run builds the app once and runs every web gate (web-check: web-test, web-size, web-e2e and
+        # web-screenshots)
+        self.assertIn("run: make web-check", job)
+        self.assertIn("\nweb-check: web-test web-size web-e2e web-screenshots ", read("Makefile"))
 
     def test_the_release_runs_only_after_ci_passes_on_a_push_to_main(self):
         text = read(".github", "workflows", "release.yml")

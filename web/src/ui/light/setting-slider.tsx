@@ -5,7 +5,7 @@ import { Slider } from "../components/slider";
 import { CommitTracker } from "./commit-tracker";
 
 /** How long the keyboard waits after its last key before the value is sent: each key press would be a save. */
-export const KEY_PAUSE_MS = 500;
+const KEY_PAUSE_MS = 500;
 
 /**
  * A setting with a slider. While the thumb moves the value shown is the one being chosen and nothing is sent; the

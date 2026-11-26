@@ -63,7 +63,7 @@ Cases for the pure logic of milestone 4, each file with a `description`:
 - `net/origin.json`: the WebSocket origin check and the origin of a site address. `net/ws_message.json`: reassembly of WebSocket frames into one line, with the close statuses. `net/http.json`: what a request path means for the served app, and the answer headers.
 - `net/scan.json`: the list of a WiFi scan (one entry per name, strongest access point, best 16 names, sorted).
 - `net/wifi.json`: the wait between tries, the state a disconnect reason leaves, the power fallback, the hostname and the checks of the network name and password.
-- `board/stored.json`: what the board reads at start, the blob that holds both records or the old separate keys, a damaged blob.
+- `board/stored.json`: what the board reads at start: the blob that holds both records, a damaged blob, nothing stored.
 - `board/record.json`: the 255-byte board record, both ways (`record_hex`), laid out by an independent script from the table of the specification.
 - `update/web_image.json`: the web image of the `www` partition, header fields and body bytes laid out by hand from the specification, valid and refused, read by the board's reader (native tests) and by `tools/web_image.py`.
 - `update/semver.json`, `update/manifest.json`, `update/web_manifest.json`, `update/schedule.json`, `update/boot.json`: versions and precedence, the firmware and web manifests (valid and refused texts), the install window and the check schedule, and what the boot does with the update record.

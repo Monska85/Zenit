@@ -20,7 +20,7 @@ enum class Color : uint8_t
 };
 constexpr size_t COLOR_COUNT = 4;
 
-// Output channels, in GPIO order: red 3, green 4, blue 5, white 6.
+// Output channels, in GPIO order: red 3, green 4, blue 5, white 10.
 enum Channel : uint8_t
 {
   RED = 0,

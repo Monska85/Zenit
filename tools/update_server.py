@@ -73,7 +73,7 @@ def main(argv=None):
         except OSError as error:
             print(f"update_server: {error}", file=sys.stderr)
             return 1
-        if not pages_site.MIN_FIRMWARE_SIZE <= len(data) <= assets.app_slot(assets.ROOT / "partitions.csv")[1]:
+        if not pages_site.MIN_FIRMWARE_SIZE <= len(data) <= assets.partition("app0")[1]:
             print("update_server: the file is not a size a board installs", file=sys.stderr)
             return 1
     if args.web is not None:

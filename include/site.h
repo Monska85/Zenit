@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// The project's site address, set when the firmware is built (scripts/site_url.py): where the update manifest is and
+// The project's site address, set when the firmware is built (tools/site_url.py): where the update manifest is and
 // the origin the WebSocket accepts.
 
 #pragma once

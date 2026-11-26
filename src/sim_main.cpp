@@ -258,7 +258,7 @@ void run_event(const Event &event, uint64_t now)
   zenit::LightSettings next = settings::current();
   std::string error;
   zenit::set_light_setting(next, event.key, event.value, error);
-  if (app::change_settings(next, now) != settings::Commit::Ok)
+  if (app::change_settings(next, settings::board(), now) != settings::Commit::Ok)
     platform::log("cannot save %s", event.key.c_str());
   else
     platform::log("%s=%s at %llu ms", event.key.c_str(), event.value.c_str(), (unsigned long long)now);

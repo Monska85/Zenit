@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POLL_MS, BoardSession, OpenFailed, type Visibility } from "../src/board/session";
-import { FakeBoard, INFO, ScriptedTransport, lineOf } from "./helpers";
+import { FakeBoard, INFO, ScriptedTransport, TIME_STATUS, lineOf } from "./helpers";
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
@@ -188,6 +188,22 @@ describe("polling", () => {
     expect(session.getState().light?.on).toBe(false);
     await vi.advanceTimersByTimeAsync(POLL_MS * 3);
     expect(commands(board).slice(before)).toEqual(["status", "status", "status", "status"]);
+  });
+
+  it("notifies subscribers once for status replies that did not change", async () => {
+    const { session, board } = await connected(new FakeBoard().withNetwork());
+    let notified = 0;
+    session.subscribe(() => notified++);
+    // A synced board's clock moves at every reply; nothing the page shows does
+    for (let i = 0; i < 3; i++) {
+      board.time = { ...TIME_STATUS, epoch: TIME_STATUS.epoch + i + 1 };
+      await vi.advanceTimersByTimeAsync(POLL_MS);
+    }
+    expect(notified).toBe(0);
+    board.on = false;
+    await vi.advanceTimersByTimeAsync(POLL_MS * 3);
+    expect(notified).toBe(1);
+    expect(session.getState().light?.on).toBe(false);
   });
 
   it("does not ask while the page is hidden, and asks once when it is shown", async () => {

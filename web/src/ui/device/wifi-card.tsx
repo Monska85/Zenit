@@ -3,47 +3,32 @@
 import { useState } from "react";
 import { choiceOptions, WIFI_POWER_LABELS, WIFI_POWERS } from "../../device/settings";
 import { boardAddress, describeSignal, describeWifiState, PHONE_ACCESS_HINT } from "../../wifi/model";
-import { useBoard } from "../board-context";
+import { useBoard, useSession } from "../board-context";
 import { Button } from "../components/button";
 import { Card, CardTitle } from "../components/card";
 import { SelectField } from "../components/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogTitle,
-} from "../components/alert-dialog";
+import { ConfirmDialog } from "../components/confirm-dialog";
 import { useCommit } from "../light/use-commit";
 import { ImprovPanel } from "./improv-panel";
 
 function ForgetNetwork() {
-  const { session } = useBoard();
+  const session = useSession();
   const [open, setOpen] = useState(false);
   return (
     <>
       <Button variant="outline" onClick={() => setOpen(true)}>
         Forget this network
       </Button>
-      <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent>
-          <AlertDialogTitle className="mb-2 text-lg font-semibold">Forget this WiFi network?</AlertDialogTitle>
-          <AlertDialogDescription className="mb-4 text-base">
-            Zenit leaves the network and turns its WiFi off. You can set it up again with the USB cable.
-          </AlertDialogDescription>
-          <div className="flex justify-end gap-2">
-            <AlertDialogCancel asChild>
-              <Button variant="outline">Cancel</Button>
-            </AlertDialogCancel>
-            <AlertDialogAction asChild>
-              <Button variant="danger" onClick={() => void session.forgetWifi()}>
-                Forget network
-              </Button>
-            </AlertDialogAction>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="Forget this WiFi network?"
+        confirm="Forget network"
+        tone="danger"
+        onConfirm={() => void session.forgetWifi()}
+      >
+        Zenit leaves the network and turns its WiFi off. You can set it up again with the USB cable.
+      </ConfirmDialog>
     </>
   );
 }

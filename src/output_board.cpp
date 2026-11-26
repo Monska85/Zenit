@@ -22,6 +22,15 @@ constexpr uint16_t BOARD_DUTY_MAX = zenit::DUTY_MAX - 1;
 
 uint32_t board_duty(uint16_t duty) { return duty > BOARD_DUTY_MAX ? BOARD_DUTY_MAX : duty; }
 bool attached[zenit::CHANNEL_COUNT] = {false, false, false, false};
+// The duty each channel was last given, so a tick that changes nothing makes no driver call.
+uint32_t written[zenit::CHANNEL_COUNT] = {0, 0, 0, 0};
+
+void set(size_t channel, uint32_t duty)
+{
+  // A write that failed is tried again at the next tick.
+  if (attached[channel] && written[channel] != duty && ledcWrite(CHANNEL_PINS[channel], duty))
+    written[channel] = duty;
+}
 } // namespace
 
 void begin()
@@ -35,6 +44,7 @@ void begin()
   for (size_t i = 0; i < zenit::CHANNEL_COUNT; i++)
   {
     attached[i] = ledcAttach(CHANNEL_PINS[i], zenit::PWM_FREQUENCY_HZ, zenit::PWM_BITS);
+    written[i] = 0;
     if (attached[i])
       ledcWrite(CHANNEL_PINS[i], 0);
     else
@@ -48,11 +58,11 @@ void write(const zenit::Duties &duties)
 {
   // Channels going to 0 first, then the lit one, so two dies are never on together during a color switch.
   for (size_t i = 0; i < zenit::CHANNEL_COUNT; i++)
-    if (attached[i] && duties.value[i] == 0)
-      ledcWrite(CHANNEL_PINS[i], 0);
+    if (duties.value[i] == 0)
+      set(i, 0);
   for (size_t i = 0; i < zenit::CHANNEL_COUNT; i++)
-    if (attached[i] && duties.value[i] != 0)
-      ledcWrite(CHANNEL_PINS[i], board_duty(duties.value[i]));
+    if (duties.value[i] != 0)
+      set(i, board_duty(duties.value[i]));
 }
 
 void status_led(bool on) { digitalWrite(STATUS_LED_PIN, on ? LOW : HIGH); }

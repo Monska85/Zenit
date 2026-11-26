@@ -1,0 +1,12 @@
+{
+  "description": "fall_asleep at brightness 100, floor 20, timer 1 minute; timer_minutes 2 at 10 s restarts the effect with the new countdown. Fade-down from F = 1000 - 800 * 10000 / 60000 = 866.67 to 173.33 at 10.5 s (520 at 10.25 s). The new countdown started at 10 s, so at the effect's start e is already 500 ms. The fade-in follows the moving factor: at 10.75 s, u = 0.5 and F(e = 750) = 1000 - 800 * 750 / 120000 = 995, shown 173.33 + (995 - 173.33) * 0.5 = 584.17; at 11 s, F(e = 1000) = 993.33. L = F / 10.",
+  "settings": { "effect": "fall_asleep", "brightness": 100, "floor": 20, "timer_minutes": 1 },
+  "events": [{ "at": 10000, "set": { "timer_minutes": 2 } }],
+  "expect": [
+    { "at": 10000, "duties": [0, 0, 0, 11358] },
+    { "at": 10250, "duties": [0, 0, 0, 3300] },
+    { "at": 10500, "duties": [0, 0, 0, 389] },
+    { "at": 10750, "duties": [0, 0, 0, 4325] },
+    { "at": 11000, "duties": [0, 0, 0, 16102], "timer_remaining_s": 119 }
+  ]
+}

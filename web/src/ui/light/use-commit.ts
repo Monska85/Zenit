@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { Settings } from "../../protocol/types";
-import { useBoard } from "../board-context";
+import { useSession } from "../board-context";
 import { CommitTracker } from "./commit-tracker";
 
 /**
@@ -10,7 +10,7 @@ import { CommitTracker } from "./commit-tracker";
  * Only the latest commit of a setting clears it: an earlier one that ends late leaves the later choice showing.
  */
 export function useCommit(): { pending: Partial<Settings>; commit: (patch: Partial<Settings>) => Promise<void> } {
-  const { session } = useBoard();
+  const session = useSession();
   const [pending, setPending] = useState<Partial<Settings>>({});
   const tracker = useRef(new CommitTracker());
   const commit = async (patch: Partial<Settings>): Promise<void> => {

@@ -6,20 +6,14 @@ import { useBoard } from "../board-context";
 import { Banner } from "../components/banner";
 import { Button } from "../components/button";
 import { Card, CardTitle } from "../components/card";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogTitle,
-} from "../components/alert-dialog";
+import { ConfirmDialog } from "../components/confirm-dialog";
 import type { Route } from "../route";
 
 // ESP Web Tools is large: it loads only when the installation starts.
 const Installer = lazy(() => import("./installer"));
 
 /** Where the manifest of the installer is, next to the app. */
-export const MANIFEST_PATH = "firmware/manifest.json";
+const MANIFEST_PATH = "firmware/manifest.json";
 
 export function FirmwareInstall({ published, go }: { published: FirmwareManifest | null; go: (route: Route) => void }) {
   const { board, session } = useBoard();
@@ -78,26 +72,15 @@ export function FirmwareInstall({ published, go }: { published: FirmwareManifest
           </Button>
         </>
       )}
-      <AlertDialog open={asking} onOpenChange={setAsking}>
-        <AlertDialogContent>
-          <AlertDialogTitle className="mb-2 text-lg font-semibold">Before you connect the cable</AlertDialogTitle>
-          <AlertDialogDescription asChild>
-            <div className="mb-4 flex flex-col gap-3 text-base">
-              <Banner tone="warning">
-                Unplug the panel power socket from the wall before you connect the USB cable. Never connect USB and the
-                panel power together.
-              </Banner>
-              <p>
-                Your settings are kept. The installer offers to erase everything for a clean install: choose that only
-                if the Zenit misbehaves.
-              </p>
-              {stuck && (
-                <Banner tone="error">
-                  The USB port is still in use. Unplug the USB cable, plug it in again, then reload this page.
-                </Banner>
-              )}
-            </div>
-          </AlertDialogDescription>
+      <ConfirmDialog
+        open={asking}
+        onOpenChange={setAsking}
+        title="Before you connect the cable"
+        confirm="Continue"
+        disabled={!unplugged}
+        keepOpen
+        onConfirm={() => void start()}
+        extra={
           <label htmlFor={checkId} className="mb-4 flex min-h-11 cursor-pointer items-center gap-3 text-base">
             <input
               id={checkId}
@@ -108,16 +91,22 @@ export function FirmwareInstall({ published, go }: { published: FirmwareManifest
             />
             The panel power socket is unplugged
           </label>
-          <div className="flex justify-end gap-2">
-            <AlertDialogCancel asChild>
-              <Button variant="outline">Cancel</Button>
-            </AlertDialogCancel>
-            <Button disabled={!unplugged} onClick={() => void start()}>
-              Continue
-            </Button>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
+        }
+      >
+        <Banner tone="warning">
+          Unplug the panel power socket from the wall before you connect the USB cable. Never connect USB and the panel
+          power together.
+        </Banner>
+        <p>
+          Your settings are kept. The installer offers to erase everything for a clean install: choose that only if the
+          Zenit misbehaves.
+        </p>
+        {stuck && (
+          <Banner tone="error">
+            The USB port is still in use. Unplug the USB cable, plug it in again, then reload this page.
+          </Banner>
+        )}
+      </ConfirmDialog>
     </Card>
   );
 }

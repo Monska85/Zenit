@@ -14,7 +14,7 @@ import { frameRequest, parseLine } from "../src/protocol/frame";
 import { validBody } from "../src/protocol/schema";
 import { plain, toInfo, toSettings } from "../src/protocol/types";
 import type { JsonObject } from "../src/protocol/strict-json";
-import { INFO, ScriptedTransport, lineOf } from "./helpers";
+import { fromHex, INFO, ScriptedTransport, lineOf } from "./helpers";
 
 const DIR = join(import.meta.dirname, "..", "..", "conformance", "protocol");
 
@@ -79,8 +79,6 @@ function replyOf(expectation: Record<string, unknown>): Record<string, unknown> 
   return reply["ok"] === false ? { ...reply, message: "for people" } : reply;
 }
 
-const hex = (digits: string): Uint8Array => Uint8Array.from(digits.match(/../g) ?? [], (pair) => parseInt(pair, 16));
-
 describe("conformance cases", () => {
   it("are present", () => {
     expect(cases.length).toBeGreaterThan(20);
@@ -100,7 +98,7 @@ describe("conformance cases", () => {
         const transport = step.transport ?? testCase.transport ?? "usb";
         let bytes: Uint8Array | null = null;
         if (typeof step.send === "string") bytes = encoder.encode(step.send);
-        else if (step.send_hex !== undefined) bytes = hex(step.send_hex);
+        else if (step.send_hex !== undefined) bytes = fromHex(step.send_hex);
         if (bytes === null || bytes.includes(0x0a)) continue;
         // The board limits the nesting of a request to 4 levels; replies are read to 64
         if (/nest|level/i.test(step.note ?? "")) continue;

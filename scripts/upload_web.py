@@ -4,20 +4,20 @@
 """
 
 import os
+import sys
 
 Import("env")  # noqa: F821 - provided by PlatformIO (SCons)
 
 project = env.subst("$PROJECT_DIR")  # noqa: F821
 IMAGE = os.path.join(project, ".pio", "web", "zenit-web.bin")
 
+# The partition table is read by tools/release_assets.py, as for the release files
+sys.path.insert(0, os.path.join(project, "tools"))
+import release_assets  # noqa: E402
+
 
 def www_offset():
-    with open(os.path.join(project, "partitions.csv"), encoding="utf-8") as table:
-        for line in table:
-            fields = [field.strip() for field in line.split("#", 1)[0].split(",")]
-            if fields[0] == "www":
-                return fields[3]
-    raise SystemExit("partitions.csv has no www partition")
+    return hex(release_assets.partition("www", os.path.join(project, "partitions.csv"))[0])
 
 
 def check_image(*_args, **_kwargs):

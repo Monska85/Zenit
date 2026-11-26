@@ -33,6 +33,8 @@ import shutil
 import sys
 from pathlib import Path
 
+import web_image
+
 ROOT = Path(__file__).resolve().parent.parent
 BOARD = "esp32c3"
 # Where the ESP32-C3 reads each part, from the chip's boot rules
@@ -47,28 +49,17 @@ PARTITIONS_NAME = f"zenit-{BOARD}-partitions.bin"
 BOOT_APP0_NAME = f"zenit-{BOARD}-boot_app0.bin"
 PROTOCOL_NAME = f"zenit-{BOARD}-protocol.txt"
 NOTICES_NAME = "THIRD_PARTY_NOTICES.txt"
-# The protocol the firmware speaks
-PROTOCOL_HEADER = ROOT / "lib" / "ZenitProto" / "src" / "proto_limits.h"
-
-
-def firmware_protocol(header=PROTOCOL_HEADER):
-    found = re.search(r"constexpr uint8_t PROTOCOL_VERSION = (\d+);", Path(header).read_text(encoding="utf-8"))
-    if not found:
-        raise ReleaseError(f"{header}: no PROTOCOL_VERSION")
-    return int(found.group(1))
-
-
 class ReleaseError(Exception):
     pass
 
 
-def app_slot(partitions_csv):
-    """(offset, size) of the first application slot, `ota_0`, in a partitions.csv."""
-    for line in partitions_csv.read_text(encoding="utf-8").splitlines():
+def partition(name, partitions_csv=ROOT / "partitions.csv"):
+    """(offset, size) of the partition `name` in a partitions.csv (`app0` is the first application slot)."""
+    for line in Path(partitions_csv).read_text(encoding="utf-8").splitlines():
         fields = [field.strip() for field in line.split("#", 1)[0].split(",")]
-        if len(fields) >= 5 and fields[1] == "app" and fields[2] == "ota_0":
+        if len(fields) >= 5 and fields[0] == name:
             return int(fields[3], 0), int(fields[4], 0)
-    raise ReleaseError(f"{partitions_csv} has no ota_0 application slot")
+    raise ReleaseError(f"{partitions_csv} has no partition {name}")
 
 
 def merge_factory(parts):
@@ -100,7 +91,7 @@ def make_assets(version, build_dir, boot_app0, out_dir, partitions_csv, notices=
     if not re.fullmatch(r"[0-9A-Za-z][0-9A-Za-z.+-]{0,63}", version):
         raise ReleaseError(f"'{version}' is not a version")
     app = read(build_dir / "firmware.bin", "the application")
-    offset, size = app_slot(partitions_csv)
+    offset, size = partition("app0", partitions_csv)
     if len(app) > size:
         raise ReleaseError(f"the application is {len(app)} bytes, its slot {size}")
     # The firmware keeps its version behind a marker and ends it with a NUL (src/platform.cpp): only that exact text
@@ -119,7 +110,7 @@ def make_assets(version, build_dir, boot_app0, out_dir, partitions_csv, notices=
     (out_dir / BOOTLOADER_NAME).write_bytes(bootloader)
     (out_dir / PARTITIONS_NAME).write_bytes(table)
     (out_dir / BOOT_APP0_NAME).write_bytes(otadata)
-    (out_dir / PROTOCOL_NAME).write_text(f"{firmware_protocol()}\n", encoding="ascii")
+    (out_dir / PROTOCOL_NAME).write_text(f"{web_image.firmware_protocol()}\n", encoding="ascii")
     names = [FACTORY_NAME, FIRMWARE_NAME, BOOTLOADER_NAME, PARTITIONS_NAME, BOOT_APP0_NAME, PROTOCOL_NAME]
     if notices is not None:
         shutil.copyfile(notices, out_dir / NOTICES_NAME)
@@ -140,7 +131,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         names = make_assets(args.version, args.build_dir, args.boot_app0, args.out, args.partitions, args.notices)
-    except (ReleaseError, OSError) as error:
+    except (ReleaseError, web_image.AssetsError, OSError) as error:
         sys.exit(f"release_assets: {error}")
     for name in names:
         print(f"{args.out / name}")

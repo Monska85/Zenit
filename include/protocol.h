@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // The command protocol of docs/protocol/protocol-v1.md. The core takes one line and writes the reply line, so every
-// transport drives it the same way: the USB serial port on the board, standard input in the simulator, the WebSocket
-// later. It runs on the loop task only.
+// transport drives it the same way: the USB serial port and the WebSocket on the board, standard input in the
+// simulator. It runs on the loop task only.
 
 #pragma once
 

@@ -12,7 +12,7 @@ Run them from the repository root with `just` or `make` (`just --list`, `make he
 | `just web-dev`                | Start the app on `http://localhost:5173` with live reload.                  |
 | `just web-test`               | Type check, lint, check the formatting, run the unit and conformance tests. |
 | `just web-format`             | Format with Prettier.                                                       |
-| `just web-build`              | Type check and build into `web/dist`.                                       |
+| `just web-build`              | Build into `web/dist` (the type check is in `just web-test`).               |
 | `just web-size`               | Build, then fail when the JavaScript loaded at start is over 150 KB gzip.   |
 | `just web-e2e`                | Run the Playwright end-to-end tests and layout checks.                      |
 | `just web-screenshots`        | Compare the reference screenshots (inside the Playwright container).        |

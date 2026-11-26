@@ -36,9 +36,6 @@ from pathlib import Path
 import release_assets as assets
 import web_image
 
-# The parts of the factory image that the installer writes, each at its own offset: the file names and offsets are those
-# of tools/release_assets.py and partitions.csv. The settings memory (0x9000 to 0xDFFF) is not among them, so an update
-# keeps the settings.
 # The longest manifest the board reads (lib/ZenitUpdate/src/manifest.h)
 MAX_UPDATE_MANIFEST = 1024
 # The smallest application a board installs (lib/ZenitUpdate/src/manifest.h)
@@ -55,18 +52,12 @@ class SiteError(Exception):
 WEB_PART_NAME = "zenit-web.bin"
 
 
-def www_offset(partitions_csv=assets.ROOT / "partitions.csv"):
-    """The offset of the `www` partition in a partitions.csv."""
-    for line in partitions_csv.read_text(encoding="utf-8").splitlines():
-        fields = [field.strip() for field in line.split("#", 1)[0].split(",")]
-        if fields[0] == "www":
-            return int(fields[3], 0)
-    raise SiteError("partitions.csv has no www partition")
-
-
 def parts():
     """(file name, offset) of each firmware part the installer writes, in flash order."""
-    app_offset = assets.app_slot(assets.ROOT / "partitions.csv")[0]
+    # The parts of the factory image that the installer writes, each at its own offset: the file names and offsets are
+    # those of tools/release_assets.py and partitions.csv. The settings memory (0x9000 to 0xDFFF) is not among them, so
+    # an update keeps the settings.
+    app_offset = assets.partition("app0")[0]
     return [
         (assets.BOOTLOADER_NAME, assets.BOOTLOADER_OFFSET),
         (assets.PARTITIONS_NAME, assets.PARTITION_TABLE_OFFSET),
@@ -79,7 +70,7 @@ def manifest(version, with_web=False):
     """The ESP Web Tools manifest of a firmware release: the parts at their offsets (with the web image at the `www`
     offset when `with_web`), and an offer to erase the whole flash for a clean install (without it, an install keeps
     the settings)."""
-    listed = parts() + ([(WEB_PART_NAME, www_offset())] if with_web else [])
+    listed = parts() + ([(WEB_PART_NAME, assets.partition("www")[0])] if with_web else [])
     return {
         "name": "Zenit",
         "version": version,
@@ -218,7 +209,7 @@ def assemble(web, out, firmware=None, firmware_version=None, web_image_path=None
                 json.dumps(manifest(firmware_version, with_web=image is not None), indent=2) + "\n", encoding="utf-8"
             )
             firmware_bytes = (target / assets.FIRMWARE_NAME).read_bytes()
-            slot_size = assets.app_slot(assets.ROOT / "partitions.csv")[1]
+            slot_size = assets.partition("app0")[1]
             if not MIN_FIRMWARE_SIZE <= len(firmware_bytes) <= slot_size:
                 raise SiteError(
                     f"{assets.FIRMWARE_NAME} is {len(firmware_bytes)} bytes: a board updates only to a file of "

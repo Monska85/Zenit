@@ -87,4 +87,27 @@ bool color_set_from_name(const char *name, ColorSet &set);
 // The colors of a preset list of the `christmas` effect.
 ColorList color_set_colors(ColorSet set);
 
+// The light settings as the readers of a request see them (the protocol's JSON and the simulator's `key=value` text):
+// one row per setting, in the order of the protocol's table, so both readers check the same names and ranges.
+enum class FieldKind : uint8_t
+{
+  Number, // a whole number from `min` to `max`
+  Name,   // one of the names of an enumeration: an effect, a color or a color set
+  Colors  // a list of `MIN_COLORS` to `MAX_COLORS` colors, each listed once (valid_colors)
+};
+struct LightField
+{
+  const char *name;
+  FieldKind kind;
+  uint32_t min;
+  uint32_t max;
+  // Name: what a reply says of a name that is not one of the values.
+  const char *refused;
+  // Number: stores `number`, already in range. Name: stores the value named `text`; false when no value has that name.
+  // Colors: not used (the readers build the list and store it in `colors`).
+  bool (*store)(LightSettings &settings, uint32_t number, const char *text);
+};
+// The row of the setting `name`, or nullptr when no light setting has that name.
+const LightField *find_light_field(const char *name);
+
 } // namespace zenit

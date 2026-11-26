@@ -108,7 +108,7 @@ The light, and from the WiFi and updates milestone the WiFi, time and update sta
 | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `light.on`                | `false` after off from the app or the end of the timer, until the light is turned on or the board restarts; `true` otherwise.     |
 | `light.effect`            | The `effect` setting.                                                                                                             |
-| `light.color`             | The color lit now, or `null` when the light is off.                                                                               |
+| `light.color`             | The color lit now, or `null` when no channel has a duty above 0. It follows the output, not `light.on`: `null` while the light is off and at a level below the first duty step, and the fading color during the fade-out after off, while `on` is already `false`. |
 | `light.lightness`         | The lightness `L` sent to the curve now, from 0 to 100, always written with one decimal (`60.0`).                                 |
 | `light.power_scale`       | The percentage the [power limit](../board/light-v1.md#power-limit) leaves of the duties now, from 1 to 100.                       |
 | `light.timer`             | `null` with no timer, otherwise `minutes` (the setting, 1 to 360) and `remaining`, the whole seconds until the fade-out starts, from 0 (after it) to `minutes` times 60. |
@@ -170,7 +170,7 @@ Light settings apply at once, with the [transitions](../board/light-v1.md#transi
 Turns the light on or off, without saving. One field, `on`: `true` or `false`.
 
 - `on: false` fades the light out in 1 second; it stays off until `light` with `on: true` or a restart.
-- `on: true` fades the light in to the current settings in 1 second and starts the timer again. When the light is already on, nothing changes.
+- `on: true` fades the light in to the current settings in 1 second and starts the timer again. When the light is already on, nothing changes, except during the timer's fade-out, which comes back up and restarts the timer (see [Light](../board/light-v1.md#timer)).
 
 The reply holds `light`, as in `status`.
 
@@ -266,7 +266,7 @@ The figures below are those of milestone 2; the figures of the WiFi and updates 
 
 On an ESP32-C3 SuperMini with the milestone 2 firmware (2026-11-22), after every command, a damaged line and a line over the limit had been sent several times, with the longest settings reply:
 
-- The firmware is 355,760 bytes, 17.5 % of its 2,031,616-byte slot.
+- The firmware is 355,760 bytes, 17.5 % of its 2,031,616-byte slot (the layout before [ADR 0005](../adr/0005-web-app-partition.md); the slot is now 1,769,472 bytes).
 - The loop task's lowest free stack is 5,044 bytes of 8,192 (3,148 used).
 - The heap has 277,848 bytes free, with a largest block of 139,252 bytes; the settings memory has 123 entries in use and 507 free.
 - The replies are short: `info` about 390 bytes, a `settings` reply at most 270, `status` about 175. The reply buffer holds 1,536.

@@ -3,8 +3,6 @@
 # --- Build output and generated files -------------------------------------------------------
 # PlatformIO build output, downloaded libraries and toolchains
 /.pio/
-# Board files generated for the file system image (uploadfs)
-/data/
 # Simulator output
 /sim-out/
 # Release site built locally
