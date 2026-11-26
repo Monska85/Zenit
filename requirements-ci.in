@@ -1,0 +1,13 @@
+# The Python tools CI installs, at exact versions. requirements-ci.txt is compiled from this file with every
+# dependency pinned and hashed, by pip-tools at lock time only (never a dependency of the project):
+# pip-compile --generate-hashes --strip-extras --no-emit-index-url --output-file=requirements-ci.txt requirements-ci.in
+# Dependabot updates both files.
+platformio==6.2.0
+clang-format==23.1.5
+
+# Clients of the command protocol (tools/zenit.py, tools/ws_bridge.py)
+pyserial==3.5
+websockets==17.4
+
+# The certificate bundle: Espressif's generator (tools/crt_bundle.py) and the check of the GitHub Pages chain
+cryptography==50.0.2

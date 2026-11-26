@@ -1,5 +1,5 @@
 name: Setup
-description: Python with the pinned tools of requirements-ci.txt and the PlatformIO cache.
+description: Python with the pinned and hashed tools of requirements-ci.txt and the PlatformIO cache.
 
 runs:
   using: composite
@@ -17,12 +17,14 @@ runs:
         echo "JOBS=$(nproc)" >> "$GITHUB_ENV"
         echo "NICE=0" >> "$GITHUB_ENV"
 
+    # The PlatformIO core comes from requirements-ci.txt: a new core starts a new cache
     - name: Cache PlatformIO toolchains and libraries
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.platformio
-        key: platformio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'lib/*/library.json') }}
+        key: platformio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'lib/*/library.json', 'requirements-ci.txt') }}
 
+    # Every package, dependencies included, at the version and hash of the lock
     - name: Install tools
       shell: bash
-      run: pip install -r requirements-ci.txt
+      run: pip install --require-hashes -r requirements-ci.txt

@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 jobs:
-  # Whether a pull request changed anything but documentation. Every other event runs every job. A job skipped by its
+  # Whether a pull request changed anything but documentation, or a document the tests read. Every other event runs every job. A job skipped by its
   # if: reports success, so the required checks pass; check also runs when this job fails.
   changes:
     runs-on: ubuntu-latest
@@ -22,19 +22,22 @@ jobs:
     permissions:
       pull-requests: read
     outputs:
-      code: ${{ github.event_name != 'pull_request' || steps.filter.outputs.code == 'true' }}
+      code: ${{ github.event_name != 'pull_request' || steps.filter.outputs.code == 'true' || steps.filter.outputs.specs == 'true' }}
     steps:
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         if: github.event_name == 'pull_request'
         with:
-          # A file counts when it matches every pattern: anything outside docs/ that is not Markdown.
+          # A file counts when it matches every pattern of a filter. code: anything outside docs/ that is not Markdown.
+          # specs: the documents the tests read (limits, effects, the changelog), one pattern because of `every`.
           predicate-quantifier: every
           filters: |
             code:
               - '**'
               - '!docs/**'
               - '!**/*.md'
+            specs:
+              - '{docs/protocol/**,docs/board/**,docs/web/**,CHANGELOG.md}'
 
   # actionlint checks the workflows, and the run: blocks with the runner's shellcheck
   actionlint:
@@ -72,14 +75,17 @@ jobs:
         with:
           persist-credentials: false
 
+      # The whole hashed lock: a hashed file cannot be installed in part, and the cache keeps it quick
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-ci.txt
 
       - name: Make the bundle again and compare it with the committed one
         run: |
           set -eu
-          pip install "$(grep '^cryptography==' requirements-ci.txt)"
+          pip install --require-hashes -r requirements-ci.txt
           python tools/crt_bundle.py check
 
   # Formatting, the tool tests, the native tests with the conformance cases, and the firmware and simulator builds

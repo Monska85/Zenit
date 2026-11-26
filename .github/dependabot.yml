@@ -18,7 +18,8 @@ updates:
       prefix: "ci"
       include: "scope"
 
-  # The Python tools of CI, pinned in requirements-ci.txt
+  # The Python tools of CI: the pins of requirements-ci.in and the lock compiled from it, requirements-ci.txt, with
+  # hashes. Dependabot updates the pin and compiles the lock again.
   - package-ecosystem: pip
     directory: "/"
     schedule:
@@ -49,10 +50,18 @@ updates:
       # Not a temporary cap: the major of the Node types follows "engines" in web/package.json and moves with it, by hand.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+    # A dependency joins the first group it matches. @playwright/test has its own pull request, because CI runs the
+    # screenshots in the Playwright image of the same version: that pull request also needs PLAYWRIGHT_IMAGE (tag and
+    # digest) in .github/workflows/ci.yml, which Dependabot cannot change.
     groups:
+      playwright:
+        patterns:
+          - "@playwright/test"
       web:
         patterns:
           - "*"
+        exclude-patterns:
+          - "@playwright/test"
     commit-message:
       prefix: "build"
       include: "scope"

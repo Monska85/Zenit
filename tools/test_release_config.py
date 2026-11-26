@@ -65,11 +65,28 @@ class ReleasePleaseTest(unittest.TestCase):
         for path in CONFIG["packages"]["."]["exclude-paths"]:
             self.assertTrue((ROOT / path).exists(), path)
 
+    def test_releases_are_drafts_with_their_tags_until_their_files_are_attached(self):
+        # The release workflow publishes a release after attaching its files; the tag exists at once, so release-please
+        # finds the previous release while the draft waits
+        self.assertIs(CONFIG["draft"], True)
+        self.assertIs(CONFIG["force-tag-creation"], True)
+
     def test_the_changelog_is_keep_a_changelog(self):
         text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         self.assertTrue(text.startswith("# Changelog\n"))
         self.assertIn("keepachangelog.com/en/1.1.0", text)
         self.assertIn("\n## [Unreleased]", text)
+
+
+def read(*parts):
+    return ROOT.joinpath(*parts).read_text(encoding="utf-8")
+
+
+def job(text, name):
+    """The text of one job of a workflow, up to the next job."""
+    start = text.index(f"\n  {name}:\n")
+    following = re.search(r"\n  [a-z][a-z0-9-]*:\n", text[start + 1 :])
+    return text[start : start + 1 + following.start()] if following else text[start:]
 
 
 class WorkflowTest(unittest.TestCase):
@@ -113,6 +130,118 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn("needs.changes.outputs.code == 'true'", job)
         for step in ["web-test", "web-size", "web-e2e", "web-screenshots"]:
             self.assertIn(step, job)
+
+    def test_the_release_runs_only_after_ci_passes_on_a_push_to_main(self):
+        text = read(".github", "workflows", "release.yml")
+        self.assertRegex(read(".github", "workflows", "ci.yml"), r"^name: CI\n")
+        trigger = text[text.index("\non:\n") : text.index("\npermissions:")]
+        self.assertIn("  workflow_run:\n    workflows: [CI]\n    types: [completed]\n    branches: [main]\n", trigger)
+        self.assertNotIn("  push:", trigger)
+        # CI runs make check and the web gate; the release does not run them again
+        self.assertNotIn("make check", text)
+        self.assertNotIn("\n  check:", text)
+        gate = job(text, "preflight").split("\n    steps:")[0]
+        for condition in [
+            "github.event_name == 'workflow_run'",
+            "github.event.workflow_run.conclusion == 'success'",
+            "github.event.workflow_run.event == 'push'",
+            "github.event.workflow_run.head_branch == 'main'",
+            # A pull request from a fork's main branch also has head_branch main
+            "github.event.workflow_run.head_repository.full_name == github.repository",
+        ]:
+            self.assertIn(condition, gate)
+        self.assertIn("    needs: preflight\n", job(text, "release-please"))
+
+    def test_the_release_builds_the_commit_ci_checked(self):
+        text = read(".github", "workflows", "release.yml")
+        self.assertIn("ref: ${{ github.event.workflow_run.head_sha }}", job(text, "preflight"))
+        self.assertIn("ref: ${{ github.event.workflow_run.head_sha || github.sha }}", job(text, "pages"))
+        # Every checkout names its commit: on workflow_run the default is the newest main, not the commit CI checked
+        for name in ["preflight", "build", "web-build", "pages"]:
+            for checkout in job(text, name).split("uses: actions/checkout@")[1:]:
+                self.assertIn("ref:", checkout.split("\n      - ")[0], name)
+
+    def test_a_manual_run_keeps_its_dry_run(self):
+        text = read(".github", "workflows", "release.yml")
+        self.assertIn("  workflow_dispatch:\n    inputs:\n      dry_run:", text)
+        for name in ["build", "web-build"]:
+            self.assertIn("(github.event_name == 'workflow_dispatch' && inputs.dry_run == true)", job(text, name))
+        self.assertIn(
+            "(github.event_name == 'workflow_dispatch' && inputs.dry_run == false && github.ref == 'refs/heads/main')",
+            job(text, "pages"),
+        )
+
+    def test_a_release_is_published_after_its_files_are_attached(self):
+        text = read(".github", "workflows", "release.yml")
+        for name in ["publish", "publish-web"]:
+            steps = job(text, name)
+            self.assertLess(steps.index("gh release upload"), steps.index('gh release edit "$TAG" --draft=false'), name)
+        # The site is built from published releases only
+        self.assertIn("select(.isDraft | not)", job(text, "pages"))
+
+    def test_a_web_release_is_checked_against_the_released_firmware_first(self):
+        steps = job(read(".github", "workflows", "release.yml"), "preflight")
+        # The decisions are the tool's, tested in test_web_release_check.py; the job runs each of its answers
+        self.assertIn("git tag --list | python3 tools/web_release_check.py plan", steps)
+        self.assertIn("gh release list --limit 200 --json tagName,isDraft,isPrerelease", steps)
+        self.assertIn("| python3 tools/web_release_check.py latest-firmware", steps)
+        cases = re.findall(r"^            ([a-z*]+)\)$", steps, re.M)
+        self.assertEqual(cases, ["none", "source", "released", "*"])
+        source = steps[steps.index("            source)") : steps.index("            released)")]
+        self.assertIn("web_release_check.py check --protocol-header lib/ZenitProto/src/proto_limits.h", source)
+        released = steps[steps.index("            released)") : steps.index("            *)")]
+        self.assertIn("--pattern 'zenit-esp32c3-protocol.txt' --pattern SHA256SUMS", released)
+        self.assertIn('web_release_check.py check --firmware "$RUNNER_TEMP/firmware"', released)
+        self.assertTrue((ROOT / "lib" / "ZenitProto" / "src" / "proto_limits.h").is_file())
+
+    def test_the_path_filter_runs_the_tests_when_a_document_they_read_changes(self):
+        text = job(read(".github", "workflows", "ci.yml"), "changes")
+        self.assertIn("steps.filter.outputs.specs == 'true'", text.split("\n    steps:")[0])
+        pattern = re.search(r"\n            specs:\n              - '\{([^}]*)\}'\n", text)
+        self.assertIsNotNone(pattern)
+        specs = pattern.group(1).split(",")
+        # web/test/model.test.ts reads the protocol and light specifications, this file the changelog
+        for path in ["docs/protocol/protocol-v1.md", "docs/board/light-v1.md", "docs/web/web-app-v1.md", "CHANGELOG.md"]:
+            self.assertTrue((ROOT / path).is_file(), path)
+            self.assertTrue(any(path == s or (s.endswith("/**") and path.startswith(s[:-2])) for s in specs), path)
+
+    def test_the_python_tools_are_installed_from_the_hashed_lock(self):
+        lock = read("requirements-ci.txt")
+        pins = re.findall(r"^([a-z0-9][a-z0-9._-]*)==(\S+)", read("requirements-ci.in"), re.M)
+        self.assertTrue(pins)
+        for name, version in pins:
+            self.assertRegex(lock, rf"(?m)^{re.escape(name)}=={re.escape(version)} \\$", name)
+        # Every package of the lock, dependencies included, has an exact version and at least one hash
+        entries = re.split(r"\n(?=[a-z0-9])", lock[lock.index("\n", lock.index("pip-compile")) :].strip())
+        self.assertGreater(len(entries), len(pins))
+        for entry in entries:
+            if entry.startswith("#"):
+                continue
+            self.assertRegex(entry, r"^[a-z0-9][a-z0-9._-]*==[^\s\\]+ \\\n\s+--hash=sha256:[0-9a-f]{64}", entry[:40])
+        installs = 0
+        for path in self.workflows():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if "pip install" in line:
+                    installs += 1
+                    self.assertIn("pip install --require-hashes -r requirements-ci.txt", line, path.name)
+        self.assertGreaterEqual(installs, 2)
+
+    def test_the_platformio_cache_follows_the_lock(self):
+        setup = read(".github", "actions", "setup", "action.yml")
+        key = re.search(r"key: platformio-.*hashFiles\(([^)]*)\)", setup)
+        self.assertIn("'requirements-ci.txt'", key.group(1))
+
+    def test_dependabot_updates_the_lock_and_gives_playwright_its_own_pull_request(self):
+        text = read(".github", "dependabot.yml")
+        self.assertIn('  - package-ecosystem: pip\n    directory: "/"\n', text)
+        npm = text[text.index("package-ecosystem: npm") :]
+        groups = npm[npm.index("    groups:\n") :]
+        # A dependency joins the first group it matches
+        self.assertLess(groups.index("      playwright:"), groups.index("      web:"))
+        self.assertIn('      playwright:\n        patterns:\n          - "@playwright/test"\n', groups)
+        self.assertIn('        exclude-patterns:\n          - "@playwright/test"\n', groups)
+        self.assertIn("PLAYWRIGHT_IMAGE", npm)
+        self.assertIn("PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:", read(".github", "workflows", "ci.yml"))
 
     def test_the_release_recipe_exists_in_both_task_runners(self):
         self.assertIn("release-assets", (ROOT / "justfile").read_text(encoding="utf-8"))
