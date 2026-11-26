@@ -95,8 +95,8 @@ Flow flow;
 WebFlow web;
 Schedule schedule;
 Boot boot;
-// Whether web updates are on, for the HTTP server's task (the emergency page).
-std::atomic<bool> repairable{false};
+// What the emergency page says, for the HTTP server's task: set at each decision tick.
+std::atomic<zenit::net::PageNote> page_note{zenit::net::PageNote::Off};
 
 // An X.Y.Z release is at most 20 characters (six digits each), which the record's version fields and the status hold.
 static_assert(sizeof("999999.999999.999999") <= zenit::update::RECORD_VERSION_TEXT,
@@ -332,7 +332,13 @@ Status status()
   return s;
 }
 
-bool web_repairable() { return repairable.load(); }
+zenit::net::PageNote web_page_note()
+{
+  // An install that has started is shown at once, before the next decision tick.
+  if (www::state() == WebState::Installing)
+    return zenit::net::PageNote::Installing;
+  return page_note.load();
+}
 
 Reply request_check(uint64_t now)
 {
@@ -523,7 +529,9 @@ void tick(uint64_t now)
   if (now < schedule.next_tick_ms)
     return;
   schedule.next_tick_ms = now + TICK_EVERY_MS;
-  repairable = web_on();
+  page_note = !web_on()       ? zenit::net::PageNote::Off
+              : web.has_offer ? zenit::net::PageNote::Installing
+                              : zenit::net::PageNote::Waiting;
 
   if (boot.trial)
   {

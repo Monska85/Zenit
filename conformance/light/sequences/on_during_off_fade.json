@@ -1,0 +1,14 @@
+{
+  "description": "On during the off fade comes back from the level reached (0.5 at 2.5 s, lightness 30) at the rate of a full fade: 0.6 at 2.6 s, 0.75 at 2.75 s, full at 3 s.",
+  "settings": {},
+  "events": [
+    { "at": 2000, "light": false },
+    { "at": 2500, "light": true }
+  ],
+  "expect": [
+    { "at": 2500, "duties": [0, 0, 0, 1022], "on": true },
+    { "at": 2600, "duties": [0, 0, 0, 1476], "on": true },
+    { "at": 2750, "duties": [0, 0, 0, 2382], "on": true },
+    { "at": 3000, "duties": [0, 0, 0, 4607], "on": true }
+  ]
+}

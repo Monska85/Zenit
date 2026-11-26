@@ -51,6 +51,8 @@ constexpr uint32_t UNCLAIMED_WAIT_MS = zenit::proto::LOGIN_WAIT_MS;
 // connections ahead of time) and is closed, or a few of them would fill the sockets and turn every page away.
 constexpr uint32_t PAGE_IDLE_MS = 5000;
 constexpr uint32_t SWEEP_EVERY_MS = 1000;
+// A file of the web app goes out in pieces of this size, so an install can stop it between two.
+constexpr size_t PAGE_PIECE = 4096;
 const char BUSY_RESPONSE[] = "HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
 
 char site_origin[site::ORIGIN_SIZE];
@@ -65,7 +67,8 @@ struct Event
   };
   Type type = Type::Open;
   uint16_t size = 0;
-  uint32_t id = 0; // of a Line: the reply carries it back
+  uint32_t id = 0;     // of a Line: the reply carries it back
+  uint32_t number = 0; // of an Open or a Close: the connection it is about
   char text[zenit::proto::MAX_LINE + 1];
 };
 
@@ -79,6 +82,12 @@ std::atomic<uint32_t> reply_id{0};
 
 std::atomic<httpd_handle_t> server{nullptr};
 std::atomic<int> client_fd{-1};
+// The server task only: the number of the client connection (each connection that becomes the client gets the next
+// one), so a close the loop task asked for reaches only the connection it judged, never a newer one on the same slot.
+uint32_t client_number = 0;
+uint32_t next_number = 1;
+// The loop task only: the number of the connection the protocol was last told about (its Open).
+uint32_t judged_number = 0;
 
 // Only the server task touches these.
 MessageAssembler assembler;
@@ -165,10 +174,12 @@ esp_err_t claim(httpd_req_t *req, int fd)
   int expected = -1;
   if (!client_fd.compare_exchange_strong(expected, fd))
     return read_and_refuse(req, zenit::proto::CLOSE_TRY_LATER);
+  client_number = next_number++;
   assembler.reset();
   xSemaphoreTake(reply_ready, 0); // an answer to a line of an earlier connection
   Event open;
   open.type = Event::Type::Open;
+  open.number = client_number;
   if (!to_loop.send(open, EVENT_WAIT_MS))
     return refuse(req, zenit::proto::CLOSE_INTERNAL_ERROR);
   return ESP_OK;
@@ -280,7 +291,7 @@ esp_err_t send_text(httpd_req_t *req, const char *status, const char *body)
 esp_err_t send_emergency(httpd_req_t *req)
 {
   static char page[zenit::net::MAX_EMERGENCY_PAGE];
-  const size_t size = zenit::net::emergency_page(updates::web_repairable(), site::URL, page, sizeof(page));
+  const size_t size = zenit::net::emergency_page(updates::web_page_note(), site::URL, page, sizeof(page));
   httpd_resp_set_status(req, "503 Service Unavailable");
   httpd_resp_set_type(req, "text/html; charset=utf-8");
   httpd_resp_set_hdr(req, "Cache-Control", "no-store");
@@ -318,8 +329,19 @@ esp_err_t handle_get(httpd_req_t *req)
   httpd_resp_set_hdr(req, "Content-Encoding", "gzip");
   httpd_resp_set_hdr(req, "Cache-Control", zenit::net::cache_control(asset));
   common_headers(req);
-  // The file is read from the mapped partition: an install waits until it is sent.
-  const esp_err_t sent = httpd_resp_send(req, reinterpret_cast<const char *>(asset.data), asset.size);
+  // The file is read from the mapped partition, so an install waits until it is sent: it goes in pieces, and stops at
+  // the next piece once an install has started, so the install never waits for a whole file to a slow client.
+  esp_err_t sent = ESP_OK;
+  const char *data = reinterpret_cast<const char *>(asset.data);
+  for (size_t at = 0; at < asset.size && sent == ESP_OK; at += PAGE_PIECE)
+  {
+    if (www::state() == zenit::update::WebState::Installing)
+      sent = ESP_FAIL; // the connection is closed with the file cut short; the page reloads into the emergency page
+    else
+      sent = httpd_resp_send_chunk(req, data + at, asset.size - at < PAGE_PIECE ? asset.size - at : PAGE_PIECE);
+  }
+  if (sent == ESP_OK)
+    sent = httpd_resp_send_chunk(req, nullptr, 0);
   www::serve_end();
   return finish(req, sent);
 }
@@ -359,6 +381,15 @@ esp_err_t on_open(httpd_handle_t handle, int fd)
 // that stay idle. It runs between requests, so no answer is cut short.
 void sweep(void *)
 {
+  // Each new low of this task's free stack, like the network task's line, so a test on the board finds how much of
+  // it a page, a WebSocket line or an install uses (the mark covers everything the task ran since it started).
+  static uint32_t lowest = UINT32_MAX;
+  const uint32_t free_bytes = platform::stack_free_min();
+  if (free_bytes < lowest)
+  {
+    lowest = free_bytes;
+    platform::log("server stack: %u bytes free at the lowest", static_cast<unsigned>(free_bytes));
+  }
   httpd_handle_t handle = server.load();
   if (!handle)
     return;
@@ -387,20 +418,36 @@ void on_close(httpd_handle_t, int fd)
   {
     Event closed;
     closed.type = Event::Type::Close;
+    closed.number = client_number;
     to_loop.send(closed, EVENT_WAIT_MS);
   }
   lwip_close(fd);
 }
 
-void after_close_frame(esp_err_t, int fd, void *)
-{
-  if (httpd_handle_t handle = server.load())
-    httpd_sess_trigger_close(handle, fd);
-}
-
-// The payloads of the close frames close_client sends: constant, so a frame still queued keeps its code.
+// The payloads of the close frames close_client sends.
 uint8_t policy_payload[2] = {zenit::proto::CLOSE_POLICY >> 8, zenit::proto::CLOSE_POLICY & 0xFF};
 uint8_t reload_payload[2] = {zenit::proto::CLOSE_RELOAD >> 8, zenit::proto::CLOSE_RELOAD & 0xFF};
+
+// The server task: the close the loop task asked for, packed as the connection's number (31 bits) and whether it is the
+// reload close. It runs after the handler that may be waiting for its reply, and only while that connection is still
+// the client.
+void close_work(void *arg)
+{
+  const uintptr_t packed = reinterpret_cast<uintptr_t>(arg);
+  const uint32_t number = static_cast<uint32_t>(packed >> 1) & 0x7FFFFFFFu;
+  httpd_handle_t handle = server.load();
+  const int fd = client_fd.load();
+  if (!handle || fd < 0 || (client_number & 0x7FFFFFFFu) != number)
+    return;
+  httpd_ws_frame_t frame = {};
+  frame.type = HTTPD_WS_TYPE_CLOSE;
+  frame.payload = (packed & 1) ? reload_payload : policy_payload;
+  frame.len = 2;
+  // Sent here, on this task: httpd_ws_send_data would queue another work item and wait for it, which never runs while
+  // this one waits.
+  httpd_ws_send_frame_async(handle, fd, &frame);
+  httpd_sess_trigger_close(handle, fd);
+}
 
 // The loop task: the reply of a line goes back to the server task, which is waiting for it.
 void keep_reply(const char *line, size_t length)
@@ -491,9 +538,12 @@ void poll(uint64_t now)
     switch (event.type)
     {
     case Event::Type::Open:
+      judged_number = event.number;
       protocol::wifi_opened(now);
       break;
     case Event::Type::Close:
+      if (event.number == judged_number)
+        judged_number = 0; // gone: nothing is left to close
       protocol::wifi_closed();
       break;
     case Event::Type::Line:
@@ -513,18 +563,15 @@ void poll(uint64_t now)
 
 void close_client(uint16_t code)
 {
-  const int fd = client_fd.load();
   httpd_handle_t handle = server.load();
-  if (fd < 0 || !handle)
+  if (judged_number == 0 || !handle)
     return;
-
-  httpd_ws_frame_t frame = {};
-  frame.type = HTTPD_WS_TYPE_CLOSE;
-  frame.payload = code == zenit::proto::CLOSE_RELOAD ? reload_payload : policy_payload;
-  frame.len = 2;
-  // The close frame goes out in the server task, after the handler that may be waiting for its reply.
-  if (httpd_ws_send_data_async(handle, fd, &frame, after_close_frame, nullptr) != ESP_OK)
-    httpd_sess_trigger_close(handle, fd);
+  // The connection the protocol judged is the one of the last Open it handled; the server task checks that it is still
+  // the client before it closes anything.
+  const uintptr_t packed =
+      (static_cast<uintptr_t>(judged_number & 0x7FFFFFFFu) << 1) | (code == zenit::proto::CLOSE_RELOAD ? 1u : 0u);
+  if (httpd_queue_work(handle, close_work, reinterpret_cast<void *>(packed)) != ESP_OK)
+    platform::log("the WebSocket client could not be closed");
 }
 
 } // namespace ws_server

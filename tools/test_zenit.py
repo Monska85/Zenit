@@ -1075,6 +1075,24 @@ class SimulatorControlLinesTest(unittest.TestCase):
         self.assertEqual([r["light"]["lightness"] for r in replies], [0.0, 60.0])
         self.assertEqual(err, "")
 
+    def lightness_after(self, advances):
+        text = "".join(f"!advance {ms}\n" for ms in advances) + zenit.frame({"seq": 1, "cmd": "status"}).decode() + "\n"
+        out, err = self.run_simulator([], text)
+        self.assertEqual(err, "")
+        replies = [zenit.parse_line(line.encode()) for line in out.splitlines() if line.startswith("@ZN ")]
+        return replies[-1]["light"]["lightness"]
+
+    def test_advance_keeps_every_millisecond(self):
+        # The fade-in of the boot runs for 1,000 ms: steps below or across the 10 ms grid reach the same time.
+        self.assertEqual(self.lightness_after([5, 5]), self.lightness_after([10]))
+        self.assertEqual(self.lightness_after([11] * 30), self.lightness_after([330]))
+        self.assertEqual(self.lightness_after([5] * 60), self.lightness_after([300]))
+        self.assertGreater(self.lightness_after([5] * 60), self.lightness_after([5]))
+
+    def test_a_bad_random_line_is_refused_not_an_abort(self):
+        _, err = self.run_simulator([], "!random zz\n!random abc\n!random 0g\n")
+        self.assertEqual(err.count("refused: expected pairs of hexadecimal digits"), 3)
+
     def test_a_scan_ranks_every_access_point_and_keeps_the_best_sixteen_names(self):
         # 16 names at -80, a late stronger access point of one of them, a late stronger new name, a late weak one
         entries = [f"N{i}:-80:YES" for i in range(16)] + ["N3:-30:YES", "Late:-20:NO", "Weak:-90:YES"]

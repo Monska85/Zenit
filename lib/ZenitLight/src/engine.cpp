@@ -34,7 +34,9 @@ void Ramp::retarget(double target, uint64_t now, double ms_per_unit)
 
 void LightEngine::start(const LightSettings &settings, uint64_t now, uint32_t seed)
 {
-  seed_ = seed;
+  // The one random sequence of the engine starts at the seed; each effect start continues it (start_effect).
+  effect_state_ = EffectState();
+  effect_state_.random = seed;
   target_ = shown_ = settings;
   light_ = Light::On;
   brightness_.set(settings.brightness, now);
@@ -49,15 +51,17 @@ void LightEngine::start(const LightSettings &settings, uint64_t now, uint32_t se
 void LightEngine::start_effect(uint64_t at)
 {
   effect_start_ = at;
+  // The random sequence goes on where the effect that ends left it: twinkle draws from it, the other effects leave it
+  // as it was, so a new start never replays draws of an earlier one.
+  const uint32_t random = effect_state_.random;
   effect_state_ = EffectState();
+  effect_state_.random = random;
   // The effect keeps the countdown it started with, so a later timer change reaches it only through a transition.
   effect_timer_ = TimerView();
   effect_timer_.running = timer_state_ != Timer::None;
   effect_timer_.duration_ms = timer_duration_;
   effect_timer_start_ = timer_start_;
-  effect_info(shown_.effect).reset(effect_state_, shown_, seed_);
-  // The next start continues the random sequence.
-  xorshift32(seed_);
+  effect_info(shown_.effect).reset(effect_state_, shown_, random);
 }
 
 void LightEngine::start_timer(uint64_t at)

@@ -106,9 +106,12 @@ bool serve_begin(const zenit::net::Asset *&assets, size_t &count)
 }
 void serve_end() {}
 
+bool busy = false;
+
 bool begin_install(uint32_t size, const char *version)
 {
-  if (failing == "begin")
+  busy = failing == "busy";
+  if (failing == "begin" || busy)
     return false;
   state_ = WebState::Installing;
   count_ = 0;
@@ -122,6 +125,7 @@ bool begin_install(uint32_t size, const char *version)
 
 bool write(const uint8_t *data, size_t size) { return writer.write(data, size); }
 bool install_refused() { return writer.refused(); }
+bool install_busy() { return busy; }
 
 bool end_install()
 {

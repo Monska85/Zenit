@@ -10,6 +10,7 @@
 #include <update_record.h>
 #include <web_image.h>
 
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -226,7 +227,8 @@ void update_line(const std::string &line)
 }
 
 // `!www ...`: the `www` partition. `load VERSION MIN MAX` puts an image there, `erase` leaves none, `fail STEP` fails
-// the next install at `begin`, `write` or `end` (`none` clears). Each reads the partition again, as a restart does.
+// the next install at `begin`, `write` or `end`, or as a page still being sent at `busy` (`none` clears). Each reads
+// the partition again, as a restart does.
 void www_line(const std::string &line)
 {
   const std::string rest = rest_after(line, "!www ");
@@ -344,7 +346,13 @@ bool handle(const std::string &line, uint64_t now)
     const std::string hex = rest_after(line, "!random ");
     std::vector<uint8_t> bytes;
     for (size_t i = 0; i + 1 < hex.size(); i += 2)
+    {
+      if (!std::isxdigit(static_cast<unsigned char>(hex[i])) || !std::isxdigit(static_cast<unsigned char>(hex[i + 1])))
+        break;
       bytes.push_back(static_cast<uint8_t>(std::stoi(hex.substr(i, 2), nullptr, 16)));
+    }
+    if (hex.empty() || hex.size() % 2 != 0 || bytes.size() != hex.size() / 2)
+      return complain(line, "expected pairs of hexadecimal digits"), true;
     platform::sim_queue_random_bytes(bytes.data(), bytes.size());
   }
   else if (line.rfind("!token ", 0) == 0)

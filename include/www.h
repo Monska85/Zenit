@@ -43,6 +43,9 @@ bool begin_install(uint32_t size, const char *version);
 bool write(const uint8_t *data, size_t size);
 // Whether the last write failed because the image's header was refused, not the flash.
 bool install_refused();
+// Whether the last `begin_install` failed because a file was still being sent after the wait, not the flash: nothing
+// was touched, and the install can be tried again later.
+bool install_busy();
 bool end_install();
 void abort_install();
 
@@ -51,7 +54,7 @@ void abort_install();
 void sim_reset();                                // a valid image of version 1.0.0 that speaks protocol 1
 void sim_load(const uint8_t *data, size_t size); // the partition holds these bytes (then reads it as at a start)
 void sim_erase();                                // no image
-void sim_fail(const char *step);                 // "begin", "write" or "end"; "" clears
+void sim_fail(const char *step);                 // "begin", "write", "end" or "busy" (a page send); "" clears
 // A valid image of `version` with one file, index.html, for tests and the scripted update source.
 void sim_make_image(const char *version, uint8_t protocol_min, uint8_t protocol_max, uint8_t *&data, size_t &size);
 #endif

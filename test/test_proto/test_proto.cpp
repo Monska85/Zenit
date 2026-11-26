@@ -12,6 +12,7 @@
 #include <reply_cache.h>
 #include <settings_json.h>
 #include <strict_json.h>
+#include <update_record.h>
 #include <utf8.h>
 
 #include <cstring>
@@ -22,6 +23,7 @@
 #include "platform.h"
 #include "protocol.h"
 #include "settings.h"
+#include "sim_control.h"
 #include "zenit_test.h"
 
 namespace proto = zenit::proto;
@@ -822,6 +824,73 @@ void test_core_longest_reply_fits()
   TEST_ASSERT_TRUE(written[1].size() < 900);
 }
 
+void test_core_longest_settings_reply_fits()
+{
+  start();
+  // The light at its longest, and the board settings whose text grows the most: 64 quotes for the time zone (each
+  // escaped to two characters), a 64-character NTP server, the update window and the token.
+  const std::string quotes(64, '"');
+  std::string timezone;
+  for (char c : quotes)
+    timezone += std::string("\\") + c;
+  const std::string server(64, 'n');
+  send(framed("{\"seq\":4294967295,\"cmd\":\"settings_set\",\"brightness\":100,\"effect\":\"fall_asleep\","
+              "\"color\":\"green\",\"colors\":[\"green\",\"white\",\"blue\",\"red\"],\"hold_seconds\":600,"
+              "\"period_seconds\":20,\"floor\":80,\"twinkle_strength\":50,\"timer_minutes\":360,"
+              "\"wifi_power\":\"auto\",\"update_mode\":\"automatic\",\"check_hours\":168,\"install_start\":1439,"
+              "\"install_end\":1438,\"time_sync_hours\":168,\"timezone\":\"" +
+              timezone + "\",\"ntp_server\":\"" + server + "\"}"));
+  JsonDocument doc = reply(0);
+  TEST_ASSERT_TRUE(doc["ok"].as<bool>());
+  TEST_ASSERT_EQUAL_STRING(quotes.c_str(), doc["settings"]["timezone"].as<const char *>());
+  TEST_ASSERT_EQUAL_STRING(server.c_str(), doc["settings"]["ntp_server"].as<const char *>());
+  TEST_ASSERT_TRUE(written[0].size() < zenit::proto::MAX_REPLY_LINE);
+}
+
+void test_core_longest_status_reply_fits()
+{
+  start();
+  uint64_t now = 0;
+  auto run_to = [&](uint64_t until)
+  {
+    for (now += zenit::TICK_MS; now <= until; now += zenit::TICK_MS)
+    {
+      platform::sim_set_now_ms(now);
+      app::tick(now);
+      app::service(now);
+      sim_control::after_step(now);
+    }
+    now = until;
+  };
+  // A name of 32 quotes, the longest address and signal, a web image and a web offer with 16-character versions, a
+  // firmware offer with a 20-character release, a running countdown and a time.
+  const std::string ssid(32, '"');
+  TEST_ASSERT_TRUE(sim_control::handle("!store-wifi ssid=" + ssid + " password=correct-horse", now));
+  TEST_ASSERT_TRUE(sim_control::handle(
+      "!net state=connected ssid=" + ssid + " rssi=-100 ip=255.255.255.255 synced=1 epoch=4102444799", now));
+  TEST_ASSERT_TRUE(sim_control::handle("!www load 99999.99999.9998 1 1", now));
+  TEST_ASSERT_TRUE(sim_control::handle("!update web publish 99999.99999.9999 1 1", now));
+  TEST_ASSERT_TRUE(
+      sim_control::handle("!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"999999.999999.999999\","
+                          "\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536,\"sha256\":"
+                          "\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}",
+                          now));
+  send(framed("{\"seq\":1,\"cmd\":\"settings_set\",\"update_mode\":\"notify\",\"timer_minutes\":360,"
+              "\"effect\":\"color_change\"}"),
+       protocol::Transport::Usb, now);
+  send(framed("{\"seq\":2,\"cmd\":\"update_check\"}"), protocol::Transport::Usb, now);
+  run_to(2000);
+  send(framed("{\"seq\":4294967295,\"cmd\":\"status\"}"), protocol::Transport::Usb, now);
+  JsonDocument doc = reply(written.size() - 1);
+  TEST_ASSERT_TRUE(doc["ok"].as<bool>());
+  TEST_ASSERT_EQUAL_STRING(ssid.c_str(), doc["wifi"]["ssid"].as<const char *>());
+  TEST_ASSERT_EQUAL_STRING("999999.999999.999999", doc["update"]["available"].as<const char *>());
+  TEST_ASSERT_EQUAL_STRING("99999.99999.9998", doc["update"]["web"]["version"].as<const char *>());
+  TEST_ASSERT_EQUAL_STRING("99999.99999.9999", doc["update"]["web"]["available"].as<const char *>());
+  // `skipped` and `rolled_back` are null here; each can grow by at most a release of 20 characters and its quotes.
+  TEST_ASSERT_TRUE(written.back().size() + 2 * (zenit::update::RECORD_VERSION_TEXT + 2) < zenit::proto::MAX_REPLY_LINE);
+}
+
 int main()
 {
   UNITY_BEGIN();
@@ -864,5 +933,7 @@ int main()
   RUN_TEST(test_core_light_reply_reflects_the_request);
   RUN_TEST(test_core_status_lightness_has_one_decimal);
   RUN_TEST(test_core_longest_reply_fits);
+  RUN_TEST(test_core_longest_settings_reply_fits);
+  RUN_TEST(test_core_longest_status_reply_fits);
   return UNITY_END();
 }

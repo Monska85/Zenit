@@ -27,11 +27,16 @@ enum class WifiState : uint8_t
 
 const char *wifi_state_name(WifiState state);
 
-// ESP-IDF's disconnect reasons that tell why a try failed.
-constexpr uint8_t REASON_HANDSHAKE_TIMEOUT = 15;
+// ESP-IDF's disconnect reasons that tell why a try failed (esp_wifi_types_generic.h).
+constexpr uint8_t REASON_4WAY_HANDSHAKE_TIMEOUT = 15;
 constexpr uint8_t REASON_NO_AP_FOUND = 201;
 constexpr uint8_t REASON_AUTH_FAIL = 202;
-constexpr uint8_t REASON_4WAY_HANDSHAKE_TIMEOUT = 204;
+constexpr uint8_t REASON_HANDSHAKE_TIMEOUT = 204;
+// No access point of that name with a security the station accepts (a WPA or WEP network when a password asks for
+// WPA2 at least), none within the auth mode threshold, none within the signal threshold.
+constexpr uint8_t REASON_NO_AP_FOUND_W_COMPATIBLE_SECURITY = 210;
+constexpr uint8_t REASON_NO_AP_FOUND_IN_AUTHMODE_THRESHOLD = 211;
+constexpr uint8_t REASON_NO_AP_FOUND_IN_RSSI_THRESHOLD = 212;
 constexpr uint8_t REASON_MIC_FAILURE = 14;
 constexpr uint8_t REASON_802_1X_AUTH_FAILED = 23;
 constexpr uint8_t REASON_AUTH_EXPIRE = 2;

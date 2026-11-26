@@ -611,16 +611,25 @@ void test_twinkle_continues_its_sequence_after_a_restart()
   s.effect = Effect::Twinkle;
   LightEngine engine;
   engine.start(s, 0, 1);
-  zenit::Duties first[20];
-  for (int i = 0; i < 20; i++)
-    first[i] = engine.tick(1000 + 200 * i).duties;
-  engine.set_on(false, 5000);
-  run(engine, 5000, 7000);
-  engine.set_on(true, 7000);
-  int same = 0;
-  for (int i = 0; i < 20; i++)
-    same += engine.tick(8000 + 200 * i).duties == first[i];
-  TEST_ASSERT_LESS_THAN(20, same);
+  // One output per 200 ms segment, at the middle of the segment, for 100 segments of the first run.
+  constexpr int FIRST = 100, SECOND = 20, SHIFTS = 50;
+  zenit::Duties first[FIRST];
+  for (int i = 0; i < FIRST; i++)
+    first[i] = engine.tick(1100 + 200 * i).duties;
+  engine.set_on(false, 21000);
+  run(engine, 21000, 23000);
+  engine.set_on(true, 23000);
+  zenit::Duties second[SECOND];
+  for (int i = 0; i < SECOND; i++)
+    second[i] = engine.tick(24100 + 200 * i).duties;
+  // The second run is not the first one again, whatever the shift between them (a replay one segment later included).
+  for (int shift = 0; shift <= SHIFTS; shift++)
+  {
+    int same = 0;
+    for (int i = 0; i < SECOND; i++)
+      same += second[i] == first[i + shift];
+    TEST_ASSERT_LESS_THAN_MESSAGE(SECOND / 2, same, ("shift " + std::to_string(shift)).c_str());
+  }
 }
 
 int main()

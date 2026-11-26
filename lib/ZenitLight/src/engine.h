@@ -116,7 +116,6 @@ private:
   uint64_t effect_start_ = 0;
   TimerView effect_timer_; // the countdown when the effect started, with elapsed counted from effect_timer_start_
   uint64_t effect_timer_start_ = 0;
-  uint32_t seed_ = 1;
   uint32_t limit_mw_ = POWER_LIMIT_MW;
 
   Light light_ = Light::Off;

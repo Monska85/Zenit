@@ -323,13 +323,15 @@ void run_protocol_case(const fs::path &path)
     const std::string label = name + " step " + std::to_string(index++);
     if (step["advance_ms"].is<uint64_t>())
     {
+      // As the simulator: the clock moves by every millisecond asked, and the light ticks at each point of the 10 ms
+      // grid on the way, at that point's time.
       const uint64_t until = now + step["advance_ms"].as<uint64_t>();
-      for (now += zenit::TICK_MS; now <= until; now += zenit::TICK_MS)
+      for (uint64_t tick = (now / zenit::TICK_MS + 1) * zenit::TICK_MS; tick <= until; tick += zenit::TICK_MS)
       {
-        platform::sim_set_now_ms(now);
-        app::tick(now);
-        app::service(now);
-        sim_control::after_step(now);
+        platform::sim_set_now_ms(tick);
+        app::tick(tick);
+        app::service(tick);
+        sim_control::after_step(tick);
       }
       now = until;
       platform::sim_set_now_ms(now);
@@ -387,8 +389,8 @@ void run_protocol_case(const fs::path &path)
     {
       // Bytes a JSON string cannot carry: invalid UTF-8, a raw NUL. Two hexadecimal digits each.
       const std::string hex = step["send_hex"].as<const char *>();
-      for (size_t i = 0; i + 1 < hex.size(); i += 2)
-        line += static_cast<char>(std::stoi(hex.substr(i, 2), nullptr, 16));
+      TEST_ASSERT_TRUE_MESSAGE(zenit_test::from_hex(hex, line),
+                               (label + ": send_hex is not pairs of hex digits").c_str());
     }
     else if (step["send_padded"].is<JsonObjectConst>())
     {

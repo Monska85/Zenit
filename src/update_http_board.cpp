@@ -143,7 +143,7 @@ Outcome fetch_manifest(const char *url, char *body, size_t capacity, size_t &siz
 }
 
 Outcome download(install_target::Target target, const char *url, const zenit::update::Manifest &manifest,
-                 Progress progress)
+                 Progress progress, Stop stop)
 {
   const uint32_t size = manifest.size;
   const char *sha256 = manifest.sha256;
@@ -164,7 +164,9 @@ Outcome download(install_target::Target target, const char *url, const zenit::up
   if (!install_target::begin(target, manifest))
   {
     close_url(client);
-    return Outcome::FlashError;
+    // A page still being sent that the install could not wait for is a busy board, tried again later like a network
+    // that did not answer, not a failing flash.
+    return target == install_target::Target::Web && www::install_busy() ? Outcome::Unreachable : Outcome::FlashError;
   }
   zenit::net::Sha256 hash;
   uint32_t received = 0;
@@ -173,7 +175,7 @@ Outcome download(install_target::Target target, const char *url, const zenit::up
   outcome = Outcome::Ok;
   while (received < size)
   {
-    if (now_ms() - started > DOWNLOAD_TOTAL_MS)
+    if (now_ms() - started > DOWNLOAD_TOTAL_MS || (stop && stop()))
     {
       outcome = Outcome::Unreachable;
       break;
