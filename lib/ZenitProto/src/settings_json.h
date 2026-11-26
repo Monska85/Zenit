@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// The light settings as protocol JSON (docs/protocol/protocol-v1.md#settings_get-settings_set): reading a
+// The light and board settings as protocol JSON (docs/protocol/protocol-v1.md#settings_get-settings_set): reading a
 // `settings_set` request, with a check of every field, and writing the `settings` object of a reply.
 
 #pragma once

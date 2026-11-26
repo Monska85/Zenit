@@ -16,7 +16,8 @@ import {
   wifiSettingsArgs,
   type DemuxEvent,
 } from "../src/protocol/improv";
-import { fromHex, toHex } from "../src/protocol/sha256";
+import { toHex } from "../src/protocol/sha256";
+import { fromHex } from "./helpers";
 
 interface Packet {
   name: string;

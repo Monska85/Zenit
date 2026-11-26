@@ -12,7 +12,70 @@ namespace
 const char *const EFFECT_NAMES[EFFECT_COUNT] = {"static",  "color_change", "breathing",
                                                 "twinkle", "fall_asleep",  "christmas"};
 const char *const COLOR_SET_NAMES[COLOR_SET_COUNT] = {"christmas", "ice"};
+
+const LightField LIGHT_FIELDS[] = {
+    {"brightness", FieldKind::Number, MIN_BRIGHTNESS, MAX_BRIGHTNESS, nullptr,
+     [](LightSettings &s, uint32_t n, const char *)
+     {
+       s.brightness = static_cast<uint8_t>(n);
+       return true;
+     }},
+    {"effect", FieldKind::Name, 0, 0, "not an effect of the board",
+     [](LightSettings &s, uint32_t, const char *text)
+     {
+       return effect_from_name(text, s.effect);
+     }},
+    {"color", FieldKind::Name, 0, 0, "not a color the board can light",
+     [](LightSettings &s, uint32_t, const char *text)
+     {
+       return color_from_name(text, s.color);
+     }},
+    {"colors", FieldKind::Colors, MIN_COLORS, MAX_COLORS, nullptr, nullptr},
+    {"color_set", FieldKind::Name, 0, 0, "not a color set of the board",
+     [](LightSettings &s, uint32_t, const char *text)
+     {
+       return color_set_from_name(text, s.color_set);
+     }},
+    {"hold_seconds", FieldKind::Number, MIN_HOLD_SECONDS, MAX_HOLD_SECONDS, nullptr,
+     [](LightSettings &s, uint32_t n, const char *)
+     {
+       s.hold_seconds = static_cast<uint16_t>(n);
+       return true;
+     }},
+    {"period_seconds", FieldKind::Number, MIN_PERIOD_SECONDS, MAX_PERIOD_SECONDS, nullptr,
+     [](LightSettings &s, uint32_t n, const char *)
+     {
+       s.period_seconds = static_cast<uint8_t>(n);
+       return true;
+     }},
+    {"floor", FieldKind::Number, MIN_FLOOR, MAX_FLOOR, nullptr,
+     [](LightSettings &s, uint32_t n, const char *)
+     {
+       s.floor = static_cast<uint8_t>(n);
+       return true;
+     }},
+    {"twinkle_strength", FieldKind::Number, MIN_TWINKLE_STRENGTH, MAX_TWINKLE_STRENGTH, nullptr,
+     [](LightSettings &s, uint32_t n, const char *)
+     {
+       s.twinkle_strength = static_cast<uint8_t>(n);
+       return true;
+     }},
+    {"timer_minutes", FieldKind::Number, 0, MAX_TIMER_MINUTES, nullptr,
+     [](LightSettings &s, uint32_t n, const char *)
+     {
+       s.timer_minutes = static_cast<uint16_t>(n);
+       return true;
+     }},
+};
 } // namespace
+
+const LightField *find_light_field(const char *name)
+{
+  for (const LightField &field : LIGHT_FIELDS)
+    if (std::strcmp(name, field.name) == 0)
+      return &field;
+  return nullptr;
+}
 
 bool ColorList::operator==(const ColorList &other) const
 {

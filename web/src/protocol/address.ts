@@ -93,7 +93,7 @@ export function localHost(hostname: string): boolean {
 }
 
 /** The first Chromium release whose Local Network Access covers WebSockets (docs/web/web-app-v1.md#websocket). */
-export const LNA_WEBSOCKET_CHROMIUM = 147;
+const LNA_WEBSOCKET_CHROMIUM = 147;
 
 /**
  * Whether a browser with these User-Agent Client Hints brands (`navigator.userAgentData.brands`, absent in Firefox and

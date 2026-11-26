@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// The client side of Improv Wi-Fi Serial: the board's state, its device info, a scan of the networks it sees, and
-// the WiFi settings. One request at a time. The password is only ever in the bytes of the frame, which are wiped after
-// they are sent; it is in no log, no error and no storage.
+// The client side of Improv Wi-Fi Serial: a scan of the networks the board sees, and the WiFi settings. One request at
+// a time. The password is only ever in the bytes of the frame, which are wiped after they are sent; it is in no log,
+// no error and no storage.
 
 import {
   ImprovErrorCode,
@@ -40,22 +40,13 @@ export interface ImprovNetwork {
   secure: boolean;
 }
 
-export interface ImprovDeviceInfo {
-  firmwareName: string;
-  firmwareVersion: string;
-  chip: string;
-  hostname: string;
-}
-
 export interface ImprovTimeouts {
-  state: number;
-  info: number;
   scan: number;
   provision: number;
 }
 
 /** The board scans for 15 s and connects for up to 30 s; the client waits a little longer than each. */
-export const IMPROV_TIMEOUTS: ImprovTimeouts = { state: 3000, info: 3000, scan: 20_000, provision: 35_000 };
+const IMPROV_TIMEOUTS: ImprovTimeouts = { scan: 20_000, provision: 35_000 };
 /** After the board says `provisioned` the empty result follows at once; without it the client goes on after this long. */
 const RESULT_GRACE_MS = 2000;
 export const MAX_NETWORKS = 16;
@@ -83,10 +74,6 @@ const failureFor = (code: number): ImprovError | null => {
 };
 
 export class ImprovClient {
-  /** The last state the board reported: 2 ready, 3 provisioning, 4 provisioned; null until it says. */
-  state: number | null = null;
-  /** Called when the board reports a state, the one it changed to. */
-  onState: ((state: number) => void) | null = null;
   private current: Operation | null = null;
   private readonly timeouts: ImprovTimeouts;
 
@@ -107,10 +94,6 @@ export class ImprovClient {
   private receive(type: number, data: Uint8Array): void {
     const frame = readBoardFrame(type, data);
     if (frame === null) return;
-    if (frame.kind === "state") {
-      this.state = frame.state;
-      this.onState?.(frame.state);
-    }
     const operation = this.current;
     if (operation?.handle(frame)) this.settle(operation);
   }
@@ -148,25 +131,6 @@ export class ImprovClient {
         .sendFrame(frame)
         .catch(() => operation.fail(new ImprovError("link", "the USB connection failed")))
         .finally(() => frame.fill(0));
-    });
-  }
-
-  /** Asks for the board's state. */
-  requestState(): Promise<number> {
-    return this.run<number>(rpcFrame(RpcCommandCode.CurrentState), this.timeouts.state, (done) => (frame) => {
-      if (frame.kind !== "state") return false;
-      done(frame.state);
-      return true;
-    });
-  }
-
-  /** The firmware name and version, the chip and the host name of the board. */
-  deviceInfo(): Promise<ImprovDeviceInfo> {
-    return this.run<ImprovDeviceInfo>(rpcFrame(RpcCommandCode.DeviceInfo), this.timeouts.info, (done) => (frame) => {
-      if (frame.kind !== "result" || frame.command !== RpcCommandCode.DeviceInfo) return false;
-      const [firmwareName = "", firmwareVersion = "", chip = "", hostname = ""] = frame.strings;
-      done({ firmwareName, firmwareVersion, chip, hostname });
-      return true;
     });
   }
 

@@ -28,15 +28,6 @@ def constant(header, name):
     return int(match.group(1), 0)
 
 
-def partition_size(name):
-    """The size of the partition `name` in partitions.csv."""
-    for line in (ROOT / "partitions.csv").read_text(encoding="utf-8").splitlines():
-        fields = [field.strip() for field in line.split("#", 1)[0].split(",")]
-        if len(fields) >= 5 and fields[0] == name:
-            return int(fields[4], 0)
-    raise AssertionError(f"partitions.csv has no partition {name}")
-
-
 class LimitsTest(unittest.TestCase):
     def test_the_update_manifest_limits(self):
         self.assertEqual(pages_site.MAX_UPDATE_MANIFEST, constant("ZenitUpdate/src/manifest.h", "MAX_MANIFEST"))
@@ -44,14 +35,14 @@ class LimitsTest(unittest.TestCase):
 
     def test_the_firmware_slot(self):
         slot = constant("ZenitUpdate/src/manifest.h", "SLOT_SIZE")
-        self.assertEqual(release_assets.app_slot(ROOT / "partitions.csv")[1], slot)
-        self.assertEqual(partition_size("app1"), slot)
+        self.assertEqual(release_assets.partition("app0")[1], slot)
+        self.assertEqual(release_assets.partition("app1")[1], slot)
 
     def test_the_web_image_limits(self):
         header = "ZenitNet/src/web_image.h"
         self.assertEqual(web_image.HEADER_SIZE, constant(header, "WEB_HEADER_SIZE"))
         self.assertEqual(web_image.PARTITION_SIZE, constant(header, "WEB_PARTITION_SIZE"))
-        self.assertEqual(web_image.PARTITION_SIZE, partition_size("www"))
+        self.assertEqual(web_image.PARTITION_SIZE, release_assets.partition("www")[1])
         self.assertEqual(web_image.MAX_FILES, constant(header, "MAX_WEB_FILES"))
         self.assertEqual(web_image.MAX_PATH, constant(header, "MAX_WEB_PATH"))
         self.assertEqual(web_image.MAX_MEDIA_TYPE, constant(header, "MAX_WEB_MEDIA_TYPE"))

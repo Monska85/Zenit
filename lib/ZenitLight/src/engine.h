@@ -71,7 +71,6 @@ public:
   LightFrame tick(uint64_t now);
 
   const LightSettings &settings() const { return target_; }
-  bool on() const { return light_ == Light::On; }
   // For tests: a power limit other than POWER_LIMIT_MW.
   void set_power_limit(uint32_t limit_mw) { limit_mw_ = limit_mw; }
 

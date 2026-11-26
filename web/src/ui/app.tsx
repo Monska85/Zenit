@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { Monitor, Moon, Sparkles, Sun, Unplug } from "lucide-react";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { chooseTheme, currentTheme, NEXT_THEME } from "../lib/theme";
 import type { ThemeChoice } from "../lib/storage";
 import { cn } from "../lib/utils";
-import { BoardProvider, useBoard } from "./board-context";
+import { BoardProvider, useBoard, useSession } from "./board-context";
 import { Banner } from "./components/banner";
 import { Button } from "./components/button";
 import { useRoute, type Route } from "./route";
-import { DeviceView } from "./views/device-view";
 import { ConnectView } from "./views/connect-view";
 import { LightView } from "./views/light-view";
 import { LoginView } from "./views/login-view";
-import { PrivacyView } from "./views/privacy-view";
+
+// The Device and Privacy pages load when they are opened: the first screen is the Light or Connect view.
+const DeviceView = lazy(() => import("./views/device-view").then((module) => ({ default: module.DeviceView })));
+const PrivacyView = lazy(() => import("./views/privacy-view").then((module) => ({ default: module.PrivacyView })));
 
 const THEME_ICONS: Record<ThemeChoice, typeof Sun> = { system: Monitor, light: Sun, dark: Moon };
 const THEME_NAMES: Record<ThemeChoice, string> = { system: "Match my device", light: "Light", dark: "Dark" };
@@ -38,7 +40,7 @@ function ThemeButton() {
 }
 
 function DisconnectButton({ go }: { go: (route: Route) => void }) {
-  const { session } = useBoard();
+  const session = useSession();
   return (
     <Button
       variant="ghost"
@@ -151,12 +153,14 @@ function Shell() {
         </Banner>
       )}
       <main className="flex flex-col gap-4">
-        {current === "privacy" && <PrivacyView />}
-        {current !== "privacy" && board.phase === "login" && <LoginView go={go} />}
-        {current === "device" && board.phase !== "login" && <DeviceView go={go} />}
-        {(current === "light" || current === "connect") &&
-          board.phase !== "login" &&
-          (connectScreen ? <ConnectView go={go} /> : <LightView />)}
+        <Suspense fallback={null}>
+          {current === "privacy" && <PrivacyView />}
+          {current !== "privacy" && board.phase === "login" && <LoginView go={go} />}
+          {current === "device" && board.phase !== "login" && <DeviceView go={go} />}
+          {(current === "light" || current === "connect") &&
+            board.phase !== "login" &&
+            (connectScreen ? <ConnectView go={go} /> : <LightView />)}
+        </Suspense>
       </main>
     </div>
   );

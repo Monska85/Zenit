@@ -171,32 +171,6 @@ void test_a_light_only_or_board_only_commit_keeps_the_other_record()
   TEST_ASSERT_EQUAL_UINT8(9, settings::board().check_hours);
 }
 
-void test_the_records_of_a_board_from_before_the_blob_are_read_and_replaced()
-{
-  settings::sim_clear();
-  // The light record of brightness 80 and the breathing effect, and a board record with check_hours 12 and a token
-  std::vector<uint8_t> light = {1, 80, 2, 0, 4, 1, 2, 3, 0, 0, 30, 0, 8, 20, 20, 0, 0};
-  net::BoardSettings stored;
-  stored.check_hours = 12;
-  std::strcpy(stored.token, "abcdefghij012345");
-  uint8_t board[net::BOARD_RECORD_SIZE];
-  net::encode_board_record(stored, board);
-  settings::sim_write_raw("light", light);
-  settings::sim_write_raw("board", std::vector<uint8_t>(board, board + sizeof(board)));
-  settings::begin();
-  TEST_ASSERT_EQUAL_UINT8(80, settings::current().brightness);
-  TEST_ASSERT_EQUAL_UINT8(12, settings::board().check_hours);
-  TEST_ASSERT_EQUAL_STRING("abcdefghij012345", settings::board().token);
-  // The next save writes the blob, and from then on the blob is what is read
-  zenit::LightSettings next = settings::current();
-  next.brightness = 70;
-  TEST_ASSERT_TRUE(settings::commit(next) == settings::Commit::Ok);
-  settings::sim_write_raw("light", {1, 10});
-  settings::begin();
-  TEST_ASSERT_EQUAL_UINT8(70, settings::current().brightness);
-  TEST_ASSERT_EQUAL_UINT8(12, settings::board().check_hours);
-}
-
 void test_a_blob_of_the_wrong_size_gives_the_defaults_and_a_new_token()
 {
   settings::sim_write_raw("settings", std::vector<uint8_t>(200, 1));
@@ -1696,7 +1670,6 @@ int main()
   RUN_TEST(test_a_damaged_board_record_gives_defaults_and_a_new_token);
   RUN_TEST(test_a_commit_of_both_records_is_all_or_nothing);
   RUN_TEST(test_a_light_only_or_board_only_commit_keeps_the_other_record);
-  RUN_TEST(test_the_records_of_a_board_from_before_the_blob_are_read_and_replaced);
   RUN_TEST(test_a_blob_of_the_wrong_size_gives_the_defaults_and_a_new_token);
   RUN_TEST(test_nothing_is_written_when_no_setting_differs);
   RUN_TEST(test_improv_reports_its_state_and_device_info);

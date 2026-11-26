@@ -12,6 +12,8 @@
 #include <strict_json.h>
 #include <zenit_light.h>
 
+#include <iterator>
+
 #include <cstdio>
 #include <string>
 #include <cstring>
@@ -31,8 +33,6 @@ namespace
 
 using zenit::proto::Failure;
 
-// A parsed request is a few hundred bytes at most (the line limit is 1,024); keep a margin for the tree.
-constexpr int PARSE_NESTING = 8;
 // The reply is built in place: the JSON goes after the room left for the frame head.
 char reply_line[zenit::proto::MAX_REPLY_LINE + 1];
 
@@ -124,10 +124,8 @@ struct Context
   uint64_t now;
 };
 
-Failure cmd_info(const Context &context, JsonDocument &reply)
+Failure cmd_info(const Context &, JsonDocument &reply)
 {
-  if (Failure failure = zenit::proto::allow_only(context.request, {}))
-    return failure;
   reply["protocol"] = zenit::proto::PROTOCOL_VERSION;
   reply["firmware"] = platform::firmware_version();
   reply["board"] = platform::board_name();
@@ -154,8 +152,6 @@ Failure cmd_info(const Context &context, JsonDocument &reply)
 
 Failure cmd_status(const Context &context, JsonDocument &reply)
 {
-  if (Failure failure = zenit::proto::allow_only(context.request, {}))
-    return failure;
   // Not older than this request: a change made a moment ago shows in the status already.
   app::tick(context.now);
   write_light(reply["light"].to<JsonObject>());
@@ -168,8 +164,6 @@ Failure cmd_status(const Context &context, JsonDocument &reply)
 
 Failure cmd_settings_get(const Context &context, JsonDocument &reply)
 {
-  if (Failure failure = zenit::proto::allow_only(context.request, {}))
-    return failure;
   zenit::proto::write_settings(reply["settings"].to<JsonObject>(), settings::current(), settings::board(),
                                context.transport == Transport::Usb);
   return {};
@@ -194,8 +188,6 @@ Failure cmd_settings_set(const Context &context, JsonDocument &reply)
 
 Failure cmd_light(const Context &context, JsonDocument &reply)
 {
-  if (Failure failure = zenit::proto::allow_only(context.request, {"on"}))
-    return failure;
   JsonVariantConst on = context.request["on"];
   if (!on.is<bool>())
     return zenit::proto::fail("bad_request", "\"on\" must be true or false");
@@ -215,8 +207,6 @@ Failure usb_only(const Context &context)
 
 Failure cmd_settings_reset(const Context &context, JsonDocument &reply)
 {
-  if (Failure failure = zenit::proto::allow_only(context.request, {}))
-    return failure;
   if (Failure failure = usb_only(context))
     return failure;
   if (app::change_settings(zenit::LightSettings(), settings::fresh_board_settings(), context.now) !=
@@ -229,8 +219,6 @@ Failure cmd_settings_reset(const Context &context, JsonDocument &reply)
 
 Failure cmd_wifi_forget(const Context &context, JsonDocument &)
 {
-  if (Failure failure = zenit::proto::allow_only(context.request, {}))
-    return failure;
   if (Failure failure = usb_only(context))
     return failure;
   zenit::net::BoardSettings next = settings::board();
@@ -243,8 +231,6 @@ Failure cmd_wifi_forget(const Context &context, JsonDocument &)
 
 Failure cmd_token_regenerate(const Context &context, JsonDocument &reply)
 {
-  if (Failure failure = zenit::proto::allow_only(context.request, {}))
-    return failure;
   if (Failure failure = usb_only(context))
     return failure;
   zenit::net::BoardSettings next = settings::board();
@@ -258,8 +244,6 @@ Failure cmd_token_regenerate(const Context &context, JsonDocument &reply)
 
 Failure cmd_auth_challenge(const Context &context, JsonDocument &reply)
 {
-  if (Failure failure = zenit::proto::allow_only(context.request, {}))
-    return failure;
   if (context.transport != Transport::Wifi)
     return zenit::proto::fail("bad_request", "authentication is for WiFi clients");
   uint8_t random[zenit::net::NONCE_BYTES];
@@ -270,8 +254,6 @@ Failure cmd_auth_challenge(const Context &context, JsonDocument &reply)
 
 Failure cmd_auth(const Context &context, JsonDocument &)
 {
-  if (Failure failure = zenit::proto::allow_only(context.request, {"hmac"}))
-    return failure;
   if (context.transport != Transport::Wifi)
     return zenit::proto::fail("bad_request", "authentication is for WiFi clients");
   JsonVariantConst hmac = context.request["hmac"];
@@ -310,8 +292,6 @@ Failure update_failure(updates::Reply reply)
 
 Failure cmd_update_check(const Context &context, JsonDocument &reply)
 {
-  if (Failure failure = zenit::proto::allow_only(context.request, {}))
-    return failure;
   if (Failure failure = update_failure(updates::request_check(context.now)))
     return failure;
   write_update(reply["update"].to<JsonObject>());
@@ -320,8 +300,6 @@ Failure cmd_update_check(const Context &context, JsonDocument &reply)
 
 Failure cmd_update_install(const Context &context, JsonDocument &reply)
 {
-  if (Failure failure = zenit::proto::allow_only(context.request, {"target", "force"}))
-    return failure;
   JsonVariantConst target = context.request["target"];
   const bool is_text = target.is<const char *>();
   const bool web = is_text && std::strcmp(target.as<const char *>(), "web") == 0;
@@ -339,27 +317,42 @@ Failure cmd_update_install(const Context &context, JsonDocument &reply)
   return {};
 }
 
+// Whether a WiFi client that has not logged in may send the command (network login on).
+enum class Login : bool
+{
+  Required,
+  NotNeeded
+};
+// The request fields the command takes besides `seq` and `cmd`: the listed ones, any other being `bad_request`, checked
+// before the command runs; or the command checks its own (`settings_set`, apply_settings_request).
+enum class Fields : bool
+{
+  Listed,
+  Own
+};
+
 struct Command
 {
   const char *name;
   Failure (*run)(const Context &, JsonDocument &);
-  // Whether a WiFi client that has not logged in may send it (network login on).
-  bool before_login;
+  Login login;
+  Fields checked;
+  const char *fields[2];
 };
 
 const Command COMMANDS[] = {
-    {"info", cmd_info, true},
-    {"status", cmd_status, false},
-    {"settings_get", cmd_settings_get, false},
-    {"settings_set", cmd_settings_set, false},
-    {"light", cmd_light, false},
-    {"settings_reset", cmd_settings_reset, false},
-    {"wifi_forget", cmd_wifi_forget, false},
-    {"token_regenerate", cmd_token_regenerate, false},
-    {"auth_challenge", cmd_auth_challenge, true},
-    {"auth", cmd_auth, true},
-    {"update_check", cmd_update_check, false},
-    {"update_install", cmd_update_install, false},
+    {"info", cmd_info, Login::NotNeeded, Fields::Listed, {}},
+    {"status", cmd_status, Login::Required, Fields::Listed, {}},
+    {"settings_get", cmd_settings_get, Login::Required, Fields::Listed, {}},
+    {"settings_set", cmd_settings_set, Login::Required, Fields::Own, {}},
+    {"light", cmd_light, Login::Required, Fields::Listed, {"on"}},
+    {"settings_reset", cmd_settings_reset, Login::Required, Fields::Listed, {}},
+    {"wifi_forget", cmd_wifi_forget, Login::Required, Fields::Listed, {}},
+    {"token_regenerate", cmd_token_regenerate, Login::Required, Fields::Listed, {}},
+    {"auth_challenge", cmd_auth_challenge, Login::NotNeeded, Fields::Listed, {}},
+    {"auth", cmd_auth, Login::NotNeeded, Fields::Listed, {"hmac"}},
+    {"update_check", cmd_update_check, Login::Required, Fields::Listed, {}},
+    {"update_install", cmd_update_install, Login::Required, Fields::Listed, {"target", "force"}},
 };
 
 // A request read from a frame whose checksum matched.
@@ -384,7 +377,7 @@ Failure read_request(const zenit::proto::Frame &frame, Request &request)
     return fail("bad_frame", message);
   }
   if (deserializeJson(request.document, frame.json, frame.json_length,
-                      DeserializationOption::NestingLimit(PARSE_NESTING)))
+                      DeserializationOption::NestingLimit(MAX_NESTING)))
     return fail("bad_frame", "the JSON could not be read");
   JsonObjectConst object = request.document.as<JsonObjectConst>();
   JsonVariantConst cmd = object["cmd"];
@@ -402,8 +395,11 @@ Failure dispatch(const Request &request, Transport transport, uint64_t now, Json
     if (std::strcmp(request.command, command.name) == 0)
     {
       if (transport == Transport::Wifi && settings::board().network_login && !wifi_auth.authenticated() &&
-          !command.before_login)
+          command.login == Login::Required)
         return zenit::proto::fail("unauthorized", "log in first: auth_challenge, then auth");
+      if (command.checked == Fields::Listed)
+        if (Failure failure = zenit::proto::allow_only(context.request, command.fields, std::size(command.fields)))
+          return failure;
       return command.run(context, reply);
     }
   return zenit::proto::fail("unknown_command", "this firmware does not know the command");

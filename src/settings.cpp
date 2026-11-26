@@ -25,11 +25,8 @@ bool settings_read = true;
 bool update_read = true;
 // The light record and the board record (docs/board/light-v1.md#stored-settings,
 // docs/board/wifi-and-updates-v1.md#stored-settings) are stored together as one blob under one key, so a save of both
-// is one atomic write: it is all or nothing even when the power fails. Boards from before the blob have the two records
-// under their own keys (`light`, `board`), which are read while the blob is missing.
+// is one atomic write: it is all or nothing even when the power fails.
 constexpr const char *SETTINGS_KEY = "settings";
-constexpr const char *LEGACY_LIGHT_KEY = "light";
-constexpr const char *LEGACY_BOARD_KEY = "board";
 constexpr const char *UPDATE_KEY = "update";
 constexpr size_t SETTINGS_BLOB_SIZE = zenit::LIGHT_RECORD_SIZE + zenit::net::BOARD_RECORD_SIZE;
 
@@ -54,35 +51,16 @@ void begin()
   memory_open = store::begin();
   values = zenit::LightSettings();
   board_values = zenit::net::BoardSettings();
-  settings_read = true;
-  uint8_t light_record[zenit::LIGHT_RECORD_SIZE];
-  uint8_t board_record[zenit::net::BOARD_RECORD_SIZE];
-  size_t light_size = 0, board_size = 0;
   uint8_t blob[SETTINGS_BLOB_SIZE];
   size_t blob_size = 0;
   const store::Read blob_read = store::read(SETTINGS_KEY, blob, sizeof(blob), blob_size);
-  if (blob_read == store::Read::Failed)
-    settings_read = false;
-  else if (blob_read == store::Read::Found && blob_size == sizeof(blob))
+  // A missing blob, or one of another size (damaged): both records take their defaults. After a failed read every value
+  // keeps its default too, and nothing is written: the stored settings may be fine.
+  settings_read = blob_read != store::Read::Failed;
+  if (blob_read == store::Read::Found && blob_size == sizeof(blob))
   {
-    std::memcpy(light_record, blob, sizeof(light_record));
-    std::memcpy(board_record, blob + sizeof(light_record), sizeof(board_record));
-    light_size = sizeof(light_record);
-    board_size = sizeof(board_record);
-  }
-  else if (blob_read == store::Read::Missing)
-  {
-    if (store::read(LEGACY_LIGHT_KEY, light_record, sizeof(light_record), light_size) == store::Read::Failed ||
-        store::read(LEGACY_BOARD_KEY, board_record, sizeof(board_record), board_size) == store::Read::Failed)
-      settings_read = false;
-  }
-  // A blob of another size is damaged: both records take their defaults. After a failed read every value keeps its
-  // default too, and nothing is written: the stored settings may be fine.
-  if (settings_read)
-  {
-    if (light_size == sizeof(light_record))
-      values = zenit::decode_light_record(light_record, light_size);
-    zenit::net::decode_board_record(board_record, board_size == sizeof(board_record) ? board_size : 0, board_values);
+    values = zenit::decode_light_record(blob, zenit::LIGHT_RECORD_SIZE);
+    zenit::net::decode_board_record(blob + zenit::LIGHT_RECORD_SIZE, zenit::net::BOARD_RECORD_SIZE, board_values);
   }
   if (!zenit::net::valid_token(board_values.token))
   {
@@ -121,33 +99,9 @@ zenit::net::BoardSettings fresh_board_settings()
   return fresh;
 }
 
-Commit commit(const zenit::LightSettings &next)
-{
-  // After a failed read nothing is saved, and a request that changes nothing is not reported as saved either
-  if (!settings_read)
-    return Commit::Failed;
-  if (next == values)
-    return Commit::Ok;
-  if (!write_settings(next, board_values))
-    return Commit::Failed;
-  values = next;
-  return Commit::Ok;
-}
+Commit commit(const zenit::LightSettings &next) { return commit_both(next, board_values); }
 
-Commit commit_board(const zenit::net::BoardSettings &requested)
-{
-  zenit::net::BoardSettings next = requested;
-  if (!zenit::net::valid_token(next.token))
-    make_token(next);
-  if (!settings_read)
-    return Commit::Failed;
-  if (next == board_values)
-    return Commit::Ok;
-  if (!write_settings(values, next))
-    return Commit::Failed;
-  board_values = next;
-  return Commit::Ok;
-}
+Commit commit_board(const zenit::net::BoardSettings &next) { return commit_both(values, next); }
 
 Commit commit_both(const zenit::LightSettings &light, const zenit::net::BoardSettings &requested)
 {

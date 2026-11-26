@@ -69,7 +69,7 @@ export type Opener = (interactive: boolean) => Promise<LineTransport | null>;
 
 export const POLL_MS = 1000;
 /** The wait between the tries to open a lost connection again by itself, and how many tries: about a minute. */
-export const RETRY_MS = 3000;
+const RETRY_MS = 3000;
 export const RETRY_ATTEMPTS = 20;
 
 const INITIAL: BoardState = {
@@ -112,7 +112,7 @@ export interface SessionOptions {
 }
 
 /** The close status of a board that installed a new web app: the page it served loads again to get it. */
-export const CLOSE_RELOAD = 1012;
+const CLOSE_RELOAD = 1012;
 
 /** The page's visibility, so polling can pause while it is hidden. Missing in Node. */
 export interface Visibility {
@@ -603,7 +603,14 @@ export class BoardSession {
       if (!client || generation !== this.generation || client.busy || this.visibility?.hidden()) return;
       try {
         const status = toStatus(await client.call("status"));
-        if (generation === this.generation) this.update(statusPatch(status));
+        if (generation !== this.generation) return;
+        // Most polls bring what the page already shows: do not wake every subscriber for them. `time.epoch` moves every
+        // second on a synced board and nothing on the page shows it, so it does not count as a change.
+        const patch = statusPatch(status);
+        const shown = (value: unknown): string =>
+          JSON.stringify(value, (key, v: unknown) => (key === "epoch" ? undefined : v));
+        const keys = Object.keys(patch) as (keyof BoardState)[];
+        if (keys.some((key) => shown(patch[key]) !== shown(this.state[key]))) this.update(patch);
       } catch (error) {
         if (generation !== this.generation) return;
         // A refused status is not worth a banner every second; a board that is gone is lost

@@ -57,53 +57,26 @@ Outcome fetch_manifest(const char *url, char *body, size_t capacity, size_t &siz
 
 Outcome download(Target target, const char *, const zenit::update::Manifest &manifest, Progress progress, Stop stop)
 {
-  const uint32_t size = manifest.size;
-  const char *sha256 = manifest.sha256;
+  struct Reader
+  {
+    const std::vector<uint8_t> &file;
+    size_t at;
+  };
   const Source &from = source(target);
   if (from.download_outcome != Outcome::Ok)
     return from.download_outcome;
-  if (!install_target::begin(target, manifest))
-    return target == Target::Web && www::install_busy() ? Outcome::Unreachable : Outcome::FlashError;
-  zenit::net::Sha256 hash;
-  uint32_t sent = 0;
-  const size_t chunk = 4096;
-  for (size_t at = 0; at < from.file.size(); at += chunk)
-  {
-    if (stop && stop())
-    {
-      install_target::abort(target);
-      return Outcome::Unreachable;
-    }
-    const size_t take = std::min(chunk, from.file.size() - at);
-    if (sent + take > size)
-    {
-      install_target::abort(target);
-      return Outcome::BadDownload;
-    }
-    if (!install_target::write(target, from.file.data() + at, take))
-    {
-      const bool refused = target == Target::Web && www::install_refused();
-      install_target::abort(target);
-      return refused ? Outcome::BadDownload : Outcome::FlashError;
-    }
-    hash.update(from.file.data() + at, take);
-    sent += static_cast<uint32_t>(take);
-    if (progress)
-      progress(static_cast<uint8_t>(static_cast<uint64_t>(sent) * 100 / size));
-  }
-  uint8_t digest[zenit::net::SHA256_SIZE];
-  char hex[zenit::net::SHA256_HEX + 1];
-  const bool hashed = hash.finish(digest);
-  if (hashed)
-    zenit::net::to_hex(digest, hex);
-  if (sent != size || !hashed || std::strcmp(hex, sha256) != 0)
-  {
-    install_target::abort(target);
-    return Outcome::BadDownload;
-  }
-  if (!install_target::end(target))
-    return Outcome::FlashError;
-  return Outcome::Ok;
+  Reader reader{from.file, 0};
+  return stream_install(
+      target, manifest,
+      [](void *source, uint8_t *out, size_t capacity)
+      {
+        Reader &r = *static_cast<Reader *>(source);
+        const size_t take = std::min(capacity, r.file.size() - r.at);
+        std::memcpy(out, r.file.data() + r.at, take);
+        r.at += take;
+        return static_cast<int>(take);
+      },
+      &reader, progress, stop);
 }
 
 void sim_set_manifest(Target target, const char *body)

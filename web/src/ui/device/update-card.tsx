@@ -16,17 +16,11 @@ import {
   updateBusy,
   updatesOn,
 } from "../../device/update";
-import { useBoard } from "../board-context";
+import { useBoard, useSession } from "../board-context";
 import { Banner } from "../components/banner";
 import { Button } from "../components/button";
 import { Card, CardTitle } from "../components/card";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogTitle,
-} from "../components/alert-dialog";
+import { ConfirmDialog } from "../components/confirm-dialog";
 
 function InstallDialog({
   version,
@@ -39,43 +33,27 @@ function InstallDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { session } = useBoard();
+  const session = useSession();
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogTitle className="mb-2 text-lg font-semibold">
-          {force ? `Install version ${version} anyway?` : `Install version ${version}?`}
-        </AlertDialogTitle>
-        <AlertDialogDescription asChild>
-          <div className="mb-4 flex flex-col gap-3 text-base">
-            {force && (
-              <Banner tone="warning">
-                This version did not work on this Zenit before, and Zenit went back to the earlier one. It may fail the
-                same way. If it does, Zenit goes back again by itself.
-              </Banner>
-            )}
-            <p>
-              Zenit downloads the new firmware and then restarts. The light goes dark for a moment and fades in again.
-              Keep Zenit powered until it is back, which takes a minute or so.
-            </p>
-          </div>
-        </AlertDialogDescription>
-        <div className="flex justify-end gap-2">
-          <AlertDialogCancel asChild>
-            <Button variant="outline">Cancel</Button>
-          </AlertDialogCancel>
-          <Button
-            variant={force ? "danger" : "default"}
-            onClick={() => {
-              onOpenChange(false);
-              void session.installUpdate(force);
-            }}
-          >
-            {force ? "Install anyway" : "Install"}
-          </Button>
-        </div>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={force ? `Install version ${version} anyway?` : `Install version ${version}?`}
+      confirm={force ? "Install anyway" : "Install"}
+      tone={force ? "danger" : "default"}
+      onConfirm={() => void session.installUpdate(force)}
+    >
+      {force && (
+        <Banner tone="warning">
+          This version did not work on this Zenit before, and Zenit went back to the earlier one. It may fail the same
+          way. If it does, Zenit goes back again by itself.
+        </Banner>
+      )}
+      <p>
+        Zenit downloads the new firmware and then restarts. The light goes dark for a moment and fades in again. Keep
+        Zenit powered until it is back, which takes a minute or so.
+      </p>
+    </ConfirmDialog>
   );
 }
 
@@ -223,30 +201,16 @@ export function WebAppCard() {
         </div>
       )}
       {web.available !== null && (
-        <AlertDialog open={asking} onOpenChange={setAsking}>
-          <AlertDialogContent>
-            <AlertDialogTitle className="mb-2 text-lg font-semibold">
-              Install version {web.available} of the app?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="mb-4 text-base">
-              Zenit downloads the new app and keeps the light as it is. It does not restart. When the app is installed,
-              pages open on Zenit load it again by themselves.
-            </AlertDialogDescription>
-            <div className="flex justify-end gap-2">
-              <AlertDialogCancel asChild>
-                <Button variant="outline">Cancel</Button>
-              </AlertDialogCancel>
-              <Button
-                onClick={() => {
-                  setAsking(false);
-                  void session.installWebUpdate();
-                }}
-              >
-                Install
-              </Button>
-            </div>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmDialog
+          open={asking}
+          onOpenChange={setAsking}
+          title={`Install version ${web.available} of the app?`}
+          confirm="Install"
+          onConfirm={() => void session.installWebUpdate()}
+        >
+          Zenit downloads the new app and keeps the light as it is. It does not restart. When the app is installed,
+          pages open on Zenit load it again by themselves.
+        </ConfirmDialog>
       )}
     </Card>
   );

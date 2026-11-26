@@ -8,7 +8,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <initializer_list>
 
 namespace zenit
 {
@@ -28,8 +27,9 @@ Failure fail(const char *code, const char *message);
 // A failure that names a request field: `<prefix> "<name>"`, with the name quoted by quote_text().
 Failure fail_field(const char *code, const char *prefix, const char *name);
 
-// `bad_request` when the request has a field other than `seq`, `cmd` and `names`.
-Failure allow_only(JsonObjectConst request, std::initializer_list<const char *> names);
+// `bad_request` when the request has a field other than `seq`, `cmd` and the `count` entries of `names` (null entries
+// name nothing).
+Failure allow_only(JsonObjectConst request, const char *const *names, size_t count);
 
 // The `seq` of a request: a whole number from 0 to 4,294,967,295.
 bool read_seq(JsonObjectConst request, uint32_t &seq);

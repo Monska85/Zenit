@@ -16,7 +16,7 @@
     "skipLibCheck": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
-    "types": ["node"]
+    "types": []
   },
-  "include": ["src", "test", "e2e", "screenshots", "scripts", "*.config.ts"]
+  "include": ["src"]
 }

@@ -328,3 +328,7 @@ export class ScriptedImprov implements ImprovLink {
     this.onFrame?.(type, Uint8Array.from(data));
   }
 }
+
+/** The bytes of hexadecimal digits (an even number of them). */
+export const fromHex = (digits: string): Uint8Array =>
+  Uint8Array.from(digits.match(/../g) ?? [], (pair) => parseInt(pair, 16));

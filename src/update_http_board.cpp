@@ -10,7 +10,6 @@
 #include <esp_http_client.h>
 #include <esp_timer.h>
 #include <esp_tls.h>
-#include <sha256.h>
 
 #include <cstring>
 
@@ -25,9 +24,6 @@ namespace
 constexpr int READ_TIMEOUT_MS = 10000;
 constexpr uint32_t MANIFEST_TOTAL_MS = 30000;
 constexpr uint32_t DOWNLOAD_TOTAL_MS = 10 * 60 * 1000;
-constexpr size_t CHUNK = 2048;
-
-uint8_t chunk[CHUNK];
 
 bool allowed_scheme(const char *url)
 {
@@ -145,94 +141,39 @@ Outcome fetch_manifest(const char *url, char *body, size_t capacity, size_t &siz
 Outcome download(install_target::Target target, const char *url, const zenit::update::Manifest &manifest,
                  Progress progress, Stop stop)
 {
-  const uint32_t size = manifest.size;
-  const char *sha256 = manifest.sha256;
-  esp_http_client_handle_t client;
+  struct Source
+  {
+    esp_http_client_handle_t client;
+    uint32_t started;
+    uint32_t owed; // the bytes of the file still to come
+  };
+  Source source{nullptr, 0, manifest.size};
   int64_t length = 0;
-  Outcome outcome = open_url(url, client, length);
-  if (outcome != Outcome::Ok)
-  {
-    close_url(client);
-    return outcome;
-  }
+  Outcome outcome = open_url(url, source.client, length);
   // A length that is given must be the manifest's; 0 is a chunked answer, checked by the bytes that arrive.
-  if (length > 0 && length != static_cast<int64_t>(size))
-  {
-    close_url(client);
-    return Outcome::BadDownload;
-  }
-  if (!install_target::begin(target, manifest))
-  {
-    close_url(client);
-    // A page still being sent that the install could not wait for is a busy board, tried again later like a network
-    // that did not answer, not a failing flash.
-    return target == install_target::Target::Web && www::install_busy() ? Outcome::Unreachable : Outcome::FlashError;
-  }
-  zenit::net::Sha256 hash;
-  uint32_t received = 0;
-  int last_percent = -1;
-  const uint32_t started = now_ms();
-  outcome = Outcome::Ok;
-  while (received < size)
-  {
-    if (now_ms() - started > DOWNLOAD_TOTAL_MS || (stop && stop()))
-    {
-      outcome = Outcome::Unreachable;
-      break;
-    }
-    const size_t want = size - received < CHUNK ? size - received : CHUNK;
-    const int read = esp_http_client_read(client, reinterpret_cast<char *>(chunk), static_cast<int>(want));
-    if (read < 0)
-    {
-      outcome = Outcome::Unreachable;
-      break;
-    }
-    if (read == 0)
-    {
-      // The server ended before the size the manifest promised.
-      outcome = Outcome::BadDownload;
-      break;
-    }
-    if (!install_target::write(target, chunk, static_cast<size_t>(read)))
-    {
-      // An image whose header is not the one offered is a bad download: nothing was erased.
-      outcome =
-          target == install_target::Target::Web && www::install_refused() ? Outcome::BadDownload : Outcome::FlashError;
-      break;
-    }
-    hash.update(chunk, static_cast<size_t>(read));
-    received += static_cast<uint32_t>(read);
-    const int percent = static_cast<int>(static_cast<uint64_t>(received) * 100 / size);
-    if (progress && percent != last_percent)
-    {
-      progress(static_cast<uint8_t>(percent));
-      last_percent = percent;
-    }
-  }
+  if (outcome == Outcome::Ok && length > 0 && length != static_cast<int64_t>(manifest.size))
+    outcome = Outcome::BadDownload;
   if (outcome == Outcome::Ok)
   {
-    // The file must end where the manifest says.
-    uint8_t extra;
-    if (esp_http_client_read(client, reinterpret_cast<char *>(&extra), 1) > 0)
-      outcome = Outcome::BadDownload;
+    source.started = now_ms();
+    // A read of the file after the whole download's time fails, as a network that stopped answering; the read that
+    // checks the file ends there is always made.
+    outcome = stream_install(
+        target, manifest,
+        [](void *from, uint8_t *out, size_t capacity)
+        {
+          Source &s = *static_cast<Source *>(from);
+          if (s.owed > 0 && now_ms() - s.started > DOWNLOAD_TOTAL_MS)
+            return -1;
+          const int got = esp_http_client_read(s.client, reinterpret_cast<char *>(out), static_cast<int>(capacity));
+          if (got > 0)
+            s.owed -= static_cast<uint32_t>(got) < s.owed ? static_cast<uint32_t>(got) : s.owed;
+          return got;
+        },
+        &source, progress, stop);
   }
-  close_url(client);
-  if (outcome != Outcome::Ok)
-  {
-    install_target::abort(target);
-    return outcome;
-  }
-  uint8_t digest[zenit::net::SHA256_SIZE];
-  char hex[zenit::net::SHA256_HEX + 1];
-  const bool hashed = hash.finish(digest);
-  if (hashed)
-    zenit::net::to_hex(digest, hex);
-  if (!hashed || std::strcmp(hex, sha256) != 0)
-  {
-    install_target::abort(target);
-    return Outcome::BadDownload;
-  }
-  return install_target::end(target) ? Outcome::Ok : Outcome::FlashError;
+  close_url(source.client);
+  return outcome;
 }
 
 } // namespace update_http

@@ -16,7 +16,6 @@ namespace proto
 {
 
 // WebSocket close status codes (RFC 6455) the board uses.
-constexpr uint16_t CLOSE_NORMAL = 1000;
 constexpr uint16_t CLOSE_PROTOCOL_ERROR = 1002;
 constexpr uint16_t CLOSE_UNSUPPORTED = 1003;
 constexpr uint16_t CLOSE_INVALID_PAYLOAD = 1007;

@@ -31,25 +31,6 @@ const rpcOf = (frame: Uint8Array): { command: number; args: Uint8Array } => ({
 });
 
 describe("ImprovClient", () => {
-  it("asks for the state and learns it", async () => {
-    const { link, client, play } = setup();
-    link.respond = () => play(state(ImprovState.Ready));
-    await expect(client.requestState()).resolves.toBe(ImprovState.Ready);
-    expect(client.state).toBe(ImprovState.Ready);
-    expect(rpcOf(link.written[0] as Uint8Array).command).toBe(RpcCommandCode.CurrentState);
-  });
-
-  it("reads the device info", async () => {
-    const { link, client, play } = setup();
-    link.respond = () => play(result(3, ["Zenit", "1.0.0", "ESP32-C3", "zenit-a1b2"]));
-    await expect(client.deviceInfo()).resolves.toEqual({
-      firmwareName: "Zenit",
-      firmwareVersion: "1.0.0",
-      chip: "ESP32-C3",
-      hostname: "zenit-a1b2",
-    });
-  });
-
   it("scans until the empty result, strongest first, one entry per name", async () => {
     const { link, client, play } = setup();
     link.respond = () =>
@@ -122,7 +103,6 @@ describe("ImprovClient", () => {
     link.respond = () =>
       play(state(ImprovState.Provisioning), error(ImprovErrorCode.UnableToConnect), state(ImprovState.Ready));
     await expect(client.provision("HomeNet", "wrong-password")).rejects.toMatchObject({ failure: "unable_to_connect" });
-    expect(client.state).toBe(ImprovState.Ready);
   });
 
   it("fails with invalid_rpc when the board refuses the settings", async () => {
@@ -170,8 +150,8 @@ describe("ImprovClient", () => {
 
   it("runs one request at a time", async () => {
     const { client } = setup();
-    void client.requestState().catch(() => undefined);
-    await expect(client.deviceInfo()).rejects.toMatchObject({ failure: "busy" });
+    void client.scan().catch(() => undefined);
+    await expect(client.provision("HomeNet", "x")).rejects.toMatchObject({ failure: "busy" });
   });
 
   it("fails a request in progress when it is disposed", async () => {
@@ -185,15 +165,12 @@ describe("ImprovClient", () => {
   it("reports a write that fails", async () => {
     const { link, client } = setup();
     link.sendFrame = () => Promise.reject(new Error("unplugged"));
-    await expect(client.requestState()).rejects.toMatchObject({ failure: "link" });
+    await expect(client.scan()).rejects.toMatchObject({ failure: "link" });
   });
 
-  it("ignores frames it does not know, and reports state changes to its listener", async () => {
+  it("ignores frames it does not know", async () => {
     const { link, client, play } = setup();
-    const seen: number[] = [];
-    client.onState = (value) => seen.push(value);
-    link.respond = () => play([0x7f, [1, 2, 3]], state(ImprovState.Ready));
-    await client.requestState();
-    expect(seen).toEqual([ImprovState.Ready]);
+    link.respond = () => play([0x7f, [1, 2, 3]], result(4, ["Home", "-60", "YES"]), result(4, []));
+    await expect(client.scan()).resolves.toEqual([{ ssid: "Home", rssi: -60, secure: true }]);
   });
 });

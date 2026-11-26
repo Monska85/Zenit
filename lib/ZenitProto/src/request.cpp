@@ -30,13 +30,13 @@ Failure fail_field(const char *code, const char *prefix, const char *name)
   return failure;
 }
 
-Failure allow_only(JsonObjectConst request, std::initializer_list<const char *> names)
+Failure allow_only(JsonObjectConst request, const char *const *names, size_t count)
 {
   for (JsonPairConst field : request)
   {
     bool known = field.key() == "seq" || field.key() == "cmd";
-    for (const char *name : names)
-      known = known || field.key() == name;
+    for (size_t i = 0; i < count; i++)
+      known = known || (names[i] && field.key() == names[i]);
     if (!known)
       return fail_field("bad_request", "unknown field", field.key().c_str());
   }

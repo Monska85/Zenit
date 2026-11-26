@@ -7,14 +7,7 @@ import { useBoard } from "../board-context";
 import { Banner } from "../components/banner";
 import { Button } from "../components/button";
 import { Card, CardTitle } from "../components/card";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogTitle,
-} from "../components/alert-dialog";
+import { ConfirmDialog } from "../components/confirm-dialog";
 import { AccessCard, TimeCard, UpdateSettingsCard } from "../device/settings-cards";
 import { UpdateCard, WebAppCard } from "../device/update-card";
 import { WifiCard } from "../device/wifi-card";
@@ -144,25 +137,17 @@ function ResetCard() {
           <Button variant="outline" onClick={() => setOpen(true)}>
             Reset to defaults
           </Button>
-          <AlertDialog open={open} onOpenChange={setOpen}>
-            <AlertDialogContent>
-              <AlertDialogTitle className="mb-2 text-lg font-semibold">Reset to defaults?</AlertDialogTitle>
-              <AlertDialogDescription className="mb-4 text-base">
-                Every setting goes back to its default. The light changes to the default look. Zenit also forgets its
-                WiFi network and makes a new token.
-              </AlertDialogDescription>
-              <div className="flex justify-end gap-2">
-                <AlertDialogCancel asChild>
-                  <Button variant="outline">Cancel</Button>
-                </AlertDialogCancel>
-                <AlertDialogAction asChild>
-                  <Button variant="danger" onClick={() => void session.resetSettings()}>
-                    Reset
-                  </Button>
-                </AlertDialogAction>
-              </div>
-            </AlertDialogContent>
-          </AlertDialog>
+          <ConfirmDialog
+            open={open}
+            onOpenChange={setOpen}
+            title="Reset to defaults?"
+            confirm="Reset"
+            tone="danger"
+            onConfirm={() => void session.resetSettings()}
+          >
+            Every setting goes back to its default. The light changes to the default look. Zenit also forgets its WiFi
+            network and makes a new token.
+          </ConfirmDialog>
         </>
       ) : (
         <p className="text-base text-muted-foreground">Resetting needs a USB cable. Connect with USB to do it.</p>

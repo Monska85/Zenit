@@ -37,8 +37,15 @@ using Stop = bool (*)();
 Outcome download(install_target::Target target, const char *url, const zenit::update::Manifest &manifest,
                  Progress progress, Stop stop = nullptr);
 
+// The part of `download` shared by both transports. `read` puts the next bytes of `source` into `out`, at most
+// `capacity`: it returns how many, 0 at the end of the file, or a negative number when the transfer failed
+// (Unreachable). Installs `manifest.size` bytes into `target`, then checks that the file ends there and that its
+// SHA-256 is the manifest's. Any failure aborts the target's install.
+using Read = int (*)(void *source, uint8_t *out, size_t capacity);
+Outcome stream_install(install_target::Target target, const zenit::update::Manifest &manifest, Read read, void *source,
+                       Progress progress, Stop stop);
+
 #ifdef ZENIT_SIM
-// Simulator: scripts the source.
 // Simulator: scripts the source, per target: the firmware manifest and file, or the web ones (a manifest URL that ends
 // in `web/update.json` is the web one).
 using install_target::Target;

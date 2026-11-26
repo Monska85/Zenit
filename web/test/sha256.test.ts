@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { authResponse, isToken, login } from "../src/protocol/auth";
 import { Client } from "../src/protocol/client";
-import { fromHex, hmacSha256, sha256, toHex } from "../src/protocol/sha256";
-import { FakeBoard, NONCE, TOKEN } from "./helpers";
+import { hmacSha256, sha256, toHex } from "../src/protocol/sha256";
+import { FakeBoard, fromHex, NONCE, TOKEN } from "./helpers";
 import { createHmac } from "node:crypto";
 
 interface HashCases {

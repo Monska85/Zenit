@@ -9,6 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import release_assets as assets  # noqa: E402
+import web_image  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -42,21 +43,21 @@ class SlotTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "partitions.csv"
             path.write_text(PARTITIONS)
-            self.assertEqual(assets.app_slot(path), (0x10000, 0x100))
+            self.assertEqual(assets.partition("app0", path), (0x10000, 0x100))
 
     def test_the_real_layout(self):
-        self.assertEqual(assets.app_slot(ROOT / "partitions.csv"), (0x10000, 0x1B0000))
+        self.assertEqual(assets.partition("app0"), (0x10000, 0x1B0000))
 
     def test_no_slot_fails(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "partitions.csv"
             path.write_text("nvs, data, nvs, 0x9000, 0x5000,\n")
             with self.assertRaises(assets.ReleaseError):
-                assets.app_slot(path)
+                assets.partition("app0", path)
 
     def test_the_real_offsets_match_the_partition_table(self):
         # The factory image puts the application at the slot's offset and the table where the chip looks for it
-        self.assertEqual(assets.app_slot(ROOT / "partitions.csv")[0], 0x10000)
+        self.assertEqual(assets.partition("app0")[0], 0x10000)
         self.assertEqual(assets.PARTITION_TABLE_OFFSET, 0x8000)
         # nvs starts at 0x9000, right after the 4 KiB table at 0x8000; otadata at 0xe000 is where boot_app0 goes
         text = (ROOT / "partitions.csv").read_text()
@@ -115,7 +116,7 @@ class AssetsTest(unittest.TestCase):
         self.assertEqual((self.out / "zenit-esp32c3-partitions.bin").read_bytes(), b"TABLE")
         self.assertEqual((self.out / "zenit-esp32c3-boot_app0.bin").read_bytes(), b"OTADATA")
         # The protocol the firmware speaks, read from the protocol library
-        self.assertEqual((self.out / "zenit-esp32c3-protocol.txt").read_text(), f"{assets.firmware_protocol()}\n")
+        self.assertEqual((self.out / "zenit-esp32c3-protocol.txt").read_text(), f"{web_image.firmware_protocol()}\n")
 
     def test_the_offsets_of_the_parts_leave_the_settings_memory_alone(self):
         # nvs is 0x9000 to 0xDFFF: no part written at its offset reaches it

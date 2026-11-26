@@ -111,7 +111,7 @@ jobs:
           set -eu
           size=$(stat -c %s .pio/build/esp32c3/firmware.bin)
           # The size of the first application slot in partitions.csv
-          slot=$(($(awk -F, '$1 == "app0" { gsub(/ /, "", $5); print $5 }' partitions.csv)))
+          slot=$(python3 -c 'import sys; sys.path.insert(0, "tools"); import release_assets; print(release_assets.partition("app0")[1])')
           echo "firmware $size bytes, slot $slot bytes"
           test $((slot - size)) -ge 65536
 
@@ -158,20 +158,13 @@ jobs:
       - name: Install the dependencies from the lockfile
         run: make web-install
 
-      - name: Type check, lint, check the formatting, run the unit and conformance tests
-        run: make web-test
-
-      - name: Build, and check the size of the JavaScript loaded at start
-        run: make web-size
-
       - name: Install the browser
         run: cd web && npx playwright install --with-deps chromium
 
-      - name: End-to-end tests and layout checks against the simulator
-        run: make web-e2e
-
-      - name: Reference screenshots
-        run: make web-screenshots
+      # One make run, so the app is built once: type check, lint, formatting, unit and conformance tests, the build and
+      # its size budget, the end-to-end tests and layout checks against the simulator, and the reference screenshots
+      - name: The whole web gate
+        run: make web-check
 
       - name: Keep the Playwright reports of a failure
         if: ${{ failure() }}

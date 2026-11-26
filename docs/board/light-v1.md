@@ -1,6 +1,6 @@
 # Light, version 1
 
-Status: **proposed**. Why it works this way is recorded in [ADR 0001](../adr/0001-architecture.md). The hardware is described in [`docs/reference/hardware.md`](../reference/hardware.md); the settings named here are read and changed through the [command protocol](../protocol/protocol-v1.md).
+Status: **accepted**. Why it works this way is recorded in [ADR 0001](../adr/0001-architecture.md). The hardware is described in [`docs/reference/hardware.md`](../reference/hardware.md); the settings named here are read and changed through the [command protocol](../protocol/protocol-v1.md).
 
 This document specifies what the board's LED shows: the channels and their PWM, the brightness curve, the power limit, the effects, the fades, the timer and the behavior at boot. Every rule is a function of the settings and of time, so the simulator and the tests reproduce the board exactly.
 
@@ -44,7 +44,7 @@ An effect produces a color and a factor `F` from 0 to 1,000 (per mille). The lig
 
 ## Engine tick
 
-The engine computes the outputs every 10 ms from a monotonic clock in milliseconds, starting at 0 when the light starts. Each effect is a pure function of the time `t` elapsed since the effect started, of its parameters and, for `twinkle`, of its random sequence. The duties are written to the LEDC channels at every tick. A tick that comes late computes the value of its real time: nothing accumulates.
+The engine computes the outputs every 10 ms from a monotonic clock in milliseconds, starting at 0 when the light starts. Each effect is a pure function of the time `t` elapsed since the effect started, of its parameters and, for `twinkle`, of its random sequence. The duties are computed at every tick; the board writes a channel's duty to its LEDC channel only when it differs from the one last written, the channels going to 0 first. A tick that comes late computes the value of its real time: nothing accumulates.
 
 ## Effects
 
@@ -79,11 +79,11 @@ Cycles through `colors` (2 to 4 colors, in order, a color may appear once only).
 
 ### `twinkle`
 
-`color`, with a factor that wanders below full like a star in the atmosphere. Every 200 ms the effect draws a target `G` uniformly from `1000 - 10 * twinkle_strength` to 1,000, and `F` moves linearly from its value to `G` over the next 200 ms. The draws come from a 32-bit xorshift generator (`x ^= x << 13; x ^= x >> 17; x ^= x << 5`), seeded from the hardware random number generator at each boot on the board and from a fixed seed in the simulator and the tests. The engine has one sequence: each start of an effect takes it where the previous effect left it (twinkle draws from it, the other effects leave it as it was), so a restart of twinkle after an effect change or light on goes on with the next draws and never repeats a pattern it has already shown, until the sequence comes round after 2^32 - 1 draws; `G = 1000 - 10 * twinkle_strength + (x mod (10 * twinkle_strength + 1))`. `F` starts at 1,000.
+`color`, with a factor that wanders below full like a star in the atmosphere. Every 200 ms the effect draws a target `G` uniformly from `1000 - 10 * twinkle_strength` to 1,000, and `F` moves linearly from its value to `G` over the next 200 ms. The draws come from a 32-bit xorshift generator (`x ^= x << 13; x ^= x >> 17; x ^= x << 5`), seeded from the hardware random number generator at each boot on the board and from a fixed seed in the simulator and the tests. The engine has one sequence: each start of an effect takes it where the previous effect left it (twinkle draws from it, the other effects leave it as it was), so a restart of twinkle after an effect change or light on goes on with the next draws and never repeats a pattern it has already shown, until the sequence comes round after 2^32 - 1 draws; `G = 1000 - 10 * twinkle_strength + (x mod (10 * twinkle_strength + 1))`. `F` starts at 1,000. The engine runs the effect at every tick whether anything shows, so while the light is off or fully dark twinkle keeps drawing one target every 200 ms, and the next start goes on from a later point of the sequence.
 
 ### `fall_asleep`
 
-`color`. With a timer running, `F` falls linearly from 1,000 when the countdown starts to `floor` when it ends: `F = 1000 - (1000 - floor * 10) * e / T`, with `e` the time elapsed since the countdown started (at most `T`) and `T` the timer duration. The timer's own fade-out then takes the light to off. With no timer, it behaves as `static`. The effect follows the countdown that was running when it started: a change of `timer_minutes`, or light on during the fade-out, restarts it with the transition of an effect change, from full with the new countdown.
+`color`. With a timer running, `F` falls linearly from 1,000 when the countdown starts to `floor` when it ends: `F = 1000 - (1000 - floor * 10) * e / T`, with `e` the time elapsed since the countdown started (at most `T`) and `T` the timer duration. The timer's own fade-out then takes the light to off. With no timer, it behaves as `static`. The effect follows the countdown that was running when it started: a change of `timer_minutes`, or light on during the fade-out, restarts it with the transition of an effect change, with the new countdown. That countdown starts at the moment of the change and the effect starts at the end of the 500 ms fade-down, so `e` is already 500 at the effect's `t = 0` and it starts slightly below full (with a new timer of 1 minute and `floor` 20, at `F = 993.33`).
 
 ### `christmas`
 
@@ -94,8 +94,8 @@ Cycles through `colors` (2 to 4 colors, in order, a color may appear once only).
 Changes never jump:
 
 - **Brightness** moves linearly in `L` from the value shown to the new one in 500 ms, whatever the size of the change.
-- **Effect, or a parameter the running effect reads:** the light holds the color and the factor it shows and takes the factor down to 20 % of itself in 500 ms. The new effect then starts at `t = 0`, and the factor moves linearly, in 500 ms, from that level to the new effect's own factor. Another change during the fade-down keeps fading and shows the latest settings. A change back to the running effect during the fade-down turns back from where it is to the effect's own factor, at the rate of a full fade-down (a change of 800 in 500 ms, so a return of `d` takes `d * 500 / 800` ms, rounded to the nearest millisecond, with `d` measured at the moment of the turn-back; the effect keeps moving during the return, so a moving effect such as `twinkle` can make it slightly faster or slower), unless the running effect has moved to another color meanwhile: then the fade-down goes on and the effect starts again. A fade-down that restarts the running effect for a new countdown (see [Timer](#timer)) is never turned back. A parameter the running effect does not read changes nothing.
-- **Light on and off** move at the rate of a full fade in 1,000 ms: from off, on takes 1,000 ms; from a partial level, the matching part of that time. Off is reported at once (`status` says off), while the light fades out; changes during that fade-out follow the rules above and keep fading out. On during the fade-out comes back from the current level, and restarts the timer.
+- **Effect, or a parameter the running effect reads:** the light holds the color and the factor it shows and takes the factor down to 20 % of itself in 500 ms. The new effect then starts at `t = 0`, and the factor moves linearly, in 500 ms, from that level to the new effect's own factor as it moves: at a fraction `u` of the 500 ms the factor is `level + (F(t) - level) * u`, with `F(t)` the new effect's factor at that moment, not at its start. Another change during the fade-down keeps fading and shows the latest settings. A change back to the running effect during the fade-down turns back from where it is to the effect's own factor, at the rate of a full fade-down (a change of 800 in 500 ms, so a return of `d` takes `d * 500 / 800` ms, rounded to the nearest millisecond, with `d` measured at the moment of the turn-back; the effect keeps moving during the return, so a moving effect such as `twinkle` can make it slightly faster or slower), unless the running effect has moved to another color meanwhile: then the fade-down goes on and the effect starts again. A fade-down that restarts the running effect for a new countdown (see [Timer](#timer)) is never turned back. A parameter the running effect does not read changes nothing.
+- **Light on and off** move at the rate of a full fade in 1,000 ms: from off, on takes 1,000 ms; from a partial level, the matching part of that time. Off is reported at once (`status` says off), while the light fades out; changes during that fade-out follow the rules above and keep fading out. A change once the light is off has no transition: nothing shows, and the next light on fades in to the new settings. On during the fade-out comes back from the current level, and restarts the timer.
 - A change that arrives during a transition starts from the current output.
 
 ## Timer
@@ -124,7 +124,7 @@ The ESP32-C3 SuperMini's blue LED (GPIO 8, on when low) is always off, except wh
 
 ## Stored settings
 
-The light settings are a record of 17 bytes, stored in NVS (namespace `zenit`) together with the [board record](wifi-and-updates-v1.md#stored-settings) as one blob under the key `settings`: the light record first, then the board record, 272 bytes. The blob is written in one step, so a save is all or nothing even when the power fails during it, and a save of both records has no state in between to repair. A board from before the blob has the records under the keys `light` and `board`; they are read while `settings` is missing, and the next save writes the blob. A blob of another size is damaged: both records take their defaults. `conformance/board/stored.json` gives what is read from each combination. Version 1 is 17 bytes:
+The light settings are a record of 17 bytes, stored in NVS (namespace `zenit`) together with the [board record](wifi-and-updates-v1.md#stored-settings) as one blob under the key `settings`: the light record first, then the board record, 272 bytes. The blob is written in one step, so a save is all or nothing even when the power fails during it, and a save of both records has no state in between to repair. A blob of another size is damaged: both records take their defaults. `conformance/board/stored.json` gives what is read from each combination. Version 1 is 17 bytes:
 
 | Byte  | Content                                                                           |
 | ----- | --------------------------------------------------------------------------------- |
@@ -145,7 +145,7 @@ These codes never change meaning: a new effect, color or color set takes the nex
 
 ## Measurements
 
-On an ESP32-C3 SuperMini with this milestone's firmware (2026-11-21): the firmware takes 315 KB of its 1,984 KiB slot; the loop task's minimum free stack is 6,276 bytes of 8,192 after a minute of running; the heap has 281,796 bytes free, with a largest block of 139,252 bytes. Measured with a temporary task that printed `uxTaskGetStackHighWaterMark` of the loop task once a second; the measuring code is not in the repository.
+On an ESP32-C3 SuperMini with this milestone's firmware (2026-11-21): the firmware takes 315 KB of its 1,984 KiB slot (the layout before [ADR 0005](../adr/0005-web-app-partition.md); the slot is now 1,728 KiB); the loop task's minimum free stack is 6,276 bytes of 8,192 after a minute of running; the heap has 281,796 bytes free, with a largest block of 139,252 bytes. Measured with a temporary task that printed `uxTaskGetStackHighWaterMark` of the loop task once a second; the measuring code is not in the repository.
 
 ## Simulator and tests
 

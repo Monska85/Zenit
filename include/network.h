@@ -17,8 +17,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <ws_message.h>
+#ifdef ZENIT_SIM
 #include <string>
 #include <vector>
+#endif
 
 namespace network
 {
@@ -77,7 +79,8 @@ uint32_t provision(const char *ssid, const char *password);
 
 bool request_scan();
 ScanState scan_state();
-// Copies the networks of the last scan, strongest first, and returns how many; the scan state goes back to idle.
+// Copies the networks of the last scan, one per name (its strongest access point), strongest first, and returns how
+// many; the scan state goes back to idle.
 size_t take_scan(Network *out, size_t capacity);
 
 // Closes the WebSocket client's connection with `code` (the simulator's bridge does it on the line

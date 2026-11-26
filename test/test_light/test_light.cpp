@@ -6,6 +6,7 @@
 
 #include <cmath>
 #include <string>
+#include <vector>
 
 #include "app.h"
 #include "output.h"
@@ -266,10 +267,19 @@ void test_settings_memory_round_trip()
   TEST_ASSERT_TRUE(settings::current() == s);
 }
 
+// Stores `light` as the light part of the settings blob, followed by a board record of defaults.
+void store_light_record(std::vector<uint8_t> light)
+{
+  uint8_t board[zenit::net::BOARD_RECORD_SIZE];
+  zenit::net::encode_board_record(zenit::net::BoardSettings(), board);
+  light.insert(light.end(), board, board + sizeof(board));
+  settings::sim_write_raw("settings", light);
+}
+
 void test_damaged_fields_take_their_defaults()
 {
   // Version 1, brightness 0 (out of range), effect 99, color green, colors {green, green} (a repeat), timer 361.
-  settings::sim_write_raw("light", {1, 0, 99, 2, 2, 2, 2, 0, 0, 0, 30, 0, 8, 20, 20, 0x69, 0x01});
+  store_light_record({1, 0, 99, 2, 2, 2, 2, 0, 0, 0, 30, 0, 8, 20, 20, 0x69, 0x01});
   settings::begin();
   LightSettings expected;
   expected.color = Color::Green; // the one valid field that differs from the defaults
@@ -278,10 +288,10 @@ void test_damaged_fields_take_their_defaults()
 
 void test_a_record_of_another_size_or_version_is_ignored()
 {
-  settings::sim_write_raw("light", {2, 80, 1, 1, 2, 1, 2, 0, 0, 0, 30, 0, 8, 20, 20, 0, 0});
+  store_light_record({2, 80, 1, 1, 2, 1, 2, 0, 0, 0, 30, 0, 8, 20, 20, 0, 0});
   settings::begin();
   TEST_ASSERT_TRUE(settings::current() == LightSettings());
-  settings::sim_write_raw("light", {1, 80});
+  store_light_record({1, 80});
   settings::begin();
   TEST_ASSERT_TRUE(settings::current() == LightSettings());
 }
@@ -332,12 +342,12 @@ void test_app_saves_before_it_applies()
   LightSettings next;
   next.color = Color::Red;
   settings::sim_fail_writes(true);
-  TEST_ASSERT_TRUE(app::change_settings(next, 2000) == settings::Commit::Failed);
+  TEST_ASSERT_TRUE(app::change_settings(next, settings::board(), 2000) == settings::Commit::Failed);
   settings::sim_fail_writes(false);
   for (uint64_t now = 0; now <= 4000; now += zenit::TICK_MS)
     app::tick(now);
   TEST_ASSERT_EQUAL(4607, output::sim_duties().value[zenit::WHITE]);
-  TEST_ASSERT_TRUE(app::change_settings(next, 4000) == settings::Commit::Ok);
+  TEST_ASSERT_TRUE(app::change_settings(next, settings::board(), 4000) == settings::Commit::Ok);
   for (uint64_t now = 4000; now <= 6000; now += zenit::TICK_MS)
     app::tick(now);
   TEST_ASSERT_EQUAL(4607, output::sim_duties().value[zenit::RED]);

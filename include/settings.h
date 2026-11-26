@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // The settings (docs/protocol/protocol-v1.md#settings_get-settings_set). On the board they live in NVS; the simulator
-// keeps them in memory for the length of a run. The light settings, the board settings and the update record are three
-// records, each written in one step so a save is all or nothing even across a power cut.
+// keeps them in memory for the length of a run. The light and board settings are one blob and the update record is
+// another, each written in one step so a save is all or nothing even across a power cut.
 
 #pragma once
 
@@ -40,14 +40,13 @@ enum class Commit
   Failed // nothing changed
 };
 
-// Stores `next` in one write, unless it equals the current settings. `next` must be valid.
-Commit commit(const zenit::LightSettings &next);
-
-// Stores new board settings. `next` must be valid. The token is made when it is empty.
-Commit commit_board(const zenit::net::BoardSettings &next);
-// Stores both: the board record first, the light record second; the board record is written back when the second
-// write fails.
+// Stores the light and board settings in one write, unless they equal the current ones. Both must be valid. A board
+// token that is empty is made first.
 Commit commit_both(const zenit::LightSettings &light, const zenit::net::BoardSettings &board);
+// commit_both with the current board settings.
+Commit commit(const zenit::LightSettings &next);
+// commit_both with the current light settings.
+Commit commit_board(const zenit::net::BoardSettings &next);
 // Stores the update record.
 Commit commit_update(const zenit::update::UpdateRecord &next);
 // New board settings with defaults, a new token and no network.

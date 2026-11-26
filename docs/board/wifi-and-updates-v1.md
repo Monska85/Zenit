@@ -207,7 +207,7 @@ The board reads it as strict JSON (the protocol's rules), at most 1,024 bytes, w
 
 ### Transport
 
-HTTPS only, certificate checked against Espressif's common certificate bundle (the 43 roots of esp-idf's `cmn_crt_authorities.csv`, [`certs/README.md`](../../certs/README.md)) and the host name, redirects not followed, the time out of every read 10 seconds, each manifest read 30 seconds and the whole download 10 minutes. A download streams into the inactive slot or the `www` partition while a SHA-256 runs over the same bytes. Both updates use the same transport. A test build (`esp32c3_test_http`, see [Tests](#tests-and-simulator)) can read from a plain HTTP address on a local test server; the release build cannot, and `scripts/site_url.py` refuses a non-HTTPS site address for it.
+HTTPS only, certificate checked against Espressif's common certificate bundle (the 43 roots of esp-idf's `cmn_crt_authorities.csv`, [`certs/README.md`](../../certs/README.md)) and the host name, redirects not followed, the time out of every read 10 seconds, each manifest read 30 seconds and the whole download 10 minutes. A download streams into the inactive slot or the `www` partition while a SHA-256 runs over the same bytes. Both updates use the same transport. A test build (`esp32c3_test_http`, see [Tests](#tests-and-simulator)) can read from a plain HTTP address on a local test server; the release build cannot, and `tools/site_url.py` refuses a non-HTTPS site address for it.
 
 While the repository is private the site does not exist, and a check says so: a `404` or `403` is `not_published`.
 
@@ -260,7 +260,7 @@ Exactly these seven fields: `schema`, `version` (at most 16 characters, as the i
 
 ### Install window
 
-In `automatic` mode the board installs only inside the window from `install_start` to `install_end` (minutes after midnight, in `timezone`). Equal values mean the whole day. An end before the start runs over midnight. When the window is narrower than the whole day and the time is not known, nothing is installed. The loop task decides once a minute. `update_install` ignores the window, never the mode.
+In `automatic` mode the board installs only inside the window from `install_start` to `install_end` (minutes after midnight, in `timezone`). Equal values mean the whole day. An end before the start runs over midnight. When the window is narrower than the whole day and the time is not known, nothing is installed. The loop task decides every 250 ms. `update_install` ignores the window, never the mode.
 
 ### Install
 
@@ -315,9 +315,10 @@ All commands of the protocol work over WiFi except the ones reserved for USB: `s
 ## Security
 
 - The WiFi password and the token are never logged, never put in a reply other than `settings_get` and `token_regenerate` over USB, and wiped from the Improv buffers after use.
-- The served page and every answer carry the headers above. The server reads at most 1,024 bytes of a request path and 512 bytes of the headers it uses.
+- The served page and every answer carry the headers above. The server reads at most 512 bytes of a request line's address and 1,024 bytes of each header line; a path of 128 characters or more (before any `?` or `#`) is answered `404`.
 - Updates are checked for integrity (SHA-256 from an HTTPS manifest) and cannot downgrade. They are not signed: whoever controls the site controls the firmware. Signing is out of scope for version 1 and recorded in ADR 0004.
 - With `network_login` off (the default) the home network is trusted: any client on it can change every setting a WiFi client may change, `ntp_server` and `timezone` included. Turn the login on where that is not so.
+- The site address the WebSocket accepts as an `Origin` is the origin of the whole GitHub Pages account (`https://monska85.github.io`), shared by every Pages project of that account: a page of any of them passes the Origin check (the browser's local network access prompt still asks first). A custom domain for the site would narrow it.
 - `ws://` and `http://` are not encrypted: anyone on the home network sees what the app and the board exchange, and the token never crosses the network, only HMACs of it.
 
 ## Tests and simulator

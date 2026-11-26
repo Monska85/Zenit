@@ -17,7 +17,7 @@ import {
   choiceOptions,
   UPDATE_MODES,
 } from "../../device/settings";
-import { useBoard } from "../board-context";
+import { useBoard, useSession } from "../board-context";
 import { Banner } from "../components/banner";
 import { Button } from "../components/button";
 import { Card, CardTitle } from "../components/card";
@@ -25,14 +25,7 @@ import { ChoiceGroup } from "../components/choice";
 import { SelectField } from "../components/select";
 import { SwitchField } from "../components/switch";
 import { ValueForm } from "../components/value-form";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogTitle,
-} from "../components/alert-dialog";
+import { ConfirmDialog } from "../components/confirm-dialog";
 import { useCommit } from "../light/use-commit";
 
 const CUSTOM = "custom";
@@ -219,32 +212,24 @@ export function TimeCard() {
 }
 
 function RegenerateToken() {
-  const { session } = useBoard();
+  const session = useSession();
   const [open, setOpen] = useState(false);
   return (
     <>
       <Button variant="outline" onClick={() => setOpen(true)}>
         Make a new token
       </Button>
-      <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent>
-          <AlertDialogTitle className="mb-2 text-lg font-semibold">Make a new token?</AlertDialogTitle>
-          <AlertDialogDescription className="mb-4 text-base">
-            The old token stops working. Every phone and computer that uses Zenit over WiFi has to log in again with the
-            new one.
-          </AlertDialogDescription>
-          <div className="flex justify-end gap-2">
-            <AlertDialogCancel asChild>
-              <Button variant="outline">Cancel</Button>
-            </AlertDialogCancel>
-            <AlertDialogAction asChild>
-              <Button variant="danger" onClick={() => void session.regenerateToken()}>
-                Make a new token
-              </Button>
-            </AlertDialogAction>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="Make a new token?"
+        confirm="Make a new token"
+        tone="danger"
+        onConfirm={() => void session.regenerateToken()}
+      >
+        The old token stops working. Every phone and computer that uses Zenit over WiFi has to log in again with the new
+        one.
+      </ConfirmDialog>
     </>
   );
 }
@@ -327,28 +312,19 @@ export function AccessCard() {
           </p>
         )}
       </div>
-      <AlertDialog open={asking} onOpenChange={setAsking}>
-        <AlertDialogContent>
-          <AlertDialogTitle className="mb-2 text-lg font-semibold">Turn on the login?</AlertDialogTitle>
-          <AlertDialogDescription asChild>
-            <div className="mb-4 flex flex-col gap-3 text-base">
-              <p>
-                Zenit closes this connection, and then asks for the token. You find the token in the Device page when
-                Zenit is connected with the USB cable, or with the command line tool over USB.
-              </p>
-              <Banner tone="warning">Make sure you have the token before you continue.</Banner>
-            </div>
-          </AlertDialogDescription>
-          <div className="flex justify-end gap-2">
-            <AlertDialogCancel asChild>
-              <Button variant="outline">Cancel</Button>
-            </AlertDialogCancel>
-            <AlertDialogAction asChild>
-              <Button onClick={() => void commit({ network_login: true })}>Turn on</Button>
-            </AlertDialogAction>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={asking}
+        onOpenChange={setAsking}
+        title="Turn on the login?"
+        confirm="Turn on"
+        onConfirm={() => void commit({ network_login: true })}
+      >
+        <p>
+          Zenit closes this connection, and then asks for the token. You find the token in the Device page when Zenit is
+          connected with the USB cable, or with the command line tool over USB.
+        </p>
+        <Banner tone="warning">Make sure you have the token before you continue.</Banner>
+      </ConfirmDialog>
     </Card>
   );
 }

@@ -87,7 +87,6 @@ def close_request(text):
     return None
 
 
-
 def _is_port(text):
     return 0 < len(text) <= 5 and text.isascii() and text.isdigit() and int(text) <= 65535
 
@@ -173,7 +172,7 @@ class Bridge:
     def process_request(self, connection, request):
         """Serves the web app to a page request, and refuses a second WebSocket while the first one is open."""
         if self.app_dir is not None and request.headers.get("Upgrade", "").lower() != "websocket":
-            if getattr(request, "method", "GET") != "GET":
+            if request.method != "GET":
                 # As the board: only GET is served (HEAD included), anything else is 405 with Allow: GET
                 return self.page(connection, request, allowed=False)
             return self.page(connection, request)
@@ -251,8 +250,8 @@ class Bridge:
             text = raw.decode("utf-8", "replace").rstrip("\r\n")
             if text == "!wifi-closed":
                 self.closed.set()
-            elif close_request(text) is not None:
-                self.reply(CloseClient(close_request(text)))
+            elif (code := close_request(text)) is not None:
+                self.reply(CloseClient(code))
             elif text.startswith(MARKER):
                 self.reply(text)
 

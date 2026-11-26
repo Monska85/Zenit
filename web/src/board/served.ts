@@ -16,7 +16,7 @@ export interface ServedBoard {
 const HOSTNAME = /^zenit-[0-9a-f]{4}$/;
 /** The board's answer is about 50 bytes; anything much longer is another page. */
 const MAX_BODY = 256;
-export const PROBE_TIMEOUT_MS = 2000;
+const PROBE_TIMEOUT_MS = 2000;
 
 /**
  * The board in the bytes of `/board.json`, or null unless they are strict JSON of at most 256 bytes and exactly
