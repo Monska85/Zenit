@@ -6,8 +6,8 @@
         [--firmware release/ --firmware-version 1.0.0]
 
 --web is the archive a web release attaches (the built `web/dist`). --firmware is a folder with the files of a firmware
-release (the bootloader, partition table, boot_app0 and firmware binaries, and `SHA256SUMS` when it has one: each is
-checked against it) and --firmware-version its version, X.Y.Z. The site then holds the app, the four binaries under
+release (the bootloader, partition table, boot_app0 and firmware binaries, and `SHA256SUMS`, which each is checked
+against) and --firmware-version its version, X.Y.Z. The site then holds the app, the four binaries under
 `firmware/`, `firmware/manifest.json`, the manifest ESP Web Tools installs from, with each part at its own offset so
 an update keeps the settings (docs/web/web-app-v1.md#installing-firmware), and `firmware/update.json`, the update
 manifest a board on WiFi reads (docs/board/wifi-and-updates-v1.md#source): the version, the application's file name,
@@ -43,7 +43,8 @@ import web_image
 MAX_UPDATE_MANIFEST = 1024
 # The smallest application a board installs (lib/ZenitUpdate/src/manifest.h)
 MIN_FIRMWARE_SIZE = 65536
-VERSION = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
+# X.Y.Z with at most six digits each, as the board reads it
+VERSION = web_image.VERSION
 
 
 class SiteError(Exception):
@@ -161,20 +162,21 @@ def extract_web(archive, out):
 
 
 def checked_sum(folder, name):
-    """The SHA-256 of folder/name, compared with folder/SHA256SUMS when that file exists."""
+    """The SHA-256 of folder/name, which must match its line in folder/SHA256SUMS."""
     path = folder / name
     if not path.is_file():
         raise SiteError(f"{path} is missing")
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     sums = folder / "SHA256SUMS"
-    if sums.is_file():
-        listed = {}
-        for line in sums.read_text(encoding="utf-8").splitlines():
-            parts = line.split()
-            if len(parts) == 2:
-                listed[parts[1].lstrip("*")] = parts[0]
-        if listed.get(name) != digest:
-            raise SiteError(f"{name} does not match {sums}")
+    if not sums.is_file():
+        raise SiteError(f"{sums} is missing: the firmware files cannot be checked")
+    listed = {}
+    for line in sums.read_text(encoding="utf-8").splitlines():
+        parts = line.split()
+        if len(parts) == 2:
+            listed[parts[1].lstrip("*")] = parts[0]
+    if listed.get(name) != digest:
+        raise SiteError(f"{name} does not match {sums}")
     return digest
 
 

@@ -247,15 +247,59 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn("release-assets", (ROOT / "justfile").read_text(encoding="utf-8"))
         self.assertIn("\nrelease-assets:", (ROOT / "Makefile").read_text(encoding="utf-8"))
 
-    def test_the_two_task_runners_have_the_same_recipes(self):
-        text = (ROOT / "justfile").read_text(encoding="utf-8")
-        just = set(re.findall(r"^([a-z][a-z0-9-]*)(?: [^:=\n]*)?:(?!=)", text, re.M))
-        # A recipe marked [private] is a helper that make has as a file target instead
-        just -= set(re.findall(r"^\[private\]\n([a-z][a-z0-9-]*)", text, re.M))
-        make = set(re.findall(r"^([a-z][a-z0-9-]*):", (ROOT / "Makefile").read_text(encoding="utf-8"), re.M))
-        just -= {"default"}
-        make -= {"help"}
-        self.assertEqual(just, make)
+    def test_the_two_task_runners_have_the_same_recipes_with_the_same_commands(self):
+        # A developer may have only one of them installed, so each recipe runs the same steps in both
+        just = just_recipes((ROOT / "justfile").read_text(encoding="utf-8"))
+        make = make_recipes((ROOT / "Makefile").read_text(encoding="utf-8"))
+        just.pop("default")
+        make.pop("help")
+        self.assertGreater(len(just), 20)
+        self.assertEqual(sorted(just), sorted(make))
+        for name, recipe in just.items():
+            self.assertEqual(recipe, make[name], name)
+
+
+
+def just_recipes(text):
+    """{name: (dependencies, commands)} of a justfile, with `{{name}}` written as make's `$(NAME)`. A [private] recipe
+    is a helper that make has as a file target instead (node-modules is web/node_modules)."""
+    recipes = {}
+    lines = text.splitlines()
+    index = 0
+    while index < len(lines):
+        match = re.fullmatch(r"([a-z][a-z0-9-]*)(?: [^:=]*)?:(?!=)(.*)", lines[index])
+        private = index > 0 and lines[index - 1] == "[private]"
+        index += 1
+        if match is None:
+            continue
+        body = []
+        while index < len(lines) and lines[index].startswith("    "):
+            body.append(lines[index].strip())
+            index += 1
+        if not private:
+            dependencies = ["web/node_modules" if name == "node-modules" else name for name in match.group(2).split()]
+            commands = [re.sub(r"\{\{(\w+)\}\}", lambda name: f"$({name.group(1).upper()})", line) for line in body]
+            recipes[match.group(1)] = (dependencies, commands)
+    return recipes
+
+
+def make_recipes(text):
+    """{name: (dependencies, commands)} of the Makefile's targets, without the `@test -n` lines that check a required
+    variable (just requires the argument instead)."""
+    recipes = {}
+    lines = text.splitlines()
+    index = 0
+    while index < len(lines):
+        match = re.fullmatch(r"([a-z][a-z0-9-]*):(?!=)([^#]*)(?:##.*)?", lines[index])
+        index += 1
+        if match is None:
+            continue
+        body = []
+        while index < len(lines) and lines[index].startswith("\t"):
+            body.append(lines[index].strip())
+            index += 1
+        recipes[match.group(1)] = (match.group(2).split(), [line for line in body if not line.startswith("@test -n ")])
+    return recipes
 
 
 if __name__ == "__main__":

@@ -134,15 +134,20 @@ class SerialLink:
         self.serial.timeout = 0.05
         # Keep both control lines at pyserial's default (raised together, as the kernel does on open). Clearing one of
         # them first would run the reset sequence of the ESP32-C3's USB serial port and restart the board.
+        # What pyserial raises when the port fails or the board is unplugged
+        self.errors = (OSError, serial.SerialException)
         try:
             self.serial.open()
-        except (OSError, serial.SerialException) as error:
+        except self.errors as error:
             raise ClientError(f"cannot open {port}: {error}")
         self.buffer = b""
 
     def write_line(self, line):
-        self.serial.write(line + b"\n")
-        self.serial.flush()
+        try:
+            self.serial.write(line + b"\n")
+            self.serial.flush()
+        except self.errors as error:
+            raise ClientError(f"cannot write to the port: {error}")
 
     def read_line(self, timeout):
         """The next line, without its newline, or None when none arrives within `timeout` seconds."""
@@ -156,10 +161,16 @@ class SerialLink:
                 self.buffer = b""  # no newline in sight: the bytes are not ours
             if time.monotonic() >= deadline:
                 return None
-            self.buffer += self.serial.read(self.serial.in_waiting or 1)
+            try:
+                self.buffer += self.serial.read(self.serial.in_waiting or 1)
+            except self.errors as error:
+                raise ClientError(f"cannot read from the port: {error}")
 
     def close(self):
-        self.serial.close()
+        try:
+            self.serial.close()
+        except self.errors as error:
+            raise ClientError(f"cannot close the port: {error}")
 
 
 class WebSocketLink:
@@ -167,9 +178,12 @@ class WebSocketLink:
 
     def __init__(self, url, origin=None):
         try:
+            from websockets.exceptions import WebSocketException
             from websockets.sync.client import connect
         except ImportError:
             raise ClientError("--ws needs the websockets package, version 17 (pip install websockets)")
+        # What the library raises when the connection fails or closes
+        self.errors = (OSError, WebSocketException)
         # The connection stays open for the client's lifetime, so its context is entered here and left in close()
         self.context = contextlib.ExitStack()
         try:
@@ -180,7 +194,10 @@ class WebSocketLink:
             raise ClientError(f"cannot connect to {url}: {error}")
 
     def write_line(self, line):
-        self.socket.send(line.decode("utf-8"))
+        try:
+            self.socket.send(line.decode("utf-8"))
+        except self.errors as error:
+            raise ClientError(f"the connection closed: {error}")
 
     def read_line(self, timeout):
         try:
@@ -192,15 +209,22 @@ class WebSocketLink:
         return message if isinstance(message, bytes) else message.encode("utf-8")
 
     def close(self):
-        self.context.close()
+        try:
+            self.context.close()
+        except self.errors as error:
+            raise ClientError(f"cannot close the connection: {error}")
 
 
 # ---- What a reply must look like (docs/protocol/protocol-v1.md). A reply that does not match is unusable: the client
 # throws it away and asks again. Unknown fields are ignored; every known one must have its type.
 
 
+# The largest whole number a client reads: what a JavaScript number holds exactly, so the web app reads the same
+MAX_INT = 2**53 - 1
+
+
 def is_int(value):
-    return type(value) is int  # not a bool, not a float such as 1.0
+    return type(value) is int and -MAX_INT <= value <= MAX_INT  # not a bool, not a float such as 1.0
 
 
 def is_number(value):
@@ -246,6 +270,16 @@ def int_in(low, high):
     return lambda value: is_int(value) and low <= value <= high
 
 
+def number_in(low, high):
+    """Any number, whole or written with a fraction, from `low` to `high`."""
+    return lambda value: is_number(value) and low <= value <= high
+
+
+def distinct_texts(low, high):
+    """An array of `low` to `high` texts, none of them twice."""
+    return lambda value: conforms(value, [is_text]) and low <= len(value) <= high and len(set(value)) == len(value)
+
+
 def one_of(*words):
     return lambda value: is_text(value) and value in words
 
@@ -275,16 +309,17 @@ def is_network_name(value):
 RELEASE = matching(r"(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})")
 TOKEN = matching(r"[a-z0-9]{16}")
 SETTINGS = {
-    "brightness": is_int,
+    # The ranges of docs/protocol/protocol-v1.md#settings_get-settings_set
+    "brightness": int_in(1, 100),
     "effect": is_text,
     "color": is_text,
-    "colors": [is_text],
+    "colors": distinct_texts(2, 4),
     "color_set": is_text,
-    "hold_seconds": is_int,
-    "period_seconds": is_int,
-    "floor": is_int,
-    "twinkle_strength": is_int,
-    "timer_minutes": is_int,
+    "hold_seconds": int_in(5, 600),
+    "period_seconds": int_in(4, 20),
+    "floor": int_in(5, 80),
+    "twinkle_strength": int_in(5, 50),
+    "timer_minutes": int_in(0, 360),
     # Words a newer firmware may extend are any text (docs/protocol/protocol-v1.md#versions)
     "wifi_power": Maybe(is_text),
     "update_mode": Maybe(is_text),
@@ -321,7 +356,7 @@ WIFI = where(
 )
 # `synced`, the time and the minute of the day come together
 TIME = where(
-    {"synced": is_bool, "epoch": (int_in(0, 2**53), is_null), "local_minute": (int_in(0, 1439), is_null)},
+    {"synced": is_bool, "epoch": (int_in(0, MAX_INT), is_null), "local_minute": (int_in(0, 1439), is_null)},
     lambda time: (time["synced"] is True) == (time["epoch"] is not None)
     and (time["synced"] is True) == (time["local_minute"] is not None),
 )
@@ -350,7 +385,7 @@ UPDATE = where(
         "mode": is_text,
         "state": is_text,
         "available": (RELEASE, is_null),
-        "last_check": (int_in(0, 2**53), is_null),
+        "last_check": (int_in(0, MAX_INT), is_null),
         "last_result": is_text,
         "progress": (int_in(0, 100), is_null),
         "trial": is_bool,
@@ -370,13 +405,18 @@ UPDATE = where(
     and (update["last_result"] not in ("available", "skipped") or update["available"] is not None)
     and (update["last_result"] != "up_to_date" or update["available"] is None),
 )
+# The ranges of docs/protocol/protocol-v1.md#status: a timer counts down from its minutes
+TIMER = where(
+    {"minutes": int_in(1, 360), "remaining": is_int},
+    lambda timer: 0 <= timer["remaining"] <= timer["minutes"] * 60,
+)
 LIGHT = {
     "on": is_bool,
     "effect": is_text,
     "color": (is_text, is_null),
-    "lightness": is_number,
-    "power_scale": is_int,
-    "timer": (is_null, {"minutes": is_int, "remaining": is_int}),
+    "lightness": number_in(0, 100),
+    "power_scale": int_in(1, 100),
+    "timer": (is_null, TIMER),
 }
 # The known fields of a successful reply, by command
 REPLIES = {
@@ -585,12 +625,17 @@ def main(argv=None, out=None):
         seq = fields.pop("seq", None) if args.command == "raw" else None
         # raw sends what it is given, even `info`
         reply = client.info if args.command == "info" else client.send(command, fields, seq)
+        # A link that fails to close has failed: the reply may not be the whole story
+        closing, link = link, None
+        closing.close()
     except ClientError as error:
         print(f"zenit: {error}", file=sys.stderr)
         return 2
     finally:
+        # After an earlier failure the link is closed as well as it can be, and the first error is the one reported
         if link is not None:
-            link.close()
+            with contextlib.suppress(ClientError):
+                link.close()
     print(json.dumps(reply, indent=2, ensure_ascii=False), file=out)
     return 0 if reply.get("ok") else 1
 

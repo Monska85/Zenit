@@ -51,6 +51,10 @@ A text matched by `{"$pattern": "regular expression"}` is any string that matche
 
 The checksums of the raw lines were computed with Python's `zlib.crc32`, an implementation independent of the firmware. The expected values were typed by hand from the specifications.
 
+## Clients
+
+`client/replies.json` holds replies a client must accept or refuse, by command: `command`, `valid`, a `note` for readers and `reply`, the reply body without `seq`. The web app runs it through `validBody` (`web/test/replies.test.ts`) and the command line client through `valid_body` (`tools/test_zenit.py`), each reading the file's numbers as written (`60.0` is a fraction, an integer field refuses it). Every command of the clients' reply tables has a valid and an invalid case. Both clients also read the board's replies of `protocol/*.json`.
+
 ## WiFi, updates and Improv
 
 Cases for the pure logic of milestone 4, each file with a `description`:

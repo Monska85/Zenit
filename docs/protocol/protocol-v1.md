@@ -62,6 +62,8 @@ A request is a JSON object with `seq` (an integer from 0 to 4,294,967,295, new f
 
 The board answers every well-formed request with exactly one reply, in order: `seq`, `ok`, and on failure `error` (an [error code](#errors)) and `message` (for people; clients do not parse it). On success the reply holds the command's own fields. Clients ignore reply fields they do not know.
 
+Every whole number in a reply is from -(2^53 - 1) to 2^53 - 1 (9,007,199,254,740,991), what a JavaScript number holds exactly; clients refuse a reply with a larger one. A field the tables below give as a range is refused outside it, as a reply that does not have its fields' types is.
+
 ### Retries
 
 The client waits for the reply with a timeout (2 seconds) and then sends the same request again, with the same `seq`, up to 5 times in all. The board remembers its last reply on each transport with the `seq` and the CRC of the request it answered; the same `seq` with the same CRC gets that reply again without running the command twice. The same `seq` with another CRC is a new request. The board forgets the remembered replies when it restarts; `info.boot_id` lets a client notice a restart. A client keeps one request in flight and accepts only the reply whose `seq` matches it.
@@ -109,9 +111,9 @@ The light, and from the WiFi and updates milestone the WiFi, time and update sta
 | `light.color`             | The color lit now, or `null` when the light is off.                                                                               |
 | `light.lightness`         | The lightness `L` sent to the curve now, from 0 to 100, always written with one decimal (`60.0`).                                 |
 | `light.power_scale`       | The percentage the [power limit](../board/light-v1.md#power-limit) leaves of the duties now, from 1 to 100.                       |
-| `light.timer`             | `null` with no timer, otherwise `minutes` (the setting) and `remaining`, the whole seconds until the fade-out starts, 0 after it. |
+| `light.timer`             | `null` with no timer, otherwise `minutes` (the setting, 1 to 360) and `remaining`, the whole seconds until the fade-out starts, from 0 (after it) to `minutes` times 60. |
 | `wifi`                    | From the WiFi and updates milestone: `state` (`not_configured`, `connecting`, `connected`, `not_found`, `wrong_password`, `no_address`), `ssid` (the stored network, or `null`), `rssi` (dBm, a whole number from -128 to 127, since a very strong signal can read slightly above 0; or `null` when not connected), `ip` (or `null`) and `hostname` (`zenit-XXXX`). |
-| `time`                    | `synced`, `epoch` (Unix seconds, or `null` until synced) and `local_minute` (minutes after midnight in `timezone`, or `null`).    |
+| `time`                    | `synced`, `epoch` (Unix seconds, 0 to 2^53 - 1, or `null` until synced) and `local_minute` (minutes after midnight in `timezone`, 0 to 1,439, or `null`). |
 | `update`                  | `mode`, `state`, `available`, `last_check`, `last_result`, `progress`, `trial`, `skipped`, `rolled_back`, `target` and `web` (`state`, `version`, `available`, `last_result`, `retry_in`), as [WiFi and updates](../board/wifi-and-updates-v1.md#status) defines them. |
 
 ### `settings_get`, `settings_set`

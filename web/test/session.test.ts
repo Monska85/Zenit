@@ -71,9 +71,10 @@ describe("BoardSession.connect", () => {
     expect(session.getState().error).toContain("newer protocol");
   });
 
-  it("refuses settings outside their limits", async () => {
+  it("refuses settings that name an effect the board does not list", async () => {
     const board = new FakeBoard();
-    board.settings["brightness"] = 500;
+    // Out-of-range values are malformed replies (conformance/client/replies.json); this one is well formed
+    board.settings["effect"] = "laser";
     const session = new BoardSession();
     const done = session.connect(board.transport(), "x");
     await vi.advanceTimersByTimeAsync(0);
@@ -121,15 +122,15 @@ describe("BoardSession.setSettings", () => {
     expect(session.getState().error).not.toContain("for logs");
   });
 
-  it("refuses to show settings the board sent outside their limits", async () => {
+  it("refuses to show settings that name a color the board does not list", async () => {
     const { session, board, transport } = await connected();
     transport.respond = (request) => {
       board.answer(request);
-      return [{ seq: request["seq"], ok: true, settings: { ...board.settings, floor: 3 } }];
+      return [{ seq: request["seq"], ok: true, settings: { ...board.settings, color: "purple" } }];
     };
     await session.setSettings({ brightness: 5 });
     expect(session.getState().error).not.toBeNull();
-    expect(session.getState().settings?.floor).toBe(20);
+    expect(session.getState().settings?.color).toBe("white");
   });
 
   it("is lost when the board stops answering", async () => {

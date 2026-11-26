@@ -8,7 +8,8 @@ import { JsonFloat, type JsonObject } from "./strict-json";
 
 export type Check = (value: unknown) => boolean;
 
-/** A whole number written as one (`1`, not `1.0`), within what JavaScript holds exactly. */
+/** A whole number written as one (`1`, not `1.0`), from -(2^53 - 1) to 2^53 - 1: what JavaScript holds exactly, and the
+ * bound `is_int` of tools/zenit.py uses. */
 export const isInt: Check = (value) => typeof value === "number" && Number.isSafeInteger(value);
 export const isNumber: Check = (value) => typeof value === "number" || value instanceof JsonFloat;
 export const isText: Check = (value) => typeof value === "string";
@@ -44,6 +45,22 @@ const intIn =
   (low: number, high: number): Check =>
   (value) =>
     isInt(value) && (value as number) >= low && (value as number) <= high;
+/** Any number, whole or written with a fraction, from `low` to `high`. */
+const numberIn =
+  (low: number, high: number): Check =>
+  (value) => {
+    if (!isNumber(value)) return false;
+    const number = value instanceof JsonFloat ? value.value : (value as number);
+    return number >= low && number <= high;
+  };
+/** An array of `low` to `high` texts, none of them twice. */
+const distinctTexts =
+  (low: number, high: number): Check =>
+  (value) =>
+    arrayOf(isText)(value) &&
+    (value as string[]).length >= low &&
+    (value as string[]).length <= high &&
+    new Set(value as string[]).size === (value as string[]).length;
 /** A text that matches the pattern entirely. */
 const matching =
   (pattern: RegExp): Check =>
@@ -68,16 +85,17 @@ const IPV4: Check = (value) =>
 
 const SETTINGS = shape(
   {
-    brightness: isInt,
+    // The ranges of docs/protocol/protocol-v1.md#settings_get-settings_set
+    brightness: intIn(1, 100),
     effect: isText,
     color: isText,
-    colors: arrayOf(isText),
+    colors: distinctTexts(2, 4),
     color_set: isText,
-    hold_seconds: isInt,
-    period_seconds: isInt,
-    floor: isInt,
-    twinkle_strength: isInt,
-    timer_minutes: isInt,
+    hold_seconds: intIn(5, 600),
+    period_seconds: intIn(4, 20),
+    floor: intIn(5, 80),
+    twinkle_strength: intIn(5, 50),
+    timer_minutes: intIn(0, 360),
   },
   {
     // Words a newer firmware may extend are any text: the app names the ones it knows (docs/protocol/protocol-v1.md#versions)
@@ -176,13 +194,18 @@ const UPDATE = and(
     (update["last_result"] !== "up_to_date" || update["available"] === null),
 );
 
+// The ranges of docs/protocol/protocol-v1.md#status: a timer counts down from its minutes
+const TIMER = and(shape({ minutes: intIn(1, 360), remaining: isInt }), (timer) => {
+  const remaining = timer["remaining"] as number;
+  return remaining >= 0 && remaining <= (timer["minutes"] as number) * 60;
+});
 const LIGHT = shape({
   on: isBool,
   effect: isText,
   color: anyOf(isText, isNull),
-  lightness: isNumber,
-  power_scale: isInt,
-  timer: anyOf(isNull, shape({ minutes: isInt, remaining: isInt })),
+  lightness: numberIn(0, 100),
+  power_scale: intIn(1, 100),
+  timer: anyOf(isNull, TIMER),
 });
 
 /** The known fields of a successful reply, by command. */

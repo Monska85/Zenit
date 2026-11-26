@@ -159,5 +159,5 @@ web-check: web-test web-size web-e2e web-screenshots
 
 # Remove build outputs and simulator output
 clean:
-    pio run -t clean -e native -e native_test -e {{board}}
-    rm -rf {{out}} release web/dist web/test-results* web/playwright-report*
+    pio run -t clean -e native -e native_test -e {{board}} -e esp32c3_test_http
+    rm -rf {{out}} release web/dist web/test-results* web/playwright-report* .pio/web

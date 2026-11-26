@@ -8,9 +8,11 @@ import io
 import json
 import os
 import queue
+import re
 import subprocess
 import sys
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -20,6 +22,14 @@ import zenit  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 SIMULATOR = ROOT / ".pio" / "build" / "native" / "program"
+# CI has every dependency and builds the simulator first: a missing one there is a failure, not a skip
+IN_CI = bool(os.environ.get("CI"))
+try:
+    import websockets.exceptions
+
+    HAVE_WEBSOCKETS = True
+except ImportError:
+    HAVE_WEBSOCKETS = False
 
 
 def reply_line(**fields):
@@ -741,6 +751,239 @@ class MainTest(unittest.TestCase):
         self.assertIn("cannot open x", err.getvalue())
 
 
+class FakeSerial:
+    """pyserial's Serial, with a failure of the board's port injected into one operation."""
+
+    def __init__(self, failing):
+        self.failing = failing
+        self.closed = False
+
+    def fail(self, operation):
+        if self.failing == operation:
+            raise FakeSerialModule.SerialException(f"{operation} failed")
+
+    def open(self):
+        self.fail("open")
+
+    def write(self, data):
+        self.fail("write")
+        return len(data)
+
+    def flush(self):
+        self.fail("flush")
+
+    @property
+    def in_waiting(self):
+        self.fail("in_waiting")
+        return 0
+
+    def read(self, size):
+        self.fail("read")
+        time.sleep(0.001)
+        return b""
+
+    def close(self):
+        self.closed = True
+        self.fail("close")
+
+
+class FakeSerialModule:
+    """The `serial` module as SerialLink uses it."""
+
+    class SerialException(OSError):  # as in pyserial, an IOError
+        pass
+
+    def __init__(self, failing):
+        self.port = FakeSerial(failing)
+
+    def Serial(self):
+        return self.port
+
+
+class TransportFailureTest(unittest.TestCase):
+    """A board unplugged or a connection lost in the middle of a request is a connection failure, exit status 2."""
+
+    def serial_link(self, failing):
+        module = FakeSerialModule(failing)
+        with mock.patch.dict(sys.modules, {"serial": module}):
+            return zenit.SerialLink("x"), module.port
+
+    def test_serial_operations_that_fail_raise_the_client_error(self):
+        for failing, operation in [
+            ("write", lambda link: link.write_line(b"line")),
+            ("flush", lambda link: link.write_line(b"line")),
+            ("read", lambda link: link.read_line(1)),
+            ("in_waiting", lambda link: link.read_line(1)),
+            ("close", lambda link: link.close()),
+        ]:
+            link, _ = self.serial_link(failing)
+            with self.assertRaises(zenit.ClientError, msg=failing):
+                operation(link)
+
+    def test_a_port_that_cannot_be_opened_raises_the_client_error(self):
+        with self.assertRaises(zenit.ClientError):
+            self.serial_link("open")
+
+    def run_main(self, failing):
+        module = FakeSerialModule(failing)
+        with mock.patch.dict(sys.modules, {"serial": module}), mock.patch("sys.stderr", io.StringIO()) as err:
+            status = zenit.main(["--port", "x", "--timeout", "0.05", "--attempts", "1", "info"], io.StringIO())
+        return status, err.getvalue(), module.port
+
+    def test_main_exits_with_2_when_the_port_fails(self):
+        for failing in ("write", "read"):
+            status, err, port = self.run_main(failing)
+            self.assertEqual(status, 2, failing)
+            self.assertIn(f"{failing} failed", err)
+            self.assertTrue(port.closed)
+
+    def test_a_port_that_fails_to_close_after_a_failure_reports_the_first_failure(self):
+        module = FakeSerialModule("write")
+        module.port.close = lambda: (_ for _ in ()).throw(FakeSerialModule.SerialException("close failed"))
+        with mock.patch.dict(sys.modules, {"serial": module}), mock.patch("sys.stderr", io.StringIO()) as err:
+            self.assertEqual(zenit.main(["--port", "x", "--attempts", "1", "info"], io.StringIO()), 2)
+        self.assertIn("write failed", err.getvalue())
+        self.assertNotIn("close failed", err.getvalue())
+
+    def test_a_link_that_fails_to_close_after_its_reply_exits_with_2(self):
+        class Closing(ScriptedLink):
+            def close(self):
+                raise zenit.ClientError("cannot close the port: gone")
+
+        out = io.StringIO()
+        with mock.patch.object(zenit, "SerialLink", return_value=Closing(echo_ok)), mock.patch(
+            "sys.stderr", io.StringIO()
+        ) as err:
+            self.assertEqual(zenit.main(["--port", "x", "info"], out), 2)
+        self.assertIn("cannot close the port", err.getvalue())
+        self.assertEqual(out.getvalue(), "")
+
+    @unittest.skipUnless(HAVE_WEBSOCKETS or IN_CI, "needs the websockets package")
+    def test_websocket_send_and_close_that_fail_raise_the_client_error(self):
+        closed = websockets.exceptions.ConnectionClosedError(None, None)
+        for failing in ("send", "close"):
+            for error in (closed, OSError("reset")):
+                self.check_websocket_failure(failing, error)
+
+    def check_websocket_failure(self, failing, error):
+        socket = mock.MagicMock()
+        context = mock.MagicMock()
+        context.__enter__.return_value = socket
+        if failing == "send":
+            socket.send.side_effect = error
+        else:
+            context.__exit__.side_effect = error
+        with mock.patch("websockets.sync.client.connect", return_value=context):
+            link = zenit.WebSocketLink("ws://127.0.0.1:1")
+        with self.assertRaises(zenit.ClientError, msg=f"{failing} {error!r}"):
+            link.write_line(b"line") if failing == "send" else link.close()
+
+
+class SharedRepliesTest(unittest.TestCase):
+    """conformance/client/replies.json, the replies both clients must accept or refuse (web/test/replies.test.ts runs
+    the same file through the web app's validBody)."""
+
+    def setUp(self):
+        self.cases = json.loads((ROOT / "conformance" / "client" / "replies.json").read_text(encoding="utf-8"))["cases"]
+
+    def test_each_reply_is_accepted_or_refused_as_the_case_says(self):
+        for case in self.cases:
+            # Through the client's own reader: the framed body, numbers written as in the file (60.0 stays a fraction)
+            reply = zenit.parse_line(zenit.frame(case["reply"]))
+            self.assertIsNotNone(reply, case["note"])
+            self.assertEqual(zenit.valid_body(case["command"], reply), case["valid"], f"{case['command']}: {case['note']}")
+
+    def test_every_command_of_the_reply_table_has_a_valid_and_a_refused_case(self):
+        for command in zenit.REPLIES:
+            self.assertEqual({case["valid"] for case in self.cases if case["command"] == command}, {True, False}, command)
+
+
+class ConformanceTest(unittest.TestCase):
+    """The protocol conformance cases (conformance/protocol), read from the client's side, as web/test/conformance.test.ts
+    does: a line the board refuses is a line the client throws away, a request it frames reads back the same, and a
+    reply the board gives is one the client accepts."""
+
+    # Limits only the board has: it reads 1,024 bytes and 4 levels, the client more
+    BOARD_ONLY = {"framing_line_limit", "framing_nesting_limit"}
+    SAMPLES = {"string": "1.0.0", "integer": 1, "boolean": True}
+
+    @classmethod
+    def setUpClass(cls):
+        folder = ROOT / "conformance" / "protocol"
+        cls.cases = {path.stem: json.loads(path.read_text(encoding="utf-8")) for path in sorted(folder.glob("*.json"))}
+
+    @classmethod
+    def concrete(cls, value):
+        """`$any` and `$pattern` placeholders as a sample of their type."""
+        if isinstance(value, list):
+            return [cls.concrete(item) for item in value]
+        if isinstance(value, dict):
+            if len(value) == 1 and isinstance(value.get("$any"), str):
+                return cls.SAMPLES[value["$any"]]
+            if len(value) == 1 and isinstance(value.get("$pattern"), str):
+                pattern = value["$pattern"]
+                match = re.fullmatch(r"\^\[a-z0-9\]\{(\d+)\}\$", pattern)
+                if match is None:
+                    raise AssertionError(f"no sample for the pattern {pattern}")
+                return ("abcdefghij0123456789" * 4)[: int(match.group(1))]
+            return {key: cls.concrete(item) for key, item in value.items()}
+        return value
+
+    @staticmethod
+    def steps(case):
+        # The clock, the simulator's events and control lines are for the board
+        return [step for step in case["steps"] if not {"advance_ms", "event", "control", "close_requested"} & step.keys()]
+
+    def test_cases_are_present(self):
+        self.assertGreater(len(self.cases), 20)
+
+    def test_lines_the_board_refuses_are_thrown_away_and_the_ones_it_answers_are_read(self):
+        for name, case in self.cases.items():
+            if name in self.BOARD_ONLY:
+                continue
+            for step in self.steps(case):
+                transport = step.get("transport", case.get("transport", "usb"))
+                if isinstance(step.get("send"), str):
+                    line = step["send"].encode("utf-8")
+                elif "send_hex" in step:
+                    line = bytes.fromhex(step["send_hex"])
+                else:
+                    continue
+                if b"\n" in line or re.search("nest|level", step.get("note", ""), re.I):
+                    continue  # two lines, or a nesting only the board limits
+                if transport == "wifi" and b"\r" in line:
+                    continue  # over WebSocket a carriage return stays in the JSON, and a board never sends one
+                expect = step.get("expect")
+                refused = expect is None or (expect.get("ok") is False and expect.get("error") == "bad_frame")
+                label = f"{name}: {step.get('note', step.get('send', step.get('send_hex')))}"
+                self.assertEqual(zenit.parse_line(line) is None, refused, label)
+
+    def test_requests_are_framed_so_that_they_read_back_the_same(self):
+        for name, case in self.cases.items():
+            for step in self.steps(case):
+                if isinstance(step.get("send"), dict):
+                    self.assertEqual(zenit.parse_line(zenit.frame(step["send"])), step["send"], name)
+
+    def test_the_replies_of_the_board_are_accepted(self):
+        for name, case in self.cases.items():
+            command = ""
+            for step in self.steps(case):
+                if isinstance(step.get("send"), dict):
+                    command = str(step["send"].get("cmd"))
+                elif isinstance(step.get("send"), str):
+                    read = zenit.parse_line(step["send"].encode("utf-8"))
+                    command = read["cmd"] if read is not None and isinstance(read.get("cmd"), str) else ""
+                if not step.get("expect"):
+                    continue
+                reply = self.concrete(step["expect"])
+                if reply.get("ok") is False:
+                    reply = dict(reply, message="for people")  # the cases leave out the message, which is for people
+                read = zenit.parse_line(zenit.frame(reply))
+                self.assertIsNotNone(read, f"{name}: {step.get('note', '')}")
+                if read.get("ok") is False or "seq" in read:
+                    self.assertTrue(zenit.valid_body(command, read), f"{name}: {command} {step.get('note', '')}")
+
+
 class SimulatorLink:
     """The simulator's standard input and output, as a link."""
 
@@ -771,7 +1014,7 @@ class SimulatorLink:
         self.process.stdout.close()
 
 
-@unittest.skipUnless(SIMULATOR.exists(), "the simulator is not built (pio run -e native)")
+@unittest.skipUnless(SIMULATOR.exists() or IN_CI, "the simulator is not built (pio run -e native)")
 class SimulatorTest(unittest.TestCase):
     def setUp(self):
         self.link = SimulatorLink()
@@ -818,7 +1061,7 @@ class SimulatorTest(unittest.TestCase):
         self.assertEqual(json.loads(out.getvalue())["settings"]["period_seconds"], 12)
 
 
-@unittest.skipUnless(SIMULATOR.exists(), "the simulator is not built (pio run -e native)")
+@unittest.skipUnless(SIMULATOR.exists() or IN_CI, "the simulator is not built (pio run -e native)")
 class SimulatorControlLinesTest(unittest.TestCase):
     def run_simulator(self, args, text):
         done = subprocess.run([str(SIMULATOR), "--protocol", *args], input=text, capture_output=True, text=True, timeout=20)

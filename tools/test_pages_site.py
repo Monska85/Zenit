@@ -43,9 +43,14 @@ class SiteTest(unittest.TestCase):
         files = dict(PARTS, **{PROTOCOL: b"1\n"})
         for name, data in files.items():
             (self.release / name).write_bytes(data)
-        sums = "".join(f"{hashlib.sha256(data).hexdigest()}  {name}\n" for name, data in files.items())
-        (self.release / "SHA256SUMS").write_text(sums, encoding="utf-8")
+        self.write_sums()
         self.out = self.root / "site"
+
+    def write_sums(self):
+        """SHA256SUMS of the release files as they are now, as the release job writes it."""
+        files = sorted(path for path in self.release.iterdir() if path.name != "SHA256SUMS")
+        sums = "".join(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n" for path in files)
+        (self.release / "SHA256SUMS").write_text(sums, encoding="utf-8")
 
     def build(self, **overrides):
         args = {"web": self.web, "out": self.out, "firmware": self.release, "firmware_version": "1.2.3"}
@@ -104,8 +109,8 @@ class SiteTest(unittest.TestCase):
 
     def test_a_firmware_the_board_would_refuse_is_not_published(self):
         (self.release / FIRMWARE).write_bytes(b"small")
-        (self.release / "SHA256SUMS").unlink()
-        with self.assertRaises(pages_site.SiteError):
+        self.write_sums()
+        with self.assertRaisesRegex(pages_site.SiteError, "a board updates only to a file of"):
             self.build()
 
     def test_the_manifest_is_the_one_the_web_app_accepts(self):
@@ -230,12 +235,21 @@ class SiteTest(unittest.TestCase):
             self.build()
         self.assertFalse(self.out.exists())
 
-    def test_checksums_are_optional_but_the_parts_are_not(self):
+    def test_the_checksums_are_required(self):
         (self.release / "SHA256SUMS").unlink()
-        self.build()
+        with self.assertRaisesRegex(pages_site.SiteError, "SHA256SUMS is missing"):
+            self.build()
+        self.assertFalse(self.out.exists())
+
+    def test_the_parts_are_required(self):
         (self.release / pages_site.assets.FIRMWARE_NAME).unlink()
-        with self.assertRaises(pages_site.SiteError):
-            self.build(out=self.root / "other")
+        with self.assertRaisesRegex(pages_site.SiteError, "is missing"):
+            self.build()
+
+    def test_a_version_the_board_cannot_read_is_refused(self):
+        # Six digits at most in each part, as the board reads a version (web_image.VERSION)
+        with self.assertRaisesRegex(pages_site.SiteError, "not X.Y.Z"):
+            self.build(firmware_version="1234567.0.0")
 
     def test_an_archive_without_an_index_is_refused(self):
         make_archive(self.web, {"assets/app.js": b"1"})
