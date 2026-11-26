@@ -1,13 +1,17 @@
 name: Release
 
-# release-please keeps a release pull request open on main for each package: the firmware (tags vX.Y.Z) and the web app
-# (tags web-vX.Y.Z). Merging one tags the release and creates its GitHub Release with the notes from the changelog; the
-# jobs below then build that tag and attach its files: for the firmware the factory image, the firmware, its parts
+# This workflow runs after CI passes on a push to main, for the commit CI checked, so a release is cut only from a commit
+# that passed every check, the web app's end-to-end tests and screenshots included. release-please keeps a release pull
+# request open on main for each package: the firmware (tags vX.Y.Z) and the web app (tags web-vX.Y.Z). Merging one tags
+# the release and creates its GitHub Release as a draft with the notes from the changelog; the jobs below then build
+# that tag, attach its files and publish the release, so a release is never public without its files: for the firmware the factory image, the firmware, its parts
 # (bootloader, partition table, boot_app0) that the web installer writes, the third-party notices and their checksums;
 # for the web app `zenit-web-X.Y.Z.tar.gz` and `zenit-web-X.Y.Z.bin`, the image of the board's www partition. After
 # either release, one GitHub Pages site is assembled from the latest of each: the web app at the root, the web image
 # and its update manifest under web/, the firmware parts, the installer manifest (which writes the web image too) and
-# the firmware update manifest under firmware/. Boards on WiFi read both update manifests. A manual run
+# the firmware update manifest under firmware/. Boards on WiFi read both update manifests. Before a web release is
+# created, the web app's protocol range is checked against the protocol of the firmware the site pairs it with. A
+# manual run
 # with dry_run builds the same files from the branch it runs on, publishes nothing and keeps them as workflow
 # artifacts for 14 days. A manual run on main without dry_run publishes the site again from the latest releases.
 #
@@ -16,7 +20,11 @@ name: Release
 # environment (a fine-grained token with Contents, Pull requests and Issues read and write), because a pull request
 # opened with the default token does not start the other workflows. See Releases in README.md.
 on:
-  push:
+  # Only a successful run of a push to main in this repository releases (the jobs check it): the branch filter alone
+  # also matches a pull request from a fork's main branch.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -29,24 +37,59 @@ permissions:
   contents: read
 
 jobs:
-  # The release is cut from a main that passes every check
-  check:
-    if: github.event_name == 'push'
+  # When this commit creates a web release (its version in the manifest has no tag yet), the web app must speak the
+  # protocol of the firmware the site will pair it with: the one this commit releases, or the latest published one.
+  # Pages refuses the pairing too, but by then the release exists. A failure stops release-please for this run.
+  preflight:
+    if: >-
+      ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          # The tags tell which versions are released already
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: ./.github/actions/setup
-
-      - name: Check
-        run: make check
+      - name: Check the web app against the firmware it will be paired with
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # none: no web release in this commit; source: this run releases the firmware too, and the site pairs the
+          # app with this source's firmware; released: the site pairs it with the latest published firmware release
+          plan=$(git tag --list | python3 tools/web_release_check.py plan)
+          echo "Web release check: $plan"
+          case "$plan" in
+            none)
+              ;;
+            source)
+              python3 tools/web_release_check.py check --protocol-header lib/ZenitProto/src/proto_limits.h
+              ;;
+            released)
+              firmware_tag=$(gh release list --limit 200 --json tagName,isDraft,isPrerelease \
+                | python3 tools/web_release_check.py latest-firmware)
+              if [ -z "$firmware_tag" ]; then
+                echo "::notice::No firmware release yet: the site will have the web app alone."
+                exit 0
+              fi
+              mkdir -p "$RUNNER_TEMP/firmware"
+              gh release download "$firmware_tag" --dir "$RUNNER_TEMP/firmware" \
+                --pattern 'zenit-esp32c3-protocol.txt' --pattern SHA256SUMS
+              python3 tools/web_release_check.py check --firmware "$RUNNER_TEMP/firmware"
+              ;;
+            *)
+              exit 1
+              ;;
+          esac
 
   release-please:
-    needs: check
+    needs: preflight
     # One run at a time, so two runs never tag the same release or update the release pull request together
     concurrency:
       group: release-please
@@ -138,12 +181,16 @@ jobs:
         with:
           subject-path: ${{ runner.temp }}/release/*
 
-      - name: Attach the files to the GitHub Release
+      # release-please created the release as a draft: it becomes public once its files are attached
+      - name: Attach the files to the GitHub Release and publish it
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.release-please.outputs.tag_name }}
-        run: gh release upload "$TAG" "$RUNNER_TEMP"/release/* --clobber
+        run: |
+          set -eu
+          gh release upload "$TAG" "$RUNNER_TEMP"/release/* --clobber
+          gh release edit "$TAG" --draft=false
 
   web-build:
     needs: release-please
@@ -218,12 +265,15 @@ jobs:
         with:
           subject-path: ${{ runner.temp }}/web-release/*
 
-      - name: Attach the files to the GitHub Release
+      - name: Attach the files to the GitHub Release and publish it
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.release-please.outputs.web_tag_name }}
-        run: gh release upload "$TAG" "$RUNNER_TEMP"/web-release/* --clobber
+        run: |
+          set -eu
+          gh release upload "$TAG" "$RUNNER_TEMP"/web-release/* --clobber
+          gh release edit "$TAG" --draft=false
 
   # One site from the latest of each release, whichever was made last: the web app at the root, the firmware under
   # firmware/. GitHub Pages on a private repository needs a paid plan, so this job runs only when the repository is
@@ -249,8 +299,10 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # The commit CI checked, or the branch of a manual run (github.sha is the newest main on workflow_run)
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
 
       - name: Download the latest web release and the latest firmware release

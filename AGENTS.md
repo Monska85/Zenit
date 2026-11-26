@@ -89,7 +89,7 @@ Run builds, tests and checks only through the `justfile` or `Makefile` recipes (
 
 ## Package Management
 
-PlatformIO for the firmware (platforms and libraries pinned to exact versions in `platformio.ini`), pip with exact versions in `requirements-ci.txt` for the CI tools, and npm with a committed lockfile in `web/` (`ignore-scripts=true`, exact versions, Node from `engines`).
+PlatformIO for the firmware (platforms and libraries pinned to exact versions in `platformio.ini`), pip for the CI tools (exact top-level versions in `requirements-ci.in`, compiled with pip-tools into `requirements-ci.txt` with every dependency pinned and hashed, installed with `--require-hashes`; pip-tools runs at lock time only, never as a project dependency), and npm with a committed lockfile in `web/` (`ignore-scripts=true`, exact versions, Node from `engines`).
 
 ### Dependency Safety
 
