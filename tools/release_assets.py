@@ -22,7 +22,8 @@ Takes the build of the `esp32c3` environment and writes, into the output folder:
   SHA256SUMS                  the checksum of each file above.
 
 It stops when the application does not fit its slot in partitions.csv, or does not carry the release version (a build
-made with another ZENIT_VERSION).
+made with another ZENIT_VERSION): the firmware stores it as `ZENIT_VERSION=<version>` and a NUL, and only that exact
+text counts.
 """
 
 import argparse
@@ -89,6 +90,11 @@ def read(path, what):
     return path.read_bytes()
 
 
+def version_marker(version):
+    """The bytes the firmware built with ZENIT_VERSION=version carries: the marker, the version and its NUL."""
+    return b"ZENIT_VERSION=" + version.encode("ascii") + b"\0"
+
+
 def make_assets(version, build_dir, boot_app0, out_dir, partitions_csv, notices=None):
     """Writes the release files and returns their names."""
     if not re.fullmatch(r"[0-9A-Za-z][0-9A-Za-z.+-]{0,63}", version):
@@ -97,8 +103,9 @@ def make_assets(version, build_dir, boot_app0, out_dir, partitions_csv, notices=
     offset, size = app_slot(partitions_csv)
     if len(app) > size:
         raise ReleaseError(f"the application is {len(app)} bytes, its slot {size}")
-    # The version is a string in the application: a build with another one would publish the wrong number
-    if version.encode("ascii") not in app:
+    # The firmware keeps its version behind a marker and ends it with a NUL (src/platform.cpp): only that exact text
+    # counts, so a build with another version never passes on some other string that happens to hold the number
+    if version_marker(version) not in app:
         raise ReleaseError(f"the application does not carry the version {version}: build it with ZENIT_VERSION={version}")
     bootloader = read(build_dir / "bootloader.bin", "the bootloader")
     table = read(build_dir / "partitions.bin", "the partition table")

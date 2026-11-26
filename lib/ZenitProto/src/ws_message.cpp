@@ -36,13 +36,17 @@ MessageAssembler::Result MessageAssembler::begin_frame(FrameKind kind, size_t pa
     binary_ = kind == FrameKind::Binary;
     size_ = 0;
   }
-  if (size_ + payload_size > MAX_LINE)
+  // Written as a subtraction: size_ is at most MAX_LINE, so it cannot wrap, where a sum with a huge length could
+  if (payload_size > MAX_LINE - size_)
     return close(CLOSE_TOO_BIG);
   return Result::More;
 }
 
 MessageAssembler::Result MessageAssembler::end_frame(bool final, const uint8_t *payload, size_t payload_size)
 {
+  // A payload longer than begin_frame accepted is never copied, whatever the caller announced
+  if (!in_message_ || payload_size > MAX_LINE - size_)
+    return close(CLOSE_TOO_BIG);
   if (payload_size > 0)
     std::memcpy(buffer_ + size_, payload, payload_size);
   size_ += payload_size;

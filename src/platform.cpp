@@ -14,6 +14,16 @@
 namespace platform
 {
 
+namespace
+{
+// The version is kept behind a marker, `ZENIT_VERSION=` then the version and its NUL, so the release check
+// (tools/release_assets.py) finds this exact version in the image and not some other text that contains it. The
+// version is read through the marker, which keeps the whole of it in the image.
+constexpr char VERSION_MARKER[] = "ZENIT_VERSION=" ZENIT_VERSION;
+constexpr size_t VERSION_PREFIX = sizeof("ZENIT_VERSION=") - 1;
+const char *built_version() { return VERSION_MARKER + VERSION_PREFIX; }
+} // namespace
+
 #ifdef ZENIT_SIM
 namespace
 {
@@ -27,9 +37,9 @@ void sim_set_version(const char *version)
   version_override = version_storage;
 }
 
-const char *firmware_version() { return version_override ? version_override : ZENIT_VERSION; }
+const char *firmware_version() { return version_override ? version_override : built_version(); }
 #else
-const char *firmware_version() { return ZENIT_VERSION; }
+const char *firmware_version() { return built_version(); }
 #endif
 const char *board_name() { return ZENIT_BOARD; }
 

@@ -37,8 +37,6 @@ constexpr uint32_t TASK_STACK_BYTES = 12288;
 constexpr uint32_t LOOP_MS = 100;
 // A try to join a network gives up after this long without a result.
 constexpr uint32_t ATTEMPT_MS = 20000;
-// A connection started by Improv answers within this time.
-constexpr uint32_t PROVISION_MS = 30000;
 
 // ---- Shared by the two tasks. Each variable is guarded by `lock` or is an atomic, as the group says. ----
 Lock lock;
@@ -72,6 +70,7 @@ struct Command
   Type type = Type::Scan;
   install_target::Target target = install_target::Target::Firmware; // of a Manifest or a Download
   uint32_t id = 0;                                                  // of a Provision: the id its result carries
+  uint32_t queued_at = 0; // of a Provision: millis() when the loop task queued it, where its time starts
   char ssid[zenit::net::MAX_SSID + 1] = {0};
   char password[zenit::net::MAX_PASSWORD + 1] = {0};
   char url[zenit::update::MAX_URL + 1] = {0}; // a manifest or firmware address: the build refuses a longer one
@@ -112,7 +111,7 @@ struct Radio
   bool provisioning = false;
   char try_ssid[zenit::net::MAX_SSID + 1] = {0};
   char try_password[zenit::net::MAX_PASSWORD + 1] = {0};
-  uint32_t provision_started = 0;
+  uint32_t provision_started = 0; // when the loop task queued the try: its deadline counts from there
   uint32_t provision_id = 0;
   // The credentials the radio is working on now.
   char active_ssid[zenit::net::MAX_SSID + 1] = {0};
@@ -443,12 +442,19 @@ void set_provision(uint32_t id, Provision result)
 
 void start_provision(const Command &command, uint32_t now)
 {
+  // A request that waited behind a scan, a check or a download until its time ran out fails here, and the radio stays
+  // on its network: the loop task has given up on it or is about to.
+  if (zenit::net::provision_expired(command.queued_at, now))
+  {
+    set_provision(command.id, Provision::Failed);
+    return;
+  }
   radio.provision_id = command.id;
   // (the command's own copy of the password is wiped by run_command after this)
   std::snprintf(radio.try_ssid, sizeof(radio.try_ssid), "%s", command.ssid);
   std::snprintf(radio.try_password, sizeof(radio.try_password), "%s", command.password);
   radio.provisioning = true;
-  radio.provision_started = now;
+  radio.provision_started = command.queued_at;
   set_provision(command.id, Provision::Trying);
   stop_services();
   use_credentials(radio.try_ssid, radio.try_password, now);
@@ -458,7 +464,10 @@ void run_provision(uint32_t now)
 {
   if (!radio.provisioning)
     return;
-  if (radio.state == WifiState::Connected)
+  // The deadline wins over a connection made too late (this pass may come late, after a long command): the loop task
+  // stops waiting soon after it, and a success it no longer waits for would leave the radio on a network never stored.
+  const bool expired = zenit::net::provision_expired(radio.provision_started, now);
+  if (radio.state == WifiState::Connected && !expired)
   {
     // The new network works: the loop task stores it, and it stays the network of the radio.
     radio.provisioning = false;
@@ -468,7 +477,7 @@ void run_provision(uint32_t now)
     start_services(millis());
     return;
   }
-  if (now - radio.provision_started >= PROVISION_MS)
+  if (expired)
   {
     radio.provisioning = false;
     set_provision(radio.provision_id, Provision::Failed);
@@ -609,6 +618,7 @@ uint32_t provision(const char *ssid, const char *password)
 {
   Command command;
   command.type = Command::Type::Provision;
+  command.queued_at = millis();
   std::snprintf(command.ssid, sizeof(command.ssid), "%s", ssid);
   std::snprintf(command.password, sizeof(command.password), "%s", password);
   Locked held(lock);

@@ -1,0 +1,481 @@
+{
+  "description": "A release whose image reports another version than its manifest (here the manifest says 0.2.0 and the image reports 0.1.5): the installed image boots on trial, confirms itself and puts the version it was installed as on the skip list, with no rollback reported. A check then reports it skipped, an install refuses it and automatic mode leaves it, so the board does not download and restart again and again.",
+  "steps": [
+    {
+      "advance_ms": 1100
+    },
+    {
+      "control": "!net state=connected ssid=HomeNet rssi=-50 ip=10.0.0.5 synced=1 epoch=1790000000"
+    },
+    {
+      "send": {
+        "seq": 900,
+        "cmd": "settings_set",
+        "update_mode": "notify"
+      },
+      "expect": {
+        "seq": 900,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "notify",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      }
+    },
+    {
+      "control": "!update manifest {\"schema\":1,\"board\":\"esp32c3\",\"version\":\"0.2.0\",\"file\":\"zenit-esp32c3-firmware.bin\",\"size\":65536,\"sha256\":\"de2f256064a0af797747c2b97505dc0b9f3df0de4f489eac731c23ae9ca9cc31\"}"
+    },
+    {
+      "control": "!update firmware 65536 0"
+    },
+    {
+      "control": "!update download ok"
+    },
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null,
+          "target": "firmware",
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "update_install",
+        "target": "firmware"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "downloading",
+          "available": "0.2.0",
+          "last_check": 1790000000,
+          "last_result": "available",
+          "progress": 0,
+          "trial": false,
+          "skipped": null,
+          "rolled_back": null,
+          "target": "firmware",
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "control": "!restart as 0.1.5"
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": null,
+          "lightness": 0.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "not_configured",
+          "ssid": null,
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": true,
+          "skipped": null,
+          "rolled_back": null,
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
+        }
+      }
+    },
+    {
+      "advance_ms": 1300
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "not_configured",
+          "ssid": null,
+          "rssi": null,
+          "ip": null,
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": false,
+          "epoch": null,
+          "local_minute": null
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": "0.2.0",
+          "rolled_back": null,
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "info"
+      },
+      "expect": {
+        "seq": 5,
+        "ok": true,
+        "protocol": 1,
+        "firmware": "0.1.5",
+        "board": "simulator",
+        "boot_id": {
+          "$any": "integer"
+        },
+        "colors": [
+          "white",
+          "red",
+          "green",
+          "blue"
+        ],
+        "effects": [
+          "static",
+          "color_change",
+          "breathing",
+          "twinkle",
+          "fall_asleep",
+          "christmas"
+        ],
+        "color_sets": [
+          "christmas",
+          "ice"
+        ],
+        "power_limit_mw": 1000,
+        "memory": {
+          "free": 0,
+          "largest": 0
+        },
+        "nvs": {
+          "used": 0,
+          "free": 0
+        },
+        "limits": {
+          "line": 1024
+        }
+      }
+    },
+    {
+      "control": "!net state=connected ssid=HomeNet rssi=-50 ip=10.0.0.5 synced=1 epoch=1790000000"
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "update_check"
+      },
+      "expect": {
+        "seq": 6,
+        "ok": true,
+        "update": {
+          "mode": "notify",
+          "state": "checking",
+          "available": null,
+          "last_check": null,
+          "last_result": "never",
+          "progress": null,
+          "trial": false,
+          "skipped": "0.2.0",
+          "rolled_back": null,
+          "target": "firmware",
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
+        }
+      }
+    },
+    {
+      "advance_ms": 10
+    },
+    {
+      "send": {
+        "seq": 7,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 7,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000000,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "notify",
+          "state": "idle",
+          "available": "0.2.0",
+          "last_check": 1790000000,
+          "last_result": "skipped",
+          "progress": null,
+          "trial": false,
+          "skipped": "0.2.0",
+          "rolled_back": null,
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 8,
+        "cmd": "update_install",
+        "target": "firmware"
+      },
+      "expect": {
+        "seq": 8,
+        "ok": false,
+        "error": "nothing_to_install"
+      }
+    },
+    {
+      "send": {
+        "seq": 9,
+        "cmd": "settings_set",
+        "update_mode": "automatic"
+      },
+      "expect": {
+        "seq": 9,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      }
+    },
+    {
+      "advance_ms": 1000
+    },
+    {
+      "send": {
+        "seq": 10,
+        "cmd": "status"
+      },
+      "expect": {
+        "seq": 10,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        },
+        "wifi": {
+          "state": "connected",
+          "ssid": "HomeNet",
+          "rssi": -50,
+          "ip": "10.0.0.5",
+          "hostname": "zenit-0000"
+        },
+        "time": {
+          "synced": true,
+          "epoch": 1790000001,
+          "local_minute": 853
+        },
+        "update": {
+          "mode": "automatic",
+          "state": "idle",
+          "available": "0.2.0",
+          "last_check": 1790000000,
+          "last_result": "skipped",
+          "progress": null,
+          "trial": false,
+          "skipped": "0.2.0",
+          "rolled_back": null,
+          "target": null,
+          "web": {
+            "state": "ok",
+            "version": "1.0.0",
+            "available": null,
+            "last_result": {
+              "$any": "string"
+            },
+            "retry_in": null
+          }
+        }
+      }
+    }
+  ]
+}

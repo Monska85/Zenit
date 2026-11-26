@@ -1,5 +1,5 @@
 {
-  "description": "The reassembly of WebSocket data frames into one protocol line: fragments, the limits, binary, newlines and UTF-8. kind is text, binary or continuation; the result of each frame is more, line or close with a status.",
+  "description": "The reassembly of WebSocket data frames into one protocol line: fragments, the limits, binary, newlines and UTF-8. kind is text, binary or continuation; the result of each frame is more, line or close with a status. A frame with `announced` gives begin_frame that length without a payload (`max` is the largest value of the implementation's size type), as a header that claims a huge length does.",
   "cases": [
     {
       "name": "one text frame",
@@ -172,6 +172,97 @@
           "final": true,
           "size": 25,
           "fill": "61",
+          "begin": "close:1009"
+        }
+      ]
+    },
+    {
+      "name": "one byte, then a fragment that ends at the limit",
+      "frames": [
+        {
+          "kind": "text",
+          "final": false,
+          "size": 1,
+          "fill": "61",
+          "begin": "more",
+          "end": "more"
+        },
+        {
+          "kind": "continuation",
+          "final": true,
+          "size": 1023,
+          "fill": "61",
+          "begin": "more",
+          "end": "line"
+        }
+      ]
+    },
+    {
+      "name": "one byte, then a fragment one byte over the limit",
+      "frames": [
+        {
+          "kind": "text",
+          "final": false,
+          "size": 1,
+          "fill": "61",
+          "begin": "more",
+          "end": "more"
+        },
+        {
+          "kind": "continuation",
+          "final": true,
+          "size": 1024,
+          "fill": "61",
+          "begin": "close:1009"
+        }
+      ]
+    },
+    {
+      "name": "the limit, then one more byte",
+      "frames": [
+        {
+          "kind": "text",
+          "final": false,
+          "size": 1024,
+          "fill": "61",
+          "begin": "more",
+          "end": "more"
+        },
+        {
+          "kind": "continuation",
+          "final": true,
+          "size": 1,
+          "fill": "61",
+          "begin": "close:1009"
+        }
+      ]
+    },
+    {
+      "name": "one byte, then a fragment announced with the largest length a size can hold",
+      "frames": [
+        {
+          "kind": "text",
+          "final": false,
+          "size": 1,
+          "fill": "61",
+          "begin": "more",
+          "end": "more"
+        },
+        {
+          "kind": "continuation",
+          "final": true,
+          "announced": "max",
+          "begin": "close:1009"
+        }
+      ]
+    },
+    {
+      "name": "a first frame announced with the largest length a size can hold",
+      "frames": [
+        {
+          "kind": "text",
+          "final": true,
+          "announced": "max",
           "begin": "close:1009"
         }
       ]

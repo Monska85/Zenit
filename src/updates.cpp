@@ -241,7 +241,7 @@ bool store_booted(uint64_t now)
   if (!settings::update_record_readable())
     return true; // nothing can be stored: the unreadable record is settled after the trial
   const zenit::update::UpdateRecord record = settings::update_record();
-  const zenit::update::UpdateRecord next = zenit::update::apply_booted(record, platform::firmware_version());
+  const zenit::update::UpdateRecord next = zenit::update::apply_booted(record);
   if (next == record || store(next, now))
     return true;
   boot.retry_at_ms = now + RETRY_STORE_MS;
@@ -258,6 +258,13 @@ void confirm_trial(uint64_t now)
     firmware::mark_invalid_and_restart();
     return;
   }
+  if (!settings::read_ok())
+  {
+    // A firmware that cannot read its settings or its update record would run on defaults: the previous one boots
+    platform::log("health check failed: the settings could not be read");
+    firmware::mark_invalid_and_restart();
+    return;
+  }
   if (!store_booted(now))
     return;
   if (!firmware::mark_valid())
@@ -268,7 +275,14 @@ void confirm_trial(uint64_t now)
   boot.trial = false;
   platform::log("firmware confirmed");
   if (settings::update_record_readable())
-    store(zenit::update::apply_confirmed(settings::update_record(), platform::firmware_version()), now);
+  {
+    const zenit::update::UpdateRecord &record = settings::update_record();
+    if (zenit::update::decide_confirmed_trial(record, platform::firmware_version()) ==
+        zenit::update::BootAction::SkipPending)
+      platform::log("version %s was installed but the firmware reports %s: %s is skipped", record.pending,
+                    platform::firmware_version(), record.pending);
+    store(zenit::update::apply_confirmed(record, platform::firmware_version()), now);
+  }
   else
     boot.unsettled = true;
 }

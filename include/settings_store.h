@@ -15,9 +15,14 @@ namespace store
 
 // False when the memory could not be opened.
 bool begin();
-// The size of the stored record (at most `capacity` bytes are copied into `out`), or 0 when it is missing or
-// unreadable.
-size_t read(const char *key, uint8_t *out, size_t capacity);
+
+enum class Read : uint8_t
+{
+  Missing, // no record under the key: the caller may take defaults and write them
+  Found,   // `size` is the stored record's size; at most `capacity` bytes were copied into `out`
+  Failed   // the memory could not be read (or was not opened): the record may exist, so nothing may be written over it
+};
+Read read(const char *key, uint8_t *out, size_t capacity, size_t &size);
 // False when the record could not be saved; the stored record is then the old one.
 bool write(const char *key, const uint8_t *data, size_t size);
 

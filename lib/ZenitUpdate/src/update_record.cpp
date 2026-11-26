@@ -87,27 +87,34 @@ UpdateRecord apply_boot_action(const UpdateRecord &record, BootAction action)
     std::memset(next.pending, 0, sizeof(next.pending));
     next.booted = false;
     break;
+  case BootAction::SkipPending:
+    std::memcpy(next.skipped, record.pending, sizeof(next.skipped));
+    std::memset(next.pending, 0, sizeof(next.pending));
+    next.booted = false;
+    break;
   }
   return next;
 }
 
-UpdateRecord apply_booted(const UpdateRecord &record, const char *running_version)
+UpdateRecord apply_booted(const UpdateRecord &record)
 {
   UpdateRecord next = record;
-  if (record.pending[0] != '\0' && std::strcmp(record.pending, running_version) == 0)
+  if (record.pending[0] != '\0')
     next.booted = true;
   return next;
 }
 
+BootAction decide_confirmed_trial(const UpdateRecord &record, const char *running_version)
+{
+  if (record.pending[0] == '\0')
+    return BootAction::Nothing;
+  return std::strcmp(record.pending, running_version) == 0 ? BootAction::DropPending : BootAction::SkipPending;
+}
+
 UpdateRecord apply_confirmed(const UpdateRecord &record, const char *running_version)
 {
-  UpdateRecord next = record;
-  if (std::strcmp(record.pending, running_version) == 0)
-  {
-    std::memset(next.pending, 0, sizeof(next.pending));
-    next.booted = false;
-  }
-  if (std::strcmp(record.skipped, running_version) == 0)
+  UpdateRecord next = apply_boot_action(record, decide_confirmed_trial(record, running_version));
+  if (std::strcmp(next.skipped, running_version) == 0)
     std::memset(next.skipped, 0, sizeof(next.skipped));
   return next;
 }

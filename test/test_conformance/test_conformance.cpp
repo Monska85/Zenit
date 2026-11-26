@@ -279,6 +279,7 @@ void start_protocol_case()
 {
   replies.clear();
   settings::sim_fail_writes(false);
+  settings::sim_fail_reads(false);
   settings::sim_clear();
   settings::begin();
   firmware::sim_reset();
@@ -359,6 +360,10 @@ void run_protocol_case(const fs::path &path)
         settings::sim_fail_writes(true);
       else if (event == "storage_ok")
         settings::sim_fail_writes(false);
+      else if (event == "storage_read_fail")
+        settings::sim_fail_reads(true);
+      else if (event == "storage_read_ok")
+        settings::sim_fail_reads(false);
       else
         TEST_FAIL_MESSAGE((label + ": unknown event " + event).c_str());
       continue;

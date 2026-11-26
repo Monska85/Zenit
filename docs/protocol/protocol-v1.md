@@ -154,7 +154,7 @@ Board settings, from the WiFi and updates milestone, which adds them to `setting
 
 The board saves at once. A client sends a setting when the user has chosen it (a slider when it is released, for example), not while the user is still moving it, so the settings memory is not written many times a second.
 
-Light settings apply at once, with the [transitions](../board/light-v1.md#transitions) of the light. A change of `timer_minutes` while the light is on restarts the countdown. Board settings apply at once too: a new `wifi_power`, `timezone`, `ntp_server` or `time_sync_hours` reaches the network task; turning `network_login` on makes the board close the WiFi client's connection after the reply, so it logs in when it connects again.
+Light settings apply at once, with the [transitions](../board/light-v1.md#transitions) of the light. A change of `timer_minutes` while the light is on restarts the countdown. Board settings apply at once too: a new `wifi_power`, `timezone`, `ntp_server` or `time_sync_hours` reaches the network task; turning `network_login` on ends the WiFi client's login at once and makes the board close its connection after the reply, so it logs in when it connects again.
 
 ```text
 > {"seq":9,"cmd":"settings_set","effect":"breathing","period_seconds":12}
@@ -174,7 +174,7 @@ The reply holds `light`, as in `status`.
 
 ### `settings_reset`
 
-Puts every setting back to its default, forgets the WiFi network and makes a new token. No fields. USB only: over WiFi the reply is `usb_only`. The reply holds `settings` after the reset. The light fades to the default configuration. A firmware from before the WiFi and updates milestone puts the light settings back and has no network or token to forget. If the settings cannot be saved the reply is `storage_error` and nothing changes.
+Puts every setting back to its default, forgets the WiFi network and makes a new token, which ends the WiFi client's login at once and closes its connection after the reply. No fields. USB only: over WiFi the reply is `usb_only`. The reply holds `settings` after the reset. The light fades to the default configuration. A firmware from before the WiFi and updates milestone puts the light settings back and has no network or token to forget. If the settings cannot be saved the reply is `storage_error` and nothing changes.
 
 ### `wifi_forget`
 
@@ -182,7 +182,7 @@ From the WiFi and updates milestone. Erases the stored WiFi network and disconne
 
 ### `token_regenerate`
 
-From the WiFi and updates milestone. Makes a new token and closes the WiFi client's connection after the reply. No fields. USB only: `usb_only` over WiFi. The reply holds `token`; `storage_error` when it cannot be saved (the old token stays).
+From the WiFi and updates milestone. Makes a new token, ends the WiFi client's login at once and closes its connection after the reply. No fields. USB only: `usb_only` over WiFi. The reply holds `token`; `storage_error` when it cannot be saved (the old token stays).
 
 ### `auth_challenge`, `auth`
 
@@ -250,7 +250,7 @@ With `network_login` on, a WiFi client authenticates once per connection:
 
 1. The client sends `auth_challenge`. The board answers with `nonce`: 16 random bytes from the hardware generator, as 32 lowercase hexadecimal digits. A new `auth_challenge` replaces the previous nonce.
 2. The client sends `auth` with `hmac`: HMAC-SHA256 with the token's 16 ASCII bytes as the key and the nonce's 32 ASCII characters as the message, as 64 lowercase hexadecimal digits.
-3. A client that has not authenticated 10 seconds after its connection opened is closed (status 1008), so a silent client cannot hold the single connection. When it matches, the connection is authenticated until it closes. Otherwise the reply is `unauthorized`. A nonce serves one `auth` only. After 3 failed `auth` on one connection, the board closes it.
+3. A client that has not authenticated 10 seconds after its connection opened is closed (status 1008), so a silent client cannot hold the single connection. When it matches, the connection is authenticated until it closes, or until a new token, a reset or turning `network_login` on ends the login: from that moment, while `network_login` is on, every request the client sends, a request resent with the `seq` of an earlier one included, is `unauthorized` until it logs in again, and the board closes the connection meanwhile. A reset turns the login off, so after it the client is only closed. Otherwise the reply is `unauthorized`. A nonce serves one `auth` only. After 3 failed `auth` on one connection, the board closes it.
 
 Before authenticating, a WiFi client can send `info`, `auth_challenge` and `auth`; every other command is `unauthorized`. The token never crosses the network, but `ws://` is not encrypted.
 

@@ -111,6 +111,15 @@ void sim_set_scan(const std::vector<SimAccessPoint> &access_points);
 size_t sim_scan_list(Network *out, size_t capacity);
 // Simulator: whether the credentials Improv sends connect.
 void sim_set_provision_succeeds(bool succeeds);
+// Simulator: holds the network task as a long scan, check or download would: it takes no Improv request and ends no try
+// until released.
+void sim_hold(bool hold);
+// Simulator: the network the radio works on (the stored one, or the one an Improv try uses).
+const char *sim_radio_ssid();
+// Simulator: the id of the Improv request the network task has not taken yet, or 0.
+uint32_t sim_requested_provision_id();
+// Simulator: how many times apply() ran.
+size_t sim_apply_count();
 // Simulator: the last settings applied, and how many times, for tests.
 const zenit::net::BoardSettings &sim_applied();
 // Simulator: the code of the last close_client() since the last call here, or 0.

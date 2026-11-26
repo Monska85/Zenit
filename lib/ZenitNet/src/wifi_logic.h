@@ -40,6 +40,16 @@ constexpr uint8_t REASON_CONNECTION_FAIL = 205;
 // The state a failed try leaves, from the disconnect reason.
 WifiState state_for_disconnect(uint8_t reason);
 
+// An Improv try (docs/board/wifi-and-updates-v1.md#setup-with-improv) has this long from the moment the loop task
+// queued it. The network task measures it, even when it takes the request late after a scan, a check or a download, and
+// decides the outcome: a try out of time fails without touching the radio, and a connection made after the deadline is
+// not a success. The loop task waits 2 s longer, so the network task's answer always arrives first.
+constexpr uint32_t PROVISION_MS = 30000;
+constexpr uint32_t PROVISION_REPLY_MS = PROVISION_MS + 2000;
+
+// Whether the try queued at `queued_at` is out of time at `now` (both on the same millisecond clock, which may wrap).
+inline bool provision_expired(uint32_t queued_at, uint32_t now) { return now - queued_at >= PROVISION_MS; }
+
 // The address wait: a connection without an address after this long is `no_address`.
 constexpr uint32_t ADDRESS_WAIT_MS = 15000;
 

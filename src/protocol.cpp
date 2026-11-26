@@ -44,6 +44,9 @@ zenit::proto::ReplyCache &cache_of(Transport transport) { return caches[static_c
 // The login of the WiFi client, and a request the last command made to close its connection.
 zenit::net::AuthSession wifi_auth;
 bool close_wifi_requested = false;
+// Set when the command being run ended the WiFi client's login: its own reply is not remembered, so a resent copy is
+// judged again (and is `unauthorized` while the login is on).
+bool wifi_login_revoked = false;
 // The WiFi client's connection: whether one is open, since when, and whether its login timeout has been reported.
 bool wifi_connected = false;
 uint64_t wifi_opened_at = 0;
@@ -56,6 +59,18 @@ void reset_wifi_session()
   wifi_auth.reset();
   close_wifi_requested = false;
   login_timeout_reported = false;
+}
+
+// The WiFi client's login ends now, not when its connection closes: lines already queued, and those that arrive before
+// the close lands, are `unauthorized` (a new token, a reset, the login turned on). A remembered reply made before is
+// forgotten too, so a resent `seq` cannot fetch it. The close is asked for, and the client logs in when it connects
+// again.
+void revoke_wifi_login()
+{
+  wifi_auth.reset();
+  cache_of(Transport::Wifi).clear();
+  close_wifi_requested = true;
+  wifi_login_revoked = true;
 }
 
 // What `send` did with a reply.
@@ -171,7 +186,7 @@ Failure cmd_settings_set(const Context &context, JsonDocument &reply)
     return zenit::proto::fail("storage_error", "the settings could not be saved; nothing changed");
   // The client that turned the login on logs in when it connects again.
   if (login_turned_on)
-    close_wifi_requested = true;
+    revoke_wifi_login();
   zenit::proto::write_settings(reply["settings"].to<JsonObject>(), settings::current(), settings::board(),
                                context.transport == Transport::Usb);
   return {};
@@ -207,7 +222,7 @@ Failure cmd_settings_reset(const Context &context, JsonDocument &reply)
   if (app::change_settings(zenit::LightSettings(), settings::fresh_board_settings(), context.now) !=
       settings::Commit::Ok)
     return zenit::proto::fail("storage_error", "the settings could not be saved; nothing changed");
-  close_wifi_requested = true;
+  revoke_wifi_login();
   zenit::proto::write_settings(reply["settings"].to<JsonObject>(), settings::current(), settings::board(), true);
   return {};
 }
@@ -236,7 +251,7 @@ Failure cmd_token_regenerate(const Context &context, JsonDocument &reply)
   next.token[0] = '\0';
   if (app::change_settings(settings::current(), next, context.now) != settings::Commit::Ok)
     return zenit::proto::fail("storage_error", "the token could not be saved; the old one stays");
-  close_wifi_requested = true;
+  revoke_wifi_login();
   reply["token"] = std::string(settings::board().token);
   return {};
 }
@@ -415,6 +430,7 @@ void run_request(const zenit::proto::Frame &frame, Transport transport, uint64_t
   JsonDocument reply;
   reply["seq"] = request.seq;
   reply["ok"] = true;
+  wifi_login_revoked = false;
   if (const Failure failure = dispatch(request, transport, now, reply))
     // The fields a failed command wrote are dropped: an error reply holds `seq`, `ok`, `error` and `message`.
     error_reply(reply, failure, &request.seq);
@@ -426,7 +442,8 @@ void run_request(const zenit::proto::Frame &frame, Transport transport, uint64_t
     (void)send(reply, write);
     return;
   }
-  cache.store(request.seq, frame.crc, reply_line, sent.size);
+  if (!(transport == Transport::Wifi && wifi_login_revoked))
+    cache.store(request.seq, frame.crc, reply_line, sent.size);
 }
 
 } // namespace
