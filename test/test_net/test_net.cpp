@@ -1366,13 +1366,22 @@ void test_a_record_without_the_web_setting_reads_with_web_updates_on()
 void test_the_emergency_page_says_what_happens_and_escapes_the_site()
 {
   char page[net::MAX_EMERGENCY_PAGE];
-  TEST_ASSERT_TRUE(net::emergency_page(true, "https://example.org/", page, sizeof(page)) > 0);
+  TEST_ASSERT_TRUE(net::emergency_page(net::PageNote::Installing, "https://example.org/", page, sizeof(page)) > 0);
   TEST_ASSERT_NOT_NULL(std::strstr(page, "being installed"));
+  TEST_ASSERT_NULL(std::strstr(page, "missing"));
   TEST_ASSERT_NOT_NULL(std::strstr(page, "http-equiv=\"refresh\" content=\"30\""));
   TEST_ASSERT_NULL(std::strstr(page, "<script"));
-  TEST_ASSERT_TRUE(net::emergency_page(false, "https://example.org/?a=<b>&c=\"d\"", page, sizeof(page)) > 0);
-  TEST_ASSERT_NOT_NULL(std::strstr(page, "over USB: https://example.org/?a=&lt;b&gt;&amp;c=&quot;d&quot;</p>"));
-  TEST_ASSERT_EQUAL_size_t(0, net::emergency_page(true, "", page, 100)); // does not fit
+  // Web updates on, nothing to install: missing, the board waits for a version, and the USB route.
+  TEST_ASSERT_TRUE(net::emergency_page(net::PageNote::Waiting, "https://example.org/", page, sizeof(page)) > 0);
+  TEST_ASSERT_NULL(std::strstr(page, "being installed"));
+  TEST_ASSERT_NOT_NULL(std::strstr(page, "missing. Zenit installs it by itself as soon as the Zenit site offers"));
+  TEST_ASSERT_NOT_NULL(std::strstr(page, "over USB: https://example.org/</p>"));
+  TEST_ASSERT_TRUE(net::emergency_page(net::PageNote::Off, "https://example.org/?a=<b>&c=\"d\"", page, sizeof(page)) >
+                   0);
+  TEST_ASSERT_NULL(std::strstr(page, "by itself"));
+  TEST_ASSERT_NOT_NULL(std::strstr(page, "missing. Install it from the Zenit site over USB: "
+                                         "https://example.org/?a=&lt;b&gt;&amp;c=&quot;d&quot;</p>"));
+  TEST_ASSERT_EQUAL_size_t(0, net::emergency_page(net::PageNote::Installing, "", page, 100)); // does not fit
 }
 
 void test_a_missing_web_app_is_installed_at_once_then_retried_with_longer_waits()
@@ -1393,6 +1402,23 @@ void test_a_missing_web_app_is_installed_at_once_then_retried_with_longer_waits(
   TEST_ASSERT_EQUAL_STRING("1.1.0", s.web.version);
   TEST_ASSERT_TRUE(s.web.last_result == zenit::update::Result::Installed);
   TEST_ASSERT_EQUAL_INT64(-1, s.web.retry_in);
+}
+
+void test_the_emergency_page_says_installing_only_with_something_to_install()
+{
+  www::sim_erase();
+  publish_web("2.0.0", 2, 2); // speaks another protocol: nothing this firmware can install
+  online_with_web("automatic");
+  run_ms(now, 1000);
+  TEST_ASSERT_TRUE(updates::status().web.state == zenit::update::WebState::Missing);
+  TEST_ASSERT_TRUE(updates::web_page_note() == net::PageNote::Waiting);
+  // A version that fits is offered: its download fails, and the repair still has it to install.
+  publish_web("1.1.0", 1, 1);
+  update_http::sim_set_download_outcome(update_http::Target::Web, update_http::Outcome::Unreachable);
+  updates::request_check(now);
+  run_ms(now, 1000);
+  TEST_ASSERT_EQUAL_STRING("1.1.0", updates::status().web.available);
+  TEST_ASSERT_TRUE(updates::web_page_note() == net::PageNote::Installing);
 }
 
 void test_an_incompatible_web_app_is_reported_and_not_installed()
@@ -1431,7 +1457,7 @@ void test_web_updates_off_leave_a_missing_app_alone()
   const updates::Status s = updates::status();
   TEST_ASSERT_TRUE(s.web.state == zenit::update::WebState::Missing);
   TEST_ASSERT_TRUE(s.web.last_result == zenit::update::Result::Never);
-  TEST_ASSERT_FALSE(updates::web_repairable());
+  TEST_ASSERT_TRUE(updates::web_page_note() == net::PageNote::Off);
 }
 
 void test_a_failed_web_write_leaves_the_app_missing()
@@ -1725,6 +1751,7 @@ int main()
   RUN_TEST(test_the_repair_waits_double_from_one_minute_to_an_hour_with_a_fifth_either_way);
   RUN_TEST(test_a_record_without_the_web_setting_reads_with_web_updates_on);
   RUN_TEST(test_the_emergency_page_says_what_happens_and_escapes_the_site);
+  RUN_TEST(test_the_emergency_page_says_installing_only_with_something_to_install);
   RUN_TEST(test_a_missing_web_app_is_installed_at_once_then_retried_with_longer_waits);
   RUN_TEST(test_an_incompatible_web_app_is_reported_and_not_installed);
   RUN_TEST(test_a_web_update_installs_in_the_window_without_a_restart);

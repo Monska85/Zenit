@@ -7,6 +7,8 @@
 #include <cstddef>
 #include <cstdint>
 
+class Lock;
+
 namespace platform
 {
 
@@ -19,6 +21,12 @@ uint32_t random32();
 // Hardware random bytes, for the token, the login nonce and anything that needs secrecy. On the board, before the
 // radio has started, the draw enables the bootloader's entropy source so the bytes are random then too.
 void random_bytes(uint8_t *out, size_t size);
+
+#ifndef ZENIT_SIM
+// Board: held while the radio mode changes (the network task) and while random_bytes() looks at the radio and uses the
+// bootloader's entropy source, which must never be on while the radio starts or runs.
+Lock &radio_lock();
+#endif
 
 // Writes one log line, `zenit: ` and the text, to the serial port (the simulator's standard output).
 void log(const char *format, ...) __attribute__((format(printf, 1, 2)));

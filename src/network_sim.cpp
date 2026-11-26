@@ -54,6 +54,14 @@ install_target::Target pending_target = install_target::Target::Firmware;
 
 // One thread plays both tasks, so progress goes straight to the update flow.
 void post_progress(uint8_t percent) { updates::on_progress(percent); }
+
+// The stored network when the download was asked for: a change before it ran (a forgotten or new network) stops it, as
+// the board's network task stops a running one.
+std::string download_ssid, download_password;
+bool stored_network_changed()
+{
+  return download_ssid != applied.wifi_ssid || download_password != applied.wifi_password;
+}
 } // namespace
 
 void begin(const zenit::net::BoardSettings &settings)
@@ -159,6 +167,8 @@ bool request_download(install_target::Target target, const char *manifest_url, c
   std::strncpy(pending_url, manifest_url, sizeof(pending_url) - 1);
   pending_url[sizeof(pending_url) - 1] = '\0';
   pending_manifest = manifest;
+  download_ssid = applied.wifi_ssid;
+  download_password = applied.wifi_password;
   transfer = download_pending = true;
   return true;
 }
@@ -221,7 +231,8 @@ void poll(uint64_t now)
       UpdateEvent event;
       event.type = UpdateEvent::Type::Downloaded;
       event.target = pending_target;
-      event.result = update_worker::download(pending_target, pending_url, pending_manifest, post_progress);
+      event.result =
+          update_worker::download(pending_target, pending_url, pending_manifest, post_progress, stored_network_changed);
       events.send(event);
     }
     UpdateEvent event;

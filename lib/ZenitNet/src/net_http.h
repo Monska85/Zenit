@@ -60,12 +60,22 @@ const char *cache_control(const Asset &asset);
 // The body of `/board.json` for `hostname`, a NUL-terminated string. Returns its length, or 0 when it does not fit.
 size_t board_json(const char *hostname, char *out, size_t size);
 
+// What the emergency page says: an install runs or a repair has a version to install; web updates are on but the site
+// offers nothing this firmware can use yet; web updates are off.
+enum class PageNote : uint8_t
+{
+  Installing,
+  Waiting,
+  Off
+};
+
 // The page the board serves instead of the web app while the app is not usable (installing, missing or incompatible):
-// at most MAX_EMERGENCY_PAGE bytes, no script, it reloads itself every 30 seconds. `repairing` says the board is
-// installing the app or will try again; otherwise web updates are off and the page names the site to install it from
-// over USB. Returns its length, or 0 when it does not fit.
+// at most MAX_EMERGENCY_PAGE bytes, no script, it reloads itself every 30 seconds. `Installing` says the app is being
+// installed; `Waiting` and `Off` say it is missing and name the site to install it from over USB (`Waiting` also says
+// the board installs it by itself once the site offers a version for this firmware). Returns its length, or 0 when it
+// does not fit.
 constexpr size_t MAX_EMERGENCY_PAGE = 4096;
-size_t emergency_page(bool repairing, const char *site_url, char *out, size_t size);
+size_t emergency_page(PageNote note, const char *site_url, char *out, size_t size);
 
 } // namespace net
 } // namespace zenit

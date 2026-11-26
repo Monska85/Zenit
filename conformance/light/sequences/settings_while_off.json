@@ -1,0 +1,16 @@
+{
+  "description": "Green at brightness 100, set while the light is off, shows nothing until the next on, which fades in to it in 1 s: lightness 25 at 4.25 s, 50 at 4.5 s.",
+  "settings": {},
+  "events": [
+    { "at": 1000, "light": false },
+    { "at": 3000, "set": { "color": "green", "brightness": 100 } },
+    { "at": 4000, "light": true }
+  ],
+  "expect": [
+    { "at": 3000, "duties": [0, 0, 0, 0], "on": false },
+    { "at": 3500, "duties": [0, 0, 0, 0], "on": false },
+    { "at": 4250, "duties": [0, 723, 0, 0], "on": true },
+    { "at": 4500, "duties": [0, 3018, 0, 0], "on": true },
+    { "at": 5000, "duties": [0, 16383, 0, 0], "on": true }
+  ]
+}

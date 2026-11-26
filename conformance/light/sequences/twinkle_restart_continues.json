@@ -1,0 +1,15 @@
+{
+  "description": "Twinkle, strength 20, seed 1, brightness 60, off at 2.05 s and on at 3.1 s. The first run drew 16 targets (up to 881); the restart goes on with 915, 941, 872, 885, 916, 883, 885: factor 915 at 3.3 s with the fade-in at 0.2, then 916, 899.5 and 884 at 4.1, 4.2 and 4.4 s.",
+  "settings": { "effect": "twinkle" },
+  "seed": 1,
+  "events": [
+    { "at": 2050, "light": false },
+    { "at": 3100, "light": true }
+  ],
+  "expect": [
+    { "at": 3300, "duties": [0, 0, 0, 206] },
+    { "at": 4100, "duties": [0, 0, 0, 3750] },
+    { "at": 4200, "duties": [0, 0, 0, 3595] },
+    { "at": 4400, "duties": [0, 0, 0, 3454] }
+  ]
+}

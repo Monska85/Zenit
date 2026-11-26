@@ -128,6 +128,10 @@ void on_wifi_event(arduino_event_id_t event, arduino_event_info_t info)
   case ARDUINO_EVENT_WIFI_STA_GOT_IP:
     got_ip = true;
     break;
+  case ARDUINO_EVENT_WIFI_STA_LOST_IP:
+    // The lease ran out without a disconnect: the address is gone, and the manager connects again as after a loss.
+    got_ip = false;
+    break;
   case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
     got_ip = false;
     associated = false;
@@ -229,7 +233,11 @@ void radio_on()
     return;
   WiFi.persistent(false);
   WiFi.setAutoReconnect(false);
-  WiFi.mode(WIFI_STA);
+  {
+    // Never while random_bytes() has the bootloader's entropy source on (platform::radio_lock).
+    Locked held(platform::radio_lock());
+    WiFi.mode(WIFI_STA);
+  }
   WiFi.setHostname(hostname);
   radio.power_applied = false;
   apply_power();
@@ -239,7 +247,10 @@ void radio_off()
 {
   stop_services();
   if (WiFi.getMode() != WIFI_OFF)
+  {
+    Locked held(platform::radio_lock());
     WiFi.mode(WIFI_OFF);
+  }
   got_ip = false;
   associated = false;
   radio.trying = false;
@@ -486,6 +497,15 @@ void run_provision(uint32_t now)
   }
 }
 
+// Whether the stored network changed since the network task last took the configuration (a forgotten or new
+// network, a reset): a running download stops, so the radio leaves the old network at the next pass, not minutes later.
+bool stored_network_changed()
+{
+  Locked held(lock);
+  return std::strcmp(config.wifi_ssid, radio.board.wifi_ssid) != 0 ||
+         std::strcmp(config.wifi_password, radio.board.wifi_password) != 0;
+}
+
 // Progress is a value the loop task reads, not an event: a slow loop task can never fill the queue with it, so the
 // queue holds only the end of a transfer, and that always fits.
 void post_progress(uint8_t percent) { progress_percent = percent; }
@@ -527,7 +547,8 @@ void run_command(const Command &command, uint32_t now)
     UpdateEvent event;
     event.type = UpdateEvent::Type::Downloaded;
     event.target = command.target;
-    event.result = update_worker::download(command.target, command.url, command.manifest, post_progress);
+    event.result =
+        update_worker::download(command.target, command.url, command.manifest, post_progress, stored_network_changed);
     large = false;
     post_result(event);
     break;

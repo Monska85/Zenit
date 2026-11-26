@@ -26,8 +26,9 @@ namespace
 using zenit::update::WebState;
 
 constexpr esp_partition_subtype_t WWW_SUBTYPE = static_cast<esp_partition_subtype_t>(0x40);
-// The longest an install waits for the files being sent before it gives up: longer than the HTTP server's send timeout
-// (5 s, ws_server_board.cpp), so a slow client is dropped by the server first.
+// The longest an install waits for the files being sent before it gives up (the install is then `unreachable`, tried
+// again later). A file stops at its next piece once the state is `installing` (ws_server_board.cpp), and one piece
+// waits at most the HTTP server's send timeout (5 s), so a slow client is dropped by the server first.
 constexpr uint32_t SERVE_DRAIN_MS = 6000;
 
 const esp_partition_t *partition = nullptr;
@@ -43,6 +44,8 @@ std::atomic<WebState> state_{WebState::Missing};
 // Guards version_ and keeps it consistent with state_ for info(): the network task rewrites both during an install.
 Lock info_lock;
 std::atomic<int> serving{0};
+// The network task only: the last begin_install gave up waiting for a file being sent.
+bool busy = false;
 
 class PartitionFlash : public zenit::net::WebFlash
 {
@@ -145,6 +148,7 @@ void serve_end() { serving.fetch_sub(1); }
 
 bool begin_install(uint32_t size, const char *version)
 {
+  busy = false;
   if (!partition || size > partition->size)
     return false;
   const WebState before = state_.load();
@@ -156,6 +160,7 @@ bool begin_install(uint32_t size, const char *version)
     if (waited >= SERVE_DRAIN_MS)
     {
       state_ = before;
+      busy = true;
       return false;
     }
     vTaskDelay(pdMS_TO_TICKS(10));
@@ -171,6 +176,7 @@ bool begin_install(uint32_t size, const char *version)
 
 bool write(const uint8_t *data, size_t size) { return writer.write(data, size); }
 bool install_refused() { return writer.refused(); }
+bool install_busy() { return busy; }
 
 bool end_install()
 {

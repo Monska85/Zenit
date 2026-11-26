@@ -60,12 +60,12 @@ CheckResult check(install_target::Target target, const char *manifest_url)
 }
 
 Result download(install_target::Target target, const char *manifest_url, const zenit::update::Manifest &manifest,
-                void (*progress)(uint8_t))
+                void (*progress)(uint8_t), bool (*stop)())
 {
   char url[zenit::update::MAX_URL + 1];
   if (!zenit::update::firmware_url(manifest_url, manifest, url, sizeof(url)))
     return Result::BadManifest;
-  return result_of(update_http::download(target, url, manifest, progress));
+  return result_of(update_http::download(target, url, manifest, progress, stop));
 }
 
 } // namespace update_worker

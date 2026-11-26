@@ -30,10 +30,12 @@ enum class Outcome : uint8_t
 Outcome fetch_manifest(const char *url, char *body, size_t capacity, size_t &size);
 
 // Streams the file at `url` into `target` (the inactive slot or the `www` partition), hashing it, and checks the size
-// and SHA-256 of `manifest`. `progress` is called with a whole percentage when it changes.
+// and SHA-256 of `manifest`. `progress` is called with a whole percentage when it changes. `stop`, when given, is asked
+// before each piece: true ends the transfer as Unreachable, and the target's install is aborted.
 using Progress = void (*)(uint8_t percent);
+using Stop = bool (*)();
 Outcome download(install_target::Target target, const char *url, const zenit::update::Manifest &manifest,
-                 Progress progress);
+                 Progress progress, Stop stop = nullptr);
 
 #ifdef ZENIT_SIM
 // Simulator: scripts the source.

@@ -27,7 +27,9 @@ CheckResult check(install_target::Target target, const char *manifest_url);
 
 // Installed: the image is in the inactive slot, checked, and not yet activated. Anything else is the failure.
 // For the web app, Installed means the image is written and reads.
+// `stop`, when given, ends the transfer as Unreachable when it returns true (update_http::download).
 zenit::update::Result download(install_target::Target target, const char *manifest_url,
-                               const zenit::update::Manifest &manifest, void (*progress)(uint8_t percent));
+                               const zenit::update::Manifest &manifest, void (*progress)(uint8_t percent),
+                               bool (*stop)() = nullptr);
 
 } // namespace update_worker

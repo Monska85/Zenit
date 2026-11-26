@@ -1,0 +1,16 @@
+{
+  "description": "Fall asleep, 1 minute timer, brightness 60. A timer change at 30 s holds the factor 600 and fades it down; the timer set back at 30.1 s does not turn it back: the fade-down reaches 120 at 30.5 s and the effect starts again on the countdown from 30.1 s (factor 988 at 31 s, 986.67 at 31.1 s).",
+  "settings": { "effect": "fall_asleep", "timer_minutes": 1 },
+  "events": [
+    { "at": 30000, "set": { "timer_minutes": 2 } },
+    { "at": 30100, "set": { "timer_minutes": 1 } }
+  ],
+  "expect": [
+    { "at": 30000, "duties": [0, 0, 0, 1476] },
+    { "at": 30100, "duties": [0, 0, 0, 1038] },
+    { "at": 30300, "duties": [0, 0, 0, 439] },
+    { "at": 30500, "duties": [0, 0, 0, 131] },
+    { "at": 31000, "duties": [0, 0, 0, 4478] },
+    { "at": 31100, "duties": [0, 0, 0, 4463], "timer_remaining_s": 59 }
+  ]
+}

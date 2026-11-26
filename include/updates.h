@@ -6,6 +6,7 @@
 #pragma once
 
 #include <manifest.h>
+#include <net_http.h>
 #include <update_record.h>
 #include <update_status.h>
 
@@ -61,9 +62,9 @@ Status status();
 Reply request_check(uint64_t now);
 Reply request_install(install_target::Target target, bool force);
 
-// Whether the board will install the web app by itself (web updates are on): the emergency page says so. Read by the
-// HTTP server's task.
-bool web_repairable();
+// What the emergency page says: `Installing` while a web install runs or a repair has a version to install, `Waiting`
+// while web updates are on with nothing to install, `Off` while they are off. Read by the HTTP server's task.
+zenit::net::PageNote web_page_note();
 
 // What the network task reported (called by network::poll).
 void on_manifest(install_target::Target target, zenit::update::Result result, const zenit::update::Manifest &manifest,

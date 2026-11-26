@@ -32,6 +32,9 @@ WifiState state_for_disconnect(uint8_t reason)
   switch (reason)
   {
   case REASON_NO_AP_FOUND:
+  case REASON_NO_AP_FOUND_W_COMPATIBLE_SECURITY:
+  case REASON_NO_AP_FOUND_IN_AUTHMODE_THRESHOLD:
+  case REASON_NO_AP_FOUND_IN_RSSI_THRESHOLD:
     return WifiState::NotFound;
   case REASON_AUTH_FAIL:
   case REASON_4WAY_HANDSHAKE_TIMEOUT:

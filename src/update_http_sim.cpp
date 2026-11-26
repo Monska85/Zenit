@@ -55,7 +55,7 @@ Outcome fetch_manifest(const char *url, char *body, size_t capacity, size_t &siz
   return Outcome::Ok;
 }
 
-Outcome download(Target target, const char *, const zenit::update::Manifest &manifest, Progress progress)
+Outcome download(Target target, const char *, const zenit::update::Manifest &manifest, Progress progress, Stop stop)
 {
   const uint32_t size = manifest.size;
   const char *sha256 = manifest.sha256;
@@ -63,12 +63,17 @@ Outcome download(Target target, const char *, const zenit::update::Manifest &man
   if (from.download_outcome != Outcome::Ok)
     return from.download_outcome;
   if (!install_target::begin(target, manifest))
-    return Outcome::FlashError;
+    return target == Target::Web && www::install_busy() ? Outcome::Unreachable : Outcome::FlashError;
   zenit::net::Sha256 hash;
   uint32_t sent = 0;
   const size_t chunk = 4096;
   for (size_t at = 0; at < from.file.size(); at += chunk)
   {
+    if (stop && stop())
+    {
+      install_target::abort(target);
+      return Outcome::Unreachable;
+    }
     const size_t take = std::min(chunk, from.file.size() - at);
     if (sent + take > size)
     {

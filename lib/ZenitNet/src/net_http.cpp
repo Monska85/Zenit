@@ -71,7 +71,7 @@ size_t board_json(const char *hostname, char *out, size_t size)
   return written > 0 && static_cast<size_t>(written) < size ? static_cast<size_t>(written) : 0;
 }
 
-size_t emergency_page(bool repairing, const char *site_url, char *out, size_t size)
+size_t emergency_page(PageNote note, const char *site_url, char *out, size_t size)
 {
   static const char HEAD[] = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
                              "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
@@ -90,11 +90,14 @@ size_t emergency_page(bool repairing, const char *site_url, char *out, size_t si
     return true;
   };
   bool ok = put(HEAD);
-  if (repairing)
+  if (note == PageNote::Installing)
     ok = ok && put("The Zenit app is being installed. This page reloads by itself.");
   else
   {
-    ok = ok && put("The Zenit app is missing. Install it from the Zenit site over USB: ");
+    ok = ok && put(note == PageNote::Waiting
+                       ? "The Zenit app is missing. Zenit installs it by itself as soon as the Zenit site offers a "
+                         "version for this firmware, or install it from the Zenit site over USB: "
+                       : "The Zenit app is missing. Install it from the Zenit site over USB: ");
     // The site address is fixed at build time; it is still written as text, never as markup.
     for (const char *c = site_url; ok && *c; c++)
     {

@@ -176,11 +176,11 @@ The reply holds `light`, as in `status`.
 
 ### `settings_reset`
 
-Puts every setting back to its default, forgets the WiFi network and makes a new token, which ends the WiFi client's login at once and closes its connection after the reply. No fields. USB only: over WiFi the reply is `usb_only`. The reply holds `settings` after the reset. The light fades to the default configuration. A firmware from before the WiFi and updates milestone puts the light settings back and has no network or token to forget. If the settings cannot be saved the reply is `storage_error` and nothing changes.
+Puts every setting back to its default, forgets the WiFi network (a download that is running stops with `unreachable`) and makes a new token, which ends the WiFi client's login at once and closes its connection after the reply. No fields. USB only: over WiFi the reply is `usb_only`. The reply holds `settings` after the reset. The light fades to the default configuration. A firmware from before the WiFi and updates milestone puts the light settings back and has no network or token to forget. If the settings cannot be saved the reply is `storage_error` and nothing changes.
 
 ### `wifi_forget`
 
-From the WiFi and updates milestone. Erases the stored WiFi network and disconnects. No fields; the reply has none. USB only: `usb_only` over WiFi. `storage_error` when the settings memory fails (nothing changes). The network task always takes the change, so `busy` does not happen.
+From the WiFi and updates milestone. Erases the stored WiFi network and disconnects; a download that is running stops with `unreachable`, so the radio leaves the network at once. No fields; the reply has none. USB only: `usb_only` over WiFi. `storage_error` when the settings memory fails (nothing changes). The network task always takes the change, so `busy` does not happen.
 
 ### `token_regenerate`
 

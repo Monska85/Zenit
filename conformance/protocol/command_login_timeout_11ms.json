@@ -1,0 +1,63 @@
+{
+  "description": "The virtual clock keeps every millisecond: steps of 11 ms are not cut to the 10 ms grid. A client that has not logged in, opened at 0, is asked to be closed at 10,000 ms, reached as 9,989 ms and then 11 ms (the light ticks at 9,990 and 10,000 on the way).",
+  "steps": [
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "settings_set",
+        "network_login": true
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": true,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      },
+      "close": true
+    },
+    {
+      "event": "wifi_open"
+    },
+    {
+      "advance_ms": 9989
+    },
+    {
+      "close_requested": false
+    },
+    {
+      "advance_ms": 11
+    },
+    {
+      "close_requested": true
+    }
+  ]
+}

@@ -541,18 +541,21 @@ private:
   uint64_t now_ = 0;
 };
 
-// Runs the 10 ms grid up to `until`, one tick per step.
-void tick_to(uint64_t &now, uint64_t until)
+// Moves the virtual clock from `now` to `until`, every millisecond of it: the light ticks at each point of the 10 ms
+// grid on the way, at that point's time, and the clock then stays at `until`, between two points of the grid when the
+// steps are not multiples of 10 ms.
+void advance_to(uint64_t &now, uint64_t until)
 {
-  while (now + zenit::TICK_MS <= until)
+  for (uint64_t tick = (now / zenit::TICK_MS + 1) * zenit::TICK_MS; tick <= until; tick += zenit::TICK_MS)
   {
-    now += zenit::TICK_MS;
-    platform::sim_set_now_ms(now);
-    app::tick(now);
-    app::service(now);
+    platform::sim_set_now_ms(tick);
+    app::tick(tick);
+    app::service(tick);
     report_close_request();
-    sim_control::after_step(now);
+    sim_control::after_step(tick);
   }
+  now = until;
+  platform::sim_set_now_ms(now);
 }
 
 // Virtual time: moves only on `!advance`, and runs until standard input closes.
@@ -564,7 +567,7 @@ void run_protocol_virtual(ProtocolSession &session)
   {
     session.feed(static_cast<uint8_t>(byte), now);
     if (const uint64_t advance = session.take_advance())
-      tick_to(now, now + advance);
+      advance_to(now, now + advance);
   }
 }
 
@@ -577,7 +580,6 @@ void run_protocol_live(ProtocolSession &session)
     return static_cast<uint64_t>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
   };
-  uint64_t now = 0;
   uint64_t next_tick = zenit::TICK_MS;
   for (;;)
   {
@@ -601,13 +603,13 @@ void run_protocol_live(ProtocolSession &session)
     const uint64_t current = elapsed_ms();
     if (current >= next_tick)
     {
-      now = current - current % zenit::TICK_MS;
-      platform::sim_set_now_ms(now);
-      app::tick(now);
-      app::service(now);
+      // A late tick runs at the time it runs, never before a request just handled; the next one is on the grid again.
+      platform::sim_set_now_ms(current);
+      app::tick(current);
+      app::service(current);
       report_close_request();
-      sim_control::after_step(now);
-      next_tick = now + zenit::TICK_MS;
+      sim_control::after_step(current);
+      next_tick = current - current % zenit::TICK_MS + zenit::TICK_MS;
     }
   }
 }

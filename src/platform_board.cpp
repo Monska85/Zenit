@@ -12,6 +12,8 @@
 #include <esp_wifi.h>
 #include <nvs_flash.h>
 
+#include "task_sync.h"
+
 #include <cstdarg>
 #include <cstdio>
 
@@ -22,10 +24,18 @@ uint64_t now_ms() { return static_cast<uint64_t>(esp_timer_get_time()) / 1000; }
 
 uint32_t random32() { return esp_random(); }
 
+Lock &radio_lock()
+{
+  static Lock lock;
+  return lock;
+}
+
 void random_bytes(uint8_t *out, size_t size)
 {
   // Without the radio the generator is not seeded by noise: the bootloader's entropy source stands in for it while
-  // WiFi has not been initialized (the network task is not running WiFi then).
+  // WiFi has not been initialized. The network task changes the radio mode only while it holds the same lock, so WiFi
+  // cannot start between the check and the disable.
+  Locked held(radio_lock());
   wifi_mode_t mode;
   const bool radio = esp_wifi_get_mode(&mode) != ESP_ERR_WIFI_NOT_INIT;
   if (!radio)
