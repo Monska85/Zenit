@@ -9,8 +9,9 @@ import { Banner } from "../components/banner";
 import { Button } from "../components/button";
 
 /** The sentence for a failed WiFi request over USB. A password is never in it. */
-export function describeImprovError(error: unknown): string {
+export function describeImprovError(error: unknown, request: "scan" | "provision" = "provision"): string {
   if (error instanceof ImprovError) {
+    if (request === "scan" && error.failure === "invalid_rpc") return "Zenit could not look for networks. Try again.";
     switch (error.failure) {
       case "unable_to_connect":
         return "Zenit could not join that network. Check the name and the password, then try again.";
@@ -75,7 +76,7 @@ export function ImprovPanel() {
       setNetworks(await active.scan());
       setProgress({ kind: "idle" });
     } catch (error) {
-      setProgress({ kind: "failed", message: describeImprovError(error) });
+      setProgress({ kind: "failed", message: describeImprovError(error, "scan") });
     }
   }
 
@@ -88,12 +89,14 @@ export function ImprovPanel() {
     setProgress({ kind: "connecting" });
     try {
       await active.provision(ssid, password);
-      setPassword("");
-      setReveal(false);
       await session.refreshStatus();
       setProgress({ kind: "done", hostname: session.getState().wifi?.hostname ?? null });
     } catch (error) {
       setProgress({ kind: "failed", message: describeImprovError(error) });
+    } finally {
+      // The password was sent: it leaves the form whatever the board answered, and a new try types it again
+      setPassword("");
+      setReveal(false);
     }
   }
 
@@ -169,7 +172,7 @@ export function ImprovPanel() {
             <Button
               type="button"
               variant="outline"
-              className="px-3"
+              size="icon"
               aria-pressed={reveal}
               aria-label={reveal ? "Hide password" : "Show password"}
               onClick={() => setReveal((shown) => !shown)}

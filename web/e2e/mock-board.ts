@@ -10,8 +10,9 @@ import { parseLine } from "../src/protocol/frame.ts";
 import type { JsonObject } from "../src/protocol/strict-json.ts";
 import { FakeBoard, lineOf } from "../test/helpers.ts";
 
-export const MOCK_URL = "ws://zenit-mock.test/ws";
-export const MOCK_USB_URL = "ws://zenit-usb.test/ws";
+// `.local` names: the app connects only to addresses on the local network
+export const MOCK_URL = "ws://zenit-mock.local/ws";
+export const MOCK_USB_URL = "ws://zenit-usb.local/ws";
 
 export interface Mock {
   board: FakeBoard;

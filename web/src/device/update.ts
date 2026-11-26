@@ -2,6 +2,7 @@
 
 // What the firmware card says about `status.update` (docs/board/wifi-and-updates-v1.md#status), in plain words.
 
+import { own } from "../lib/own";
 import type { Settings, UpdateStatus, WebAppStatus, WifiStatus } from "../protocol/types";
 
 /** Whether the board looks for new versions of the web app: the mode is not off and `update_web` is not false. */
@@ -26,7 +27,7 @@ const RESULTS: Record<string, string> = {
 };
 
 export function describeResult(result: string): string {
-  return RESULTS[result] ?? `The last check ended with a result this app does not know (${result}).`;
+  return own(RESULTS, result) ?? `The last check ended with a result this app does not know (${result}).`;
 }
 
 /** What the board is doing now, or null when it is idle. */
@@ -55,14 +56,23 @@ export const updateBusy = (update: UpdateStatus): boolean => update.state !== "i
 /** Whether this firmware or the last checks leave the update choices open at all. */
 export const updatesOn = (update: UpdateStatus): boolean => update.mode !== "off";
 
+/** Whether the board looks for and installs new firmware: updates on and `update_firmware` not false. */
+export const firmwareUpdatesOn = (update: UpdateStatus, settings: Settings | null): boolean =>
+  updatesOn(update) && settings?.update_firmware !== false;
+
 export type UpdateAction = "none" | "install" | "force";
 
 /**
  * Which install button the card offers: the normal one for a version that is available, "Install anyway" for the version
  * on the skip list, none otherwise (nothing found, a board on trial, a check or an install running).
  */
-export function installAction(update: UpdateStatus, wifi: WifiStatus | null): UpdateAction {
-  if (!updatesOn(update) || updateBusy(update) || update.available === null || update.trial) return "none";
+export function installAction(
+  update: UpdateStatus,
+  wifi: WifiStatus | null,
+  settings: Settings | null = null,
+): UpdateAction {
+  if (!firmwareUpdatesOn(update, settings) || updateBusy(update) || update.available === null || update.trial)
+    return "none";
   if (wifi !== null && wifi.state !== "connected") return "none";
   if (update.last_result === "available") return "install";
   if (update.last_result === "skipped") return "force";
@@ -70,11 +80,16 @@ export function installAction(update: UpdateStatus, wifi: WifiStatus | null): Up
 }
 
 /**
- * Whether "Check now" works: updates on, nothing running, connected. With the firmware's updates off, a check still
- * looks for a new app when `webUpdatesOn`.
+ * Whether "Check now" works: updates on, nothing running, connected. With the firmware's updates off (the mode, or
+ * `update_firmware` false), a check still looks for a new app when `webUpdatesOn`.
  */
-export function canCheck(update: UpdateStatus, wifi: WifiStatus | null, webUpdatesOn = false): boolean {
-  const on = updatesOn(update) || (webUpdatesOn && update.web !== undefined);
+export function canCheck(
+  update: UpdateStatus,
+  wifi: WifiStatus | null,
+  webUpdatesOn = false,
+  settings: Settings | null = null,
+): boolean {
+  const on = firmwareUpdatesOn(update, settings) || (webUpdatesOn && update.web !== undefined);
   return on && !updateBusy(update) && (wifi === null || wifi.state === "connected");
 }
 
@@ -111,14 +126,15 @@ const WEB_RESULTS: Record<string, string> = {
 };
 
 export function describeWebState(web: WebAppStatus): string {
-  return WEB_STATES[web.state] ?? `The app on Zenit is in a state this page does not know (${web.state}).`;
+  return own(WEB_STATES, web.state) ?? `The app on Zenit is in a state this page does not know (${web.state}).`;
 }
 
 export function describeWebResult(web: WebAppStatus): string {
   if (web.last_result === "available" && web.available !== null)
     return `Version ${web.available} of the app is available.`;
   return (
-    WEB_RESULTS[web.last_result] ?? `The last check ended with a result this app does not know (${web.last_result}).`
+    own(WEB_RESULTS, web.last_result) ??
+    `The last check ended with a result this app does not know (${web.last_result}).`
   );
 }
 

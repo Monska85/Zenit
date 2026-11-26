@@ -5,7 +5,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BoardSession, POLL_MS } from "../src/board/session";
-import { CLOSE_MESSAGES } from "../src/board/messages";
+import { CLOSE_MESSAGES, INVALID_REPLY } from "../src/board/messages";
 import { ConnectionClosed } from "../src/protocol/transport";
 import { FakeBoard, TOKEN, UPDATE_STATUS, type ScriptedTransport } from "./helpers";
 
@@ -381,5 +381,108 @@ describe("a page served by a board", () => {
     expect(session.getState().served).toEqual({ hostname: "zenit-a1b2" });
     await session.disconnect();
     expect(session.getState().served).toEqual({ hostname: "zenit-a1b2" });
+  });
+});
+
+describe("after the page reconnected by itself", () => {
+  it("lets the person connect again: nothing stays opening after a restart", async () => {
+    const board = networked((fake) => {
+      fake.update = { ...fake.update, state: "restarting" };
+    });
+    const { session, transports, opener } = await opened(board);
+    transports[0]?.drop();
+    await settle();
+    await vi.advanceTimersByTimeAsync(11);
+    expect(session.getState()).toMatchObject({ phase: "connected", opening: false });
+    await session.disconnect();
+    expect(session.getState()).toMatchObject({ phase: "disconnected", opening: false });
+    const done = session.open(opener, "test");
+    await settle();
+    await done;
+    expect(transports).toHaveLength(3);
+    expect(session.getState().phase).toBe("connected");
+  });
+
+  it("lets the person connect again after the login was turned on and the page asks for the token", async () => {
+    const board = networked();
+    const { session, transports, opener } = await opened(board);
+    await session.setSettings({ network_login: true });
+    await settle();
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(session.getState()).toMatchObject({ phase: "login", opening: false });
+    await session.disconnect();
+    const done = session.open(opener, "test");
+    await settle();
+    await done;
+    expect(transports).toHaveLength(3);
+    expect(session.getState().phase).toBe("login");
+  });
+
+  it("keeps opening while a connection is being opened, even across a disconnection", async () => {
+    const session = new BoardSession(null, { retryMs: 10 });
+    let resolve: (transport: ScriptedTransport) => void = () => undefined;
+    const pending = session.open(() => new Promise((done) => (resolve = done)), "test");
+    expect(session.getState().opening).toBe(true);
+    await session.disconnect();
+    expect(session.getState().opening).toBe(true);
+    // A second open is refused while the first one waits
+    let asked = false;
+    await session.open(() => {
+      asked = true;
+      return Promise.resolve(null);
+    }, "other");
+    expect(asked).toBe(false);
+    resolve(networked().transport());
+    await settle();
+    await pending;
+    expect(session.getState()).toMatchObject({ phase: "connected", opening: false });
+  });
+});
+
+describe("a drop while the board installs the web app", () => {
+  const installingWeb = () =>
+    networked((fake) => {
+      fake.update = { ...fake.update, state: "downloading", target: "web", progress: 50 };
+    });
+
+  it("is not a restart: the board keeps running", async () => {
+    const { session, transports } = await opened(installingWeb());
+    transports[0]?.drop();
+    await settle();
+    expect(session.getState()).toMatchObject({ phase: "lost", auto: null });
+    expect(session.getState().error).not.toBeNull();
+  });
+
+  it("connects again quietly when the board closes with 1012 after the install", async () => {
+    const { session, transports } = await opened(installingWeb());
+    transports[0]?.drop(new ConnectionClosed(1012, ""));
+    await settle();
+    expect(session.getState()).toMatchObject({ phase: "lost", auto: "reconnecting", error: null });
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(transports).toHaveLength(2);
+  });
+});
+
+describe("a board that accepts the login and still refuses", () => {
+  it("tries the login once more, then asks the person, without a loop", async () => {
+    const board = networked((fake) => (fake.settings["network_login"] = true));
+    const { session } = await opened(board);
+    board.errors.set("settings_get", "unauthorized");
+    await session.submitToken(TOKEN);
+    await settle();
+    expect(session.getState().phase).toBe("login");
+    expect(commands(board).filter((command) => command === "auth")).toHaveLength(2);
+  });
+});
+
+describe("a reply the app cannot show", () => {
+  it("says so in its own sentence, not as a newer protocol", async () => {
+    const board = networked();
+    board.settings["brightness"] = 500;
+    const session = new BoardSession();
+    const done = session.connect(board.transport(), "x");
+    await settle();
+    await done;
+    expect(session.getState().error).toBe(INVALID_REPLY);
   });
 });

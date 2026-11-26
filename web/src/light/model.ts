@@ -3,6 +3,7 @@
 // The light settings as the app shows and checks them (docs/board/light-v1.md, docs/protocol/protocol-v1.md#settings_get-settings_set).
 // The limits equal the protocol's; a change to one changes both.
 
+import { own } from "../lib/own";
 import { boardSettingsProblem } from "../device/settings";
 import type { BoardInfo, Settings } from "../protocol/types";
 
@@ -65,7 +66,7 @@ const words = (identifier: string): string => {
 
 /** An effect the app knows, or a plain description of one it does not: its name in words, no settings. */
 export function effectInfo(name: string): EffectInfo {
-  return EFFECTS[name] ?? { label: words(name), description: "", params: [] };
+  return own(EFFECTS, name) ?? { label: words(name), description: "", params: [] };
 }
 
 export const COLOR_LABELS: Record<string, string> = { white: "Warm white", red: "Red", green: "Green", blue: "Blue" };
@@ -83,8 +84,8 @@ export const COLOR_SET_COLORS: Record<string, readonly string[]> = {
   ice: ["blue", "white"],
 };
 
-export const colorLabel = (name: string): string => COLOR_LABELS[name] ?? words(name);
-export const colorSetLabel = (name: string): string => COLOR_SET_LABELS[name] ?? words(name);
+export const colorLabel = (name: string): string => own(COLOR_LABELS, name) ?? words(name);
+export const colorSetLabel = (name: string): string => own(COLOR_SET_LABELS, name) ?? words(name);
 
 const inRange = (value: number, limit: { min: number; max: number }): boolean =>
   value >= limit.min && value <= limit.max;

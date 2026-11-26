@@ -4,7 +4,7 @@
 // exist answers 404, as on Pages.
 
 import { createServer } from "node:http";
-import { cpSync, existsSync, mkdtempSync, readFileSync, statSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,6 +22,10 @@ const root = mkdtempSync(join(tmpdir(), "zenit-site-"));
 cpSync(dist, root, { recursive: true });
 cpSync(join(here, "site", "firmware"), join(root, "firmware"), { recursive: true });
 
+// The copy goes when the server stops, however it is stopped
+process.on("exit", () => rmSync(root, { recursive: true, force: true }));
+for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => process.exit(0));
+
 const TYPES = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -33,7 +37,13 @@ const TYPES = {
 };
 
 createServer((request, response) => {
-  const path = decodeURIComponent(new URL(request.url ?? "/", "http://localhost").pathname);
+  let path;
+  try {
+    path = decodeURIComponent(new URL(request.url ?? "/", "http://localhost").pathname);
+  } catch {
+    response.writeHead(400, { "Content-Type": "text/plain" }).end("Bad request\n");
+    return;
+  }
   const file = normalize(join(root, path.endsWith("/") ? `${path}index.html` : path));
   if (!file.startsWith(root + sep) || !existsSync(file) || !statSync(file).isFile()) {
     response.writeHead(404, { "Content-Type": "text/plain" }).end("Not found\n");

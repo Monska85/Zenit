@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { describe, expect, it } from "vitest";
-import { describeError } from "../src/board/messages";
+import { describeError, INVALID_REPLY, NEWER_PROTOCOL } from "../src/board/messages";
 import { BoardError, ClientError } from "../src/protocol/client";
 import { routeOf } from "../src/ui/route";
-import { timerLine } from "../src/ui/light/timer-card";
+import { colorsLimit } from "../src/ui/light/effect-settings";
+import { timerLine, timerLineSpoken } from "../src/ui/light/timer-card";
 
 describe("routeOf", () => {
   it("reads the view from the fragment, and falls back to the Light view", () => {
@@ -37,8 +38,22 @@ describe("describeError", () => {
     }
   });
 
-  it("names an unknown code", () => {
+  it("names an unknown code, even one that names a member of every object", () => {
     expect(describeError(new BoardError("new_thing", "x"))).toBe("Zenit refused the request (new_thing).");
+    for (const code of ["constructor", "toString", "__proto__", "hasOwnProperty"])
+      expect(describeError(new BoardError(code, "x"))).toBe(`Zenit refused the request (${code}).`);
+  });
+
+  it("says the same sentence for updates turned off, whatever the target", () => {
+    expect(describeError(new BoardError("updates_off", "x"))).toBe(
+      "Updates are turned off. Turn them on in the Device page.",
+    );
+  });
+
+  it("tells a newer protocol apart from a reply the app cannot show", () => {
+    expect(describeError(new ClientError("protocol", "x"))).toBe(NEWER_PROTOCOL);
+    expect(describeError(new ClientError("invalid_reply", "x"))).toBe(INVALID_REPLY);
+    expect(INVALID_REPLY).not.toContain("newer protocol");
   });
 
   it("explains the status a board closes a connection with", () => {
@@ -78,5 +93,22 @@ describe("timerLine", () => {
 
   it("says the timer ended, and the light stays off", () => {
     expect(timerLine(light({ on: false, timer: { minutes: 30, remaining: 0 } }))).toContain("The timer ended.");
+  });
+
+  it("does not count every second for a screen reader in the last minute", () => {
+    expect(timerLineSpoken(light({ timer: { minutes: 1, remaining: 45 } }))).toBe("Fades out in less than a minute.");
+    expect(timerLineSpoken(light({ timer: { minutes: 1, remaining: 44 } }))).toBe("Fades out in less than a minute.");
+    expect(timerLineSpoken(light({}))).toBe("Fades out in 29 min.");
+    expect(timerLineSpoken(light({ timer: null }))).toBeNull();
+  });
+});
+
+describe("colorsLimit", () => {
+  it("says why a color box cannot change, and nothing when it can", () => {
+    expect(colorsLimit(["red", "blue"], "red")).toBe("Keep at least 2 colors.");
+    expect(colorsLimit(["red", "blue"], "green")).toBeNull();
+    expect(colorsLimit(["red", "blue", "green"], "red")).toBeNull();
+    expect(colorsLimit(["red", "blue", "green", "white"], "amber")).toBe("Pick at most 4 colors.");
+    expect(colorsLimit(["red", "blue", "green", "white"], "red")).toBeNull();
   });
 });

@@ -30,7 +30,7 @@ test("tells a person what is wrong with an address", async ({ page }) => {
   await expect(page.getByRole("alert")).toHaveText("Type the address of your Zenit.");
   await page.getByLabel("Address of your Zenit").fill("http://zenit.local");
   await connect.click();
-  await expect(page.getByRole("alert")).toHaveText("The address must start with ws:// or wss://.");
+  await expect(page.getByRole("alert")).toHaveText("The address must start with ws://.");
   await page.getByLabel("Address of your Zenit").fill("not an address");
   await connect.click();
   await expect(page.getByRole("alert")).toContainText("does not look like an address");
@@ -42,6 +42,16 @@ test("says so when nothing answers at the address", async ({ page }) => {
   await page.getByRole("button", { name: "Connect", exact: true }).click();
   await expect(page.getByRole("alert").first()).toContainText("Could not reach Zenit at that address");
   await expect(page.getByRole("heading", { name: "Connect to your Zenit" })).toBeVisible();
+});
+
+test("keeps offering the last address that worked after one that failed", async ({ page, simulator }) => {
+  await connectByAddress(page, simulator.url);
+  await page.getByRole("button", { name: "Disconnect" }).click();
+  await page.getByLabel("Address of your Zenit").fill("ws://127.0.0.1:9");
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(page.getByRole("alert").first()).toContainText("Could not reach Zenit at that address");
+  await page.reload();
+  await expect(page.getByLabel("Address of your Zenit")).toHaveValue(simulator.url);
 });
 
 test("shows the USB warning, and disables USB with a reason where the browser has no Web Serial", async ({ page }) => {
@@ -135,9 +145,7 @@ test("on a secure page of another site in Chrome, refuses a name that is not on 
   await openSecureSite(page, baseURL);
   await page.getByLabel("Address of your Zenit").fill("zenit.lan");
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByRole("alert")).toHaveText(
-    "From this page, use the Zenit's .local name or its address on your network, like zenit-1a2b.local or 192.168.1.20.",
-  );
+  await expect(page.getByRole("alert")).toHaveText(/^This app connects only to a Zenit on your own network/);
   expect(sockets).toEqual([]);
 });
 

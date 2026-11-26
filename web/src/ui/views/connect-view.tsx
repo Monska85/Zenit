@@ -39,9 +39,10 @@ export function ConnectView({ go }: { go: (route: Route) => void }) {
   async function submit(event: FormEvent): Promise<void> {
     event.preventDefault();
     setProblem(null);
-    const message = await connectAddress(session, address);
+    const { problem: message, reached } = await connectAddress(session, address);
     setProblem(message);
-    if (message === null) saveAddress(address.trim());
+    // Only an address that worked replaces the one offered next time
+    if (reached) saveAddress(address.trim());
   }
 
   // The page asks its own origin whether a Zenit served it; the answer comes in a moment

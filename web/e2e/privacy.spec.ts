@@ -43,8 +43,8 @@ test("the notices list the bundled packages and the fixed entries", async ({ pag
 
 test("makes no request outside its own site and the board, over a whole visit", async ({ page, simulator }) => {
   const outside: string[] = [];
-  await page.goto("/");
-  const site = new URL(page.url());
+  // The listeners are in place before the first request of the page, so nothing the page loads first is missed
+  const site = new URL(test.info().project.use.baseURL!);
   page.on("request", (request) => {
     const url = new URL(request.url());
     if (url.origin !== site.origin && url.protocol !== "data:" && url.protocol !== "blob:") outside.push(request.url());
@@ -82,21 +82,65 @@ test("the page carries the content security policy that forbids outside requests
   const html = await response!.text();
   const policy = /http-equiv="Content-Security-Policy"\s+content="([^"]+)"/.exec(html)?.[1];
   expect(policy).toBe(
-    "default-src 'self'; connect-src 'self' ws: wss:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'",
+    "default-src 'self'; connect-src 'self' ws:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; form-action 'none'",
   );
 });
 
 test("an outside request is blocked by the policy", async ({ page }) => {
-  await page.goto("/");
-  const blocked = await page.evaluate(async () => {
-    try {
-      await fetch("https://example.org/");
-      return false;
-    } catch {
-      return true;
-    }
+  // Were the policy missing, the request would reach this route and fail the test, never the internet
+  const reached: string[] = [];
+  await page.route("https://example.org/**", (route) => {
+    reached.push(route.request().url());
+    return route.abort();
   });
-  expect(blocked).toBe(true);
+  await page.goto("/");
+  const violation = await page.evaluate(async () => {
+    const seen = new Promise<string>((resolve) =>
+      document.addEventListener("securitypolicyviolation", (event) => resolve(event.effectiveDirective), {
+        once: true,
+      }),
+    );
+    await fetch("https://example.org/").catch(() => undefined);
+    return seen;
+  });
+  expect(violation).toBe("connect-src");
+  expect(reached).toEqual([]);
+});
+
+test("refuses an address outside the local network before opening anything", async ({ page }) => {
+  const sockets: string[] = [];
+  page.on("websocket", (socket) => sockets.push(socket.url()));
+  await page.goto("/");
+  for (const typed of ["203.0.113.5", "zenit.example.com", "ws://8.8.8.8:8765/ws", "wss://zenit-1a2b.local/ws"]) {
+    await page.getByLabel("Address of your Zenit").fill(typed);
+    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await expect(page.getByRole("alert")).toHaveText(
+      typed.startsWith("wss:")
+        ? "The address must start with ws://."
+        : /^This app connects only to a Zenit on your own network/,
+    );
+  }
+  expect(sockets).toEqual([]);
+});
+
+test("shows only a notice when another site puts the app in a frame", async ({ page }) => {
+  // Any page that frames the app: a plain file of the site holds the frame (Chrome's Local Network Access keeps a page
+  // of another site from framing one on this computer, so the test cannot use one)
+  await page.goto("/LICENSE.txt");
+  await page.evaluate(() => {
+    const frame = document.createElement("iframe");
+    frame.src = "/";
+    frame.width = "600";
+    frame.height = "400";
+    document.body.append(frame);
+  });
+  const frame = page.frameLocator("iframe");
+  await expect(frame.getByTestId("framed-notice")).toBeVisible();
+  await expect(frame.getByRole("link", { name: "Open the Zenit app in its own tab" })).toHaveAttribute(
+    "target",
+    "_blank",
+  );
+  await expect(frame.getByRole("button")).toHaveCount(0);
 });
 
 test("raises no console error on any page", async ({ page, simulator }) => {

@@ -25,7 +25,7 @@ function ThemeButton() {
   return (
     <Button
       variant="ghost"
-      className="px-3"
+      size="icon"
       onClick={() => {
         chooseTheme(next);
         setChoice(next);
@@ -37,11 +37,34 @@ function ThemeButton() {
   );
 }
 
+function DisconnectButton({ go }: { go: (route: Route) => void }) {
+  const { session } = useBoard();
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label="Disconnect"
+      onClick={() => {
+        void session.disconnect();
+        go("connect");
+      }}
+    >
+      <Unplug aria-hidden className="size-5" />
+    </Button>
+  );
+}
+
 function ConnectionChip({ go }: { go: (route: Route) => void }) {
   const { board, session } = useBoard();
   if (board.phase === "connecting") return <span className="text-sm text-muted-foreground">Connecting...</span>;
   if (board.phase === "login") {
-    return <span className="text-sm font-medium">Log in needed</span>;
+    return (
+      <div className="flex items-center gap-1">
+        <span className="text-sm font-medium">Log in needed</span>
+        {/* The page is the board's own: there is no other place to connect to */}
+        {!board.served && <DisconnectButton go={go} />}
+      </div>
+    );
   }
   if (board.phase === "connected") {
     return (
@@ -55,19 +78,7 @@ function ConnectionChip({ go }: { go: (route: Route) => void }) {
           </span>
         )}
         {/* The page is the board's own: there is no other place to connect to */}
-        {!board.served && (
-          <Button
-            variant="ghost"
-            className="px-3"
-            aria-label="Disconnect"
-            onClick={() => {
-              void session.disconnect();
-              go("connect");
-            }}
-          >
-            <Unplug aria-hidden className="size-5" />
-          </Button>
-        )}
+        {!board.served && <DisconnectButton go={go} />}
       </div>
     );
   }
@@ -141,7 +152,7 @@ function Shell() {
       )}
       <main className="flex flex-col gap-4">
         {current === "privacy" && <PrivacyView />}
-        {current !== "privacy" && board.phase === "login" && <LoginView />}
+        {current !== "privacy" && board.phase === "login" && <LoginView go={go} />}
         {current === "device" && board.phase !== "login" && <DeviceView go={go} />}
         {(current === "light" || current === "connect") &&
           board.phase !== "login" &&

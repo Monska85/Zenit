@@ -174,6 +174,12 @@ export class ImprovClient {
   scan(): Promise<ImprovNetwork[]> {
     const found = new Map<string, ImprovNetwork>();
     return this.run<ImprovNetwork[]>(rpcFrame(RpcCommandCode.ScanNetworks), this.timeouts.scan, (done) => (frame) => {
+      // The board refused the request (a frame damaged on the line, an RPC it does not know): fail at once
+      if (frame.kind === "error") {
+        const error = failureFor(frame.error);
+        if (error !== null) this.current?.fail(error);
+        return false;
+      }
       if (frame.kind !== "result" || frame.command !== RpcCommandCode.ScanNetworks) return false;
       if (frame.strings.length === 0) {
         done([...found.values()].sort((a, b) => b.rssi - a.rssi).slice(0, MAX_NETWORKS));

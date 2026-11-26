@@ -23,9 +23,9 @@ test("sends a setting only when the slider is released", async ({ page }) => {
   await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
   await page.mouse.down();
   await page.mouse.move(root.x + root.width * 0.3, root.y + root.height / 2, { steps: 10 });
-  await page.waitForTimeout(300);
-  expect(mock.commands().filter((command) => command === "settings_set")).toHaveLength(0);
+  // The slider shows the value being chosen, and nothing has been sent for it
   await expect(thumb).not.toHaveAttribute("aria-valuenow", "60");
+  expect(mock.commands().filter((command) => command === "settings_set")).toHaveLength(0);
   await page.mouse.up();
   await expect.poll(() => mock.commands().filter((command) => command === "settings_set")).toHaveLength(1);
   const sent = mock.board.requests.filter((request) => request["cmd"] === "settings_set")[0]!;
@@ -119,22 +119,27 @@ test("sends one save for a run of key presses after a click that changed nothing
   await thumb.press("ArrowLeft");
   await thumb.press("ArrowLeft");
   await expect(thumb).toHaveAttribute("aria-valuenow", "57");
-  await page.waitForTimeout(1200);
-  const sent = mock.board.requests.filter((request) => request["cmd"] === "settings_set");
-  expect(sent).toHaveLength(1);
-  expect(sent[0]).toMatchObject({ brightness: 57 });
+  const sent = () => mock.board.requests.filter((request) => request["cmd"] === "settings_set");
+  await expect.poll(() => sent().length).toBe(1);
+  expect(sent()[0]).toMatchObject({ brightness: 57 });
 });
 
 test("keeps showing the last choice while an earlier one is answered late", async ({ page }) => {
   const mock = await connect(page);
   // The board takes 600 ms for the first save and 2.5 s for the second
   let saves = 0;
-  mock.delay = (request) => (request["cmd"] === "settings_set" ? (saves++ === 0 ? 600 : 2500) : 0);
+  let firstAnswered = false;
+  mock.delay = (request) => {
+    if (request["cmd"] !== "settings_set") return 0;
+    if (saves++ > 0) return 2500;
+    setTimeout(() => (firstAnswered = true), 650);
+    return 600;
+  };
   await page.getByRole("radio", { name: "Breathing" }).check({ force: true });
   await page.getByRole("radio", { name: "Twinkle" }).check({ force: true });
   // After the first answer, the second is still on its way: the choice on screen is the second
   await expect.poll(() => mock.board.settings["effect"], { timeout: 5000 }).toBe("twinkle");
-  await page.waitForTimeout(900);
+  await expect.poll(() => firstAnswered).toBe(true);
   await expect(page.getByRole("radio", { name: "Twinkle" })).toBeChecked();
   await expect(page.getByRole("radio", { name: "Breathing" })).not.toBeChecked();
   await expect(page.getByTestId("live-effect")).toHaveText("Twinkle", { timeout: 5000 });

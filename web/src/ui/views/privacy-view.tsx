@@ -16,6 +16,9 @@ export function PrivacyView() {
             The app asks for nothing but its own files and your Zenit. It uses no fonts, scripts or images from other
             sites.
           </li>
+          <li>
+            It connects only to a Zenit on your own network, or to this computer: an address on the internet is refused.
+          </li>
           <li>Your settings and your Zenit's details travel only between this page and your Zenit.</li>
           <li>
             The browser keeps two things on this device: your theme choice, and the last address you connected to.

@@ -88,10 +88,20 @@ describe("LineSplitter", () => {
     expect(splitter.push(bytes.slice(1)).map(decode)).toEqual(["é"]);
   });
 
-  it("drops bytes that never end in a newline once there are too many", () => {
+  it("drops bytes that never end in a newline once there are too many, up to the next newline", () => {
     const splitter = new LineSplitter();
     expect(splitter.push(new Uint8Array(9000).fill(65))).toEqual([]);
-    expect(splitter.push(text("ok\n")).map(decode)).toEqual(["ok"]);
+    expect(splitter.push(text("tail\nok\n")).map(decode)).toEqual(["ok"]);
+  });
+
+  it("keeps a line of 4,096 bytes and drops a longer one, whole or in pieces", () => {
+    const splitter = new LineSplitter();
+    const long = "a".repeat(4097);
+    expect(splitter.push(text(`${"b".repeat(4096)}\n${long}\nok\n`)).map((line) => line.length)).toEqual([4096, 2]);
+    expect(splitter.push(text(long.slice(0, 3000)))).toEqual([]);
+    expect(splitter.push(text(`${long.slice(3000)}\nok\n`)).map(decode)).toEqual(["ok"]);
+    expect(splitter.push(text("a".repeat(4000)))).toEqual([]);
+    expect(splitter.push(text(`${"a".repeat(96)}\n`)).map((line) => line.length)).toEqual([4096]);
   });
 });
 

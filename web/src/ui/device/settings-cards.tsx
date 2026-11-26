@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { own } from "../../lib/own";
 import { Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import {
@@ -122,7 +123,7 @@ export function UpdateSettingsCard() {
             options={choiceOptions(UPDATE_MODES, UPDATE_MODE_LABELS, mode)}
           />
           <p className="mt-2 text-sm text-muted-foreground" data-testid="update-mode-hint">
-            {UPDATE_MODE_HINTS[mode] ?? ""}
+            {own(UPDATE_MODE_HINTS, mode) ?? ""}
           </p>
         </div>
         {settings.update_firmware !== undefined && (

@@ -2,6 +2,7 @@
 
 // The sentences people read when something goes wrong (docs/web/web-app-v1.md#errors).
 
+import { own } from "../lib/own";
 import { BoardError, ClientError } from "../protocol/client";
 
 const BOARD_ERRORS: Record<string, string> = {
@@ -12,7 +13,7 @@ const BOARD_ERRORS: Record<string, string> = {
   busy: "Zenit is busy. Try again in a moment.",
   unauthorized: "Zenit needs the access token first.",
   no_network: "Zenit is not connected to WiFi.",
-  updates_off: "Firmware updates are turned off. Turn them on in the Device page.",
+  updates_off: "Updates are turned off. Turn them on in the Device page.",
   nothing_to_install: "There is no update to install. Check for updates first.",
 };
 
@@ -24,15 +25,17 @@ export const CLOSE_MESSAGES: Record<number, string> = {
 
 export const NO_ANSWER = "Zenit did not answer. Check the cable or the address.";
 
+export const NEWER_PROTOCOL = "This Zenit speaks a newer protocol than this app. Reload the app, or update it.";
+export const INVALID_REPLY = "Zenit sent something this app cannot show. Update the firmware on the Device page.";
+
 /** The sentence for a failed request. The board's own message is for logs and is never shown. */
 export function describeError(error: unknown): string {
-  if (error instanceof BoardError) return BOARD_ERRORS[error.code] ?? `Zenit refused the request (${error.code}).`;
+  if (error instanceof BoardError) return own(BOARD_ERRORS, error.code) ?? `Zenit refused the request (${error.code}).`;
   if (error instanceof ClientError) {
-    if (error.failure === "protocol")
-      return "This Zenit speaks a newer protocol than this app. Reload the app, or update it.";
-    if (error.failure === "closed" && error.closeCode !== undefined && CLOSE_MESSAGES[error.closeCode])
-      return CLOSE_MESSAGES[error.closeCode] as string;
-    return NO_ANSWER;
+    if (error.failure === "protocol") return NEWER_PROTOCOL;
+    if (error.failure === "invalid_reply") return INVALID_REPLY;
+    const closed = error.failure === "closed" && error.closeCode !== undefined;
+    return (closed ? own(CLOSE_MESSAGES, error.closeCode as number) : undefined) ?? NO_ANSWER;
   }
   return "Something went wrong.";
 }

@@ -16,6 +16,13 @@ export function timerLine(light: LightStatus): string | null {
   return "The timer ended. The light stays off until you turn it on.";
 }
 
+/** The timer line as a screen reader hears it: in the last minute it does not count every second. */
+export function timerLineSpoken(light: LightStatus): string | null {
+  if (light.timer !== null && light.on && light.timer.remaining > 0 && light.timer.remaining < 60)
+    return "Fades out in less than a minute.";
+  return timerLine(light);
+}
+
 export function TimerCard({
   minutes,
   light,
@@ -32,6 +39,7 @@ export function TimerCard({
   const customShown = custom || (minutes !== 0 && !isPreset(minutes));
   const selected = customShown ? "custom" : String(minutes);
   const line = timerLine(light);
+  const spoken = timerLineSpoken(light);
 
   function choose(value: string): void {
     setProblem(null);
@@ -94,8 +102,11 @@ export function TimerCard({
           )}
         </form>
       )}
-      <p role="status" className="mt-3 min-h-6 text-base text-muted-foreground" data-testid="timer-line">
-        {line}
+      <p role="status" className="mt-3 min-h-6 text-base text-muted-foreground">
+        <span aria-hidden className="block" data-testid="timer-line">
+          {line}
+        </span>
+        <span className="sr-only">{spoken}</span>
       </p>
     </Card>
   );

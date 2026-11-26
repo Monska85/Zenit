@@ -101,8 +101,18 @@ describe("the transport", () => {
     socket.onmessage?.({ data: new ArrayBuffer(4) });
     socket.onmessage?.({ data: new Blob(["x"]) });
     socket.onmessage?.({ data: "a".repeat(4097) });
+    socket.onmessage?.({ data: "é".repeat(2049) });
     socket.onmessage?.({ data: "a".repeat(4096) });
     expect(lines).toEqual(["a".repeat(4096)]);
+  });
+
+  it("refuses a text longer than the limit before it encodes it", async () => {
+    const { socket, lines } = await connected();
+    const encode = vi.spyOn(TextEncoder.prototype, "encode");
+    socket.onmessage?.({ data: "a".repeat(1_000_000) });
+    expect(encode).not.toHaveBeenCalled();
+    encode.mockRestore();
+    expect(lines).toEqual([]);
   });
 
   it("tells the client once when the socket closes, with the reason", async () => {
