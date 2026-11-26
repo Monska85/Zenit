@@ -11,7 +11,6 @@ JOBS ?= 4
 NICE ?= 10
 ARGS ?=
 VERSION ?=
-FIRMWARE ?=
 SITE_URL ?=
 SIM := .pio/build/native/program
 
@@ -37,9 +36,8 @@ build-update-test: ## Build the update test firmware: it reads updates from a pl
 	@test -n "$(SITE_URL)" || { echo "SITE_URL is required, e.g. make build-update-test SITE_URL=http://192.168.1.5:8000/" >&2; exit 2; }
 	ZENIT_SITE_URL=$(SITE_URL) nice -n $(NICE) pio run -j $(JOBS) -e esp32c3_test_http
 
-update-server: ## Serve update files for the update test firmware (VERSION=1.2.0 FIRMWARE=.pio/build/esp32c3/firmware.bin, and/or WEB=.pio/web/zenit-web.bin)
-	@test -n "$(FIRMWARE)$(WEB)" || { echo "FIRMWARE (with VERSION) or WEB is required" >&2; exit 2; }
-	$(PYTHON) tools/update_server.py $(if $(FIRMWARE),--version $(VERSION) --firmware $(FIRMWARE),) $(if $(WEB),--web $(WEB),) $(ARGS)
+update-server: ## Serve update files for the update test firmware (ARGS="--version 1.2.0 --firmware .pio/build/esp32c3/firmware.bin", or ARGS="--web .pio/web/zenit-web.bin")
+	$(PYTHON) tools/update_server.py $(ARGS)
 
 upload: ## Flash the firmware (PORT=/dev/ttyACM0 to choose the port). Never with the panel socket powered
 	nice -n $(NICE) pio run -j $(JOBS) -e $(BOARD) -t upload $(UPLOAD_PORT)
@@ -135,5 +133,5 @@ web-screenshots-update: web-build ## Draw the reference screenshots again, insid
 web-check: web-test web-size web-e2e web-screenshots ## The whole web gate: checks, build, size budget, end-to-end tests and screenshots
 
 clean: ## Remove build outputs and simulator output
-	pio run -t clean -e native -e native_test -e $(BOARD)
-	rm -rf $(OUT) release web/dist web/test-results* web/playwright-report*
+	pio run -t clean -e native -e native_test -e $(BOARD) -e esp32c3_test_http
+	rm -rf $(OUT) release web/dist web/test-results* web/playwright-report* .pio/web

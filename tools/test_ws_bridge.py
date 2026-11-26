@@ -9,6 +9,7 @@ import asyncio
 import hashlib
 import hmac
 import json
+import os
 import re
 import subprocess
 import sys
@@ -25,6 +26,8 @@ import zenit  # noqa: E402
 ROOT = Path(__file__).resolve().parent.parent
 SIMULATOR = ROOT / ".pio" / "build" / "native" / "program"
 BRIDGE = Path(__file__).resolve().parent / "ws_bridge.py"
+# CI has every dependency and builds the simulator first: a missing one there is a failure, not a skip
+IN_CI = bool(os.environ.get("CI"))
 
 try:
     from websockets.exceptions import ConnectionClosed, InvalidStatus
@@ -51,7 +54,7 @@ class FakeProcess:
         self.stdin = FakeStream()
 
 
-@unittest.skipUnless(HAVE_WEBSOCKETS, "needs the websockets package")
+@unittest.skipUnless(HAVE_WEBSOCKETS or IN_CI, "needs the websockets package")
 class ControlLineOrderTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_close_is_written_before_the_next_open(self):
         from websockets.asyncio.client import connect as aconnect
@@ -106,7 +109,7 @@ class OriginTest(unittest.TestCase):
         self.assertFalse(ws_bridge.origin_allowed("https://example.org", extra))
 
 
-@unittest.skipUnless(SIMULATOR.exists() and HAVE_WEBSOCKETS, "needs the simulator program and the websockets package")
+@unittest.skipUnless((SIMULATOR.exists() and HAVE_WEBSOCKETS) or IN_CI, "needs the simulator program and the websockets package")
 class BridgeTest(unittest.TestCase):
     def setUp(self):
         self.process = subprocess.Popen(
@@ -290,7 +293,7 @@ class BridgeTest(unittest.TestCase):
         self.assertIn(self.process.wait(timeout=5), (0, -15))
 
 
-@unittest.skipUnless(SIMULATOR.exists() and HAVE_WEBSOCKETS, "needs the simulator program and the websockets package")
+@unittest.skipUnless((SIMULATOR.exists() and HAVE_WEBSOCKETS) or IN_CI, "needs the simulator program and the websockets package")
 class ServedAppTest(unittest.TestCase):
     """The bridge with --app answers page requests as a board does."""
 
@@ -385,7 +388,7 @@ class ServedAppTest(unittest.TestCase):
             self.assertEqual(self.get("/")[0], 200)
 
 
-@unittest.skipUnless(SIMULATOR.exists(), "needs the simulator program")
+@unittest.skipUnless(SIMULATOR.exists() or IN_CI, "needs the simulator program")
 class SimulatorWifiTest(unittest.TestCase):
     """The simulator as a board on WiFi, driven through its standard input: login, the close request and the token."""
 

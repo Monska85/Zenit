@@ -51,7 +51,7 @@ These apply as soon as the matching code exists. The reasons are in `docs/adr/`.
 
 These apply to everything in `web/`. The reasons are in [ADR 0003](docs/adr/0003-web-app.md) and the rules in [`docs/web/web-app-v1.md`](docs/web/web-app-v1.md).
 
-- **The client follows `tools/zenit.py` rule by rule** (framing, CRC, strict reply JSON, reply table, 2 s by 5 retries, one request in flight, `info` first, immediate resend on `bad_frame`). A change to a reply field changes `web/src/protocol/schema.ts` and `REPLIES` in the Python client together, and the conformance cases run in Vitest.
+- **The client follows `tools/zenit.py` rule by rule** (framing, CRC, strict reply JSON, reply table, 2 s by 5 retries, one request in flight, `info` first, immediate resend on `bad_frame`). A change to a reply field changes `web/src/protocol/schema.ts` and `REPLIES` in the Python client together, with its cases in `conformance/client/replies.json`; both clients run those cases and the protocol conformance cases.
 - **Web Serial never touches the control lines** (no `setSignals`): clearing DTR or RTS first restarts the ESP32-C3. Opening a port uses 115,200 baud and a buffer of 8,192 bytes.
 - **Settings are sent when the user chooses them,** never while a slider moves. The limits in `web/src/light/model.ts` equal the protocol's and the light specification's; a test reads both documents.
 - **The UI shows only what the board reports** (effects, colors, color sets from `info`) and, for an effect, only the settings it reads.

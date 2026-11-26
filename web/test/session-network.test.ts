@@ -478,7 +478,8 @@ describe("a board that accepts the login and still refuses", () => {
 describe("a reply the app cannot show", () => {
   it("says so in its own sentence, not as a newer protocol", async () => {
     const board = networked();
-    board.settings["brightness"] = 500;
+    // In range, so the reply is well formed, but not an effect the board lists in info
+    board.settings["effect"] = "laser";
     const session = new BoardSession();
     const done = session.connect(board.transport(), "x");
     await settle();

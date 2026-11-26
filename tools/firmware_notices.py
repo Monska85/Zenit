@@ -291,15 +291,25 @@ def build_notices(version, source, build_dir=BUILD_DIR, libdeps_dir=LIBDEPS_DIR,
     return notices.render(version, source)
 
 
+def source_of(version):
+    """Where the source code of `version` is: its release tag for a release X.Y.Z, which does not move on as the
+    repository does, else the repository."""
+    if re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", version):
+        return f"{REPOSITORY}/tree/v{version}"
+    return REPOSITORY
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--version", required=True, help="the firmware version the notices are for")
     parser.add_argument("--out", required=True, help="the file to write")
-    parser.add_argument("--source", default=REPOSITORY, help="where the source code is")
+    parser.add_argument(
+        "--source", help="where the source code is (default: the release tag vX.Y.Z for a version X.Y.Z, else the repository)"
+    )
     parser.add_argument("--build-dir", type=Path, default=BUILD_DIR)
     args = parser.parse_args(argv)
     try:
-        text = build_notices(args.version, args.source, build_dir=args.build_dir)
+        text = build_notices(args.version, args.source or source_of(args.version), build_dir=args.build_dir)
         Path(args.out).write_text(text, encoding="utf-8")
     except (NoticesError, OSError, ValueError, KeyError) as error:
         sys.exit(f"firmware_notices: {error}")

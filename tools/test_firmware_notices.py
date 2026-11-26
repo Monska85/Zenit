@@ -5,6 +5,7 @@ import json
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -255,6 +256,20 @@ class BuildNoticesTest(FixtureTest):
             notices.main(["--version", "1", "--out", str(out), "--build-dir", str(self.build / "missing")])
         self.assertIn("firmware_notices:", str(raised.exception))
         self.assertFalse(out.exists())
+
+    def test_the_source_of_a_release_is_its_tag(self):
+        self.assertEqual(notices.source_of("1.2.3"), notices.REPOSITORY + "/tree/v1.2.3")
+        for version in ("check", "1.2.3-dev.4+gabc1234", "01.2.3", "1.2"):
+            self.assertEqual(notices.source_of(version), notices.REPOSITORY, version)
+        out = self.root / "notices.txt"
+        for argv, source in [
+            (["--version", "1.2.3"], notices.REPOSITORY + "/tree/v1.2.3"),
+            (["--version", "check"], notices.REPOSITORY),
+            (["--version", "1.2.3", "--source", "https://example.org/source"], "https://example.org/source"),
+        ]:
+            with mock.patch.object(notices, "build_notices", return_value="text") as build:
+                notices.main([*argv, "--out", str(out)])
+            self.assertEqual(build.call_args.args[1], source, argv)
 
 
 class RepositoryConfigurationTest(unittest.TestCase):
