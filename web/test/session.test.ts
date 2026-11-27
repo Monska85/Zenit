@@ -238,6 +238,34 @@ describe("polling", () => {
     await done;
   });
 
+  it("sends a choice at once while a status poll waits for its reply, and shows the board's answer", async () => {
+    const { session, board, transport } = await connected();
+    // The board's answers to status are held back: the next poll stays in flight
+    const answer = transport.respond;
+    const held: Uint8Array[] = [];
+    transport.respond = (request, line) => {
+      const replies = answer(request, line);
+      if (request["cmd"] !== "status") return replies;
+      held.push(...replies.map((reply) => (reply instanceof Uint8Array ? reply : lineOf(reply))));
+      return [];
+    };
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    expect(commands(board).at(-1)).toBe("status");
+    const done = session.setSettings({ brightness: 5 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(commands(board).at(-1)).toBe("settings_set");
+    expect(board.settings["brightness"]).toBe(5);
+    await done;
+    expect(session.getState().settings?.brightness).toBe(5);
+    // The poll's late reply changes nothing, and the next poll asks again
+    for (const line of held) transport.receive(line);
+    transport.respond = answer;
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    expect(commands(board).at(-1)).toBe("status");
+    expect(session.getState().phase).toBe("connected");
+    expect(session.getState().error).toBeNull();
+  });
+
   it("stops after disconnect", async () => {
     const { session, board } = await connected();
     await session.disconnect();

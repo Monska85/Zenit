@@ -195,6 +195,98 @@ describe("Client.request", () => {
   });
 });
 
+describe("Client.poll", () => {
+  const status = (seq: number) => ({
+    seq,
+    ok: true,
+    light: { on: true, effect: "static", color: "white", lightness: 1.5, power_scale: 100, timer: null },
+  });
+
+  it("returns the reply, and throws a BoardError for an error reply", async () => {
+    const transport = new ScriptedTransport();
+    transport.respond = (request) => [status(request["seq"] as number)];
+    const client = new Client(transport, { seq: 1 });
+    expect((await client.poll("status"))?.["seq"]).toBe(1);
+    transport.respond = (request) => [{ seq: request["seq"], ok: false, error: "unauthorized", message: "log in" }];
+    await expect(client.poll("status")).rejects.toMatchObject({ code: "unauthorized" });
+  });
+
+  it("gives way to a request asked for while it waits: the request leaves at once and takes its own reply", async () => {
+    const transport = new ScriptedTransport();
+    const client = new Client(transport, { seq: 1 });
+    const poll = client.poll("status");
+    await vi.advanceTimersByTimeAsync(10);
+    expect(transport.written).toHaveLength(1);
+    const choice = client.request("info");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(await poll).toBeNull();
+    expect(transport.written.map((line) => parseLine(line))).toEqual([
+      { seq: 1, cmd: "status" },
+      { seq: 2, cmd: "info" },
+    ]);
+    // The board answers in order: the poll's late reply has another seq and is thrown away
+    transport.receive(lineOf(status(1)));
+    transport.receive(lineOf(info(2)));
+    expect((await choice)["seq"]).toBe(2);
+    // A poll that gave way is never sent again
+    await vi.advanceTimersByTimeAsync(2000 * 5);
+    expect(transport.written).toHaveLength(2);
+    expect(client.busy).toBe(false);
+  });
+
+  it("gives way to a request asked for while its line is still being written", async () => {
+    const transport = new ScriptedTransport();
+    // A slow write, as on Web Serial: the request comes before the poll starts to wait
+    let written: () => void = () => undefined;
+    const write = transport.send.bind(transport);
+    transport.send = async (line) => {
+      if (parseLine(line)?.["cmd"] === "status") await new Promise<void>((resolve) => (written = resolve));
+      return write(line);
+    };
+    const client = new Client(transport, { seq: 1 });
+    const poll = client.poll("status");
+    await vi.advanceTimersByTimeAsync(10);
+    const choice = client.request("info");
+    written();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(await poll).toBeNull();
+    expect(transport.written.map((line) => parseLine(line)?.["cmd"])).toEqual(["status", "info"]);
+    transport.receive(lineOf(info(2)));
+    expect((await choice)["seq"]).toBe(2);
+  });
+
+  it("ends only its own wait: a request ahead of it keeps waiting for its reply", async () => {
+    const transport = new ScriptedTransport();
+    const client = new Client(transport, { seq: 1 });
+    const first = client.request("info");
+    const poll = client.poll("status");
+    await vi.advanceTimersByTimeAsync(10);
+    void client.request("info");
+    await vi.advanceTimersByTimeAsync(1000);
+    // No early resend of the first request
+    expect(transport.written).toHaveLength(1);
+    transport.receive(lineOf(info(1)));
+    expect((await first)["seq"]).toBe(1);
+    expect(await poll).toBeNull();
+  });
+
+  it("is not sent when a request is asked for before its turn comes", async () => {
+    const transport = new ScriptedTransport();
+    const client = new Client(transport, { seq: 1 });
+    const first = client.request("info");
+    const poll = client.poll("status");
+    const choice = client.request("info");
+    await vi.advanceTimersByTimeAsync(10);
+    transport.receive(lineOf(info(1)));
+    await first;
+    expect(await poll).toBeNull();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(transport.written.map((line) => parseLine(line)?.["cmd"])).toEqual(["info", "info"]);
+    transport.receive(lineOf(info(2)));
+    expect((await choice)["seq"]).toBe(2);
+  });
+});
+
 describe("Client.call and handshake", () => {
   it("throws a BoardError for an error reply", async () => {
     const board = new FakeBoard();

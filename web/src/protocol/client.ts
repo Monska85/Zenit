@@ -62,6 +62,13 @@ class LineQueue {
     if (this.lines.length > QUEUE_LIMIT) this.lines.shift();
   }
 
+  /** The wait in progress ends now, as if it timed out. */
+  interrupt(): void {
+    const resolve = this.waiter;
+    this.waiter = null;
+    resolve?.(null);
+  }
+
   end(error: ClientError): void {
     this.ended = error;
     const resolve = this.waiter;
@@ -99,6 +106,13 @@ function randomSeq(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0]! >>> 1;
 }
 
+/** A request that gives way (`poll`): `gone` once a later request was asked for while it waited. */
+interface GiveWay {
+  gone: boolean;
+  /** Its turn has come: the wait in progress, if any, is its own. */
+  started: boolean;
+}
+
 export class Client {
   info: BoardInfo | null = null;
   /** Called once when the connection ends, with the reason, whoever ended it. */
@@ -109,6 +123,8 @@ export class Client {
   private seq: number;
   private tail: Promise<unknown> = Promise.resolve();
   private waiting = 0;
+  /** The poll waiting for its reply, which the next request makes give way. */
+  private polling: GiveWay | null = null;
 
   constructor(
     private readonly transport: LineTransport,
@@ -146,8 +162,39 @@ export class Client {
   /** Sends a request and returns its reply, an error reply included. Requests run one at a time, in order. */
   request(command: string, fields: Record<string, unknown> = {}): Promise<JsonObject> {
     if ("seq" in fields || "cmd" in fields) throw new TypeError("seq and cmd are not fields");
+    // A poll waiting for its reply gives way: what the person asked for leaves now, not after the poll's round trip
+    if (this.polling) {
+      this.polling.gone = true;
+      // Only the poll's own wait ends: a poll still waiting its turn is simply not sent
+      const started = this.polling.started;
+      this.polling = null;
+      if (started) this.queue.interrupt();
+    }
+    return this.enqueue(command, fields, null) as Promise<JsonObject>;
+  }
+
+  /**
+   * Like `call`, for a request the page makes on its own, the status poll: it gives way. When another request is asked
+   * for while the poll waits for its reply, the client stops waiting and sends the other at once; the poll's reply,
+   * when it comes, has another `seq` and is thrown away. Resolves null then. Only a request that changes nothing may
+   * give way: it is never sent again, so nothing older runs after something newer.
+   */
+  async poll(command: string): Promise<JsonObject | null> {
+    const way: GiveWay = { gone: false, started: false };
+    this.polling = way;
+    let reply: JsonObject | null;
+    try {
+      reply = await this.enqueue(command, {}, way);
+    } finally {
+      if (this.polling === way) this.polling = null;
+    }
+    if (reply !== null && reply["ok"] !== true) throw new BoardError(String(reply["error"]), String(reply["message"]));
+    return reply;
+  }
+
+  private enqueue(command: string, fields: Record<string, unknown>, way: GiveWay | null): Promise<JsonObject | null> {
     this.waiting++;
-    const run = this.tail.then(() => this.send(command, fields));
+    const run = this.tail.then(() => this.send(command, fields, way));
     this.tail = run.then(
       () => undefined,
       () => undefined,
@@ -180,21 +227,34 @@ export class Client {
     await this.transport.close();
   }
 
-  private async send(command: string, fields: Record<string, unknown>): Promise<JsonObject> {
+  private async send(
+    command: string,
+    fields: Record<string, unknown>,
+    way: GiveWay | null,
+  ): Promise<JsonObject | null> {
+    if (way) {
+      // A poll that gave way before its turn is not sent at all
+      if (way.gone) return null;
+      way.started = true;
+    }
     const seq = this.seq;
     this.seq = (this.seq + 1) % 2 ** 32;
     const line = frameRequest({ seq, cmd: command, ...fields });
     let malformed = false;
     for (let attempt = 0; attempt < this.attempts; attempt++) {
+      if (way?.gone) return null;
       await this.transport.send(line).catch((error: unknown) => {
         throw new ClientError("closed", `cannot send: ${error instanceof Error ? error.message : String(error)}`);
       });
       // A clock that cannot jump: a wall clock set back would stretch the wait
       const deadline = performance.now() + this.timeoutMs;
       for (;;) {
+        // Also a request asked for while the line was being written, before any wait could be ended
+        if (way?.gone) return null;
         const remaining = deadline - performance.now();
         if (remaining <= 0) break;
         const raw = await this.queue.next(remaining);
+        if (way?.gone) return null;
         if (raw === null) break;
         const reply = parseLine(raw);
         // A line to throw away, or an event this client does not know
