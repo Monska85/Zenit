@@ -11,7 +11,7 @@ async function connectUsb(page: import("@playwright/test").Page) {
   await installFakeSerial(page, MOCK_USB_URL);
   await page.goto("/");
   await page.getByRole("button", { name: "Connect with USB" }).click();
-  await expect(page.getByTestId("connection")).toHaveText("Connected by USB");
+  await expect(page.getByTestId("connection")).toContainText("USB");
   return mock;
 }
 
@@ -28,6 +28,7 @@ test("connects over USB the way the protocol asks, and shows the USB note", asyn
 test("never touches the control lines of the port", async ({ page }) => {
   await connectUsb(page);
   await page.getByRole("button", { name: "Light", exact: true }).click();
+  await page.getByRole("button", { name: /^Connection:/ }).click();
   await page.getByRole("button", { name: "Disconnect" }).click();
   expect((await serialUse(page)).setSignals).toBe(0);
 });
@@ -37,13 +38,14 @@ test("controls the light over USB, and ignores the board's log lines", async ({ 
   await page.getByRole("radio", { name: "Breathing" }).check({ force: true });
   await expect(page.getByTestId("live-effect")).toHaveText("Breathing");
   await page.getByRole("button", { name: "Light", exact: true }).click();
-  await expect(page.getByTestId("power-state")).toHaveText("Off");
+  await expect(page.getByTestId("power-button")).toHaveAttribute("aria-pressed", "false");
   expect(mock.commands()).toContain("settings_set");
   expect(mock.commands()).toContain("light");
 });
 
 test("closes the port when disconnecting", async ({ page }) => {
   await connectUsb(page);
+  await page.getByRole("button", { name: /^Connection:/ }).click();
   await page.getByRole("button", { name: "Disconnect" }).click();
   await expect(page.getByRole("heading", { name: "Connect to your Zenit" })).toBeVisible();
   expect((await serialUse(page)).closed).toBe(1);
@@ -74,7 +76,7 @@ test("lets go of the port before the installer takes it", async ({ page }) => {
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.locator("esp-web-install-button")).toBeAttached();
   expect((await serialUse(page)).closed).toBe(1);
-  await expect(page.getByTestId("connection")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Connection: Not connected" })).toBeVisible();
 });
 
 test("says so when the port cannot be opened", async ({ page }) => {

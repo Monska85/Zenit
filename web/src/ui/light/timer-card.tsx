@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useId, useState, type FormEvent } from "react";
-import { LIMITS, TIMER_PRESETS, formatSeconds, formatTimer } from "../../light/model";
+import { LIMITS, TIMER_PRESETS, customTimerLabel, formatSeconds, formatTimer } from "../../light/model";
 import type { LightStatus } from "../../protocol/types";
 import { Button } from "../components/button";
 import { Card, CardTitle } from "../components/card";
@@ -76,7 +76,7 @@ export function TimerCard({
         options={[
           { value: "0", label: "Off" },
           ...TIMER_PRESETS.map((preset) => ({ value: String(preset), label: formatTimer(preset) })),
-          { value: "custom", label: "Custom" },
+          { value: "custom", label: customTimerLabel(minutes) },
         ]}
       />
       {customShown && (
@@ -102,10 +102,13 @@ export function TimerCard({
           )}
         </form>
       )}
-      <p role="status" className="mt-3 min-h-6 text-base text-muted-foreground">
-        <span aria-hidden className="block" data-testid="timer-line">
-          {line}
-        </span>
+      {/* The live region stays in the page so it can speak; empty, it takes no room */}
+      <p role="status" className="text-base text-muted-foreground">
+        {line !== null && (
+          <span aria-hidden className="mt-3 block" data-testid="timer-line">
+            {line}
+          </span>
+        )}
         <span className="sr-only">{spoken}</span>
       </p>
     </Card>

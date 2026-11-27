@@ -10,17 +10,35 @@ test("connects to the simulator by address and lands on the Light view", async (
   await expect(page.getByRole("heading", { name: "Connect to your Zenit" })).toBeVisible();
   await page.getByLabel("Address of your Zenit").fill(simulator.url);
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByTestId("connection")).toHaveText("Connected over WiFi");
-  await expect(page.getByTestId("connection")).toHaveAttribute("title", simulator.url);
+  await expect(page.getByTestId("connection")).toContainText("WiFi");
+  await expect(page.getByRole("button", { name: /^Connection: WiFi/ })).toHaveAttribute("title", simulator.url);
   await expect(page.getByRole("button", { name: "Light", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
 
 test("offers the address again the next time", async ({ page, simulator }) => {
   await connectByAddress(page, simulator.url);
+  await page.getByRole("button", { name: /^Connection:/ }).click();
   await page.getByRole("button", { name: "Disconnect" }).click();
   await expect(page.getByRole("heading", { name: "Connect to your Zenit" })).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("Address of your Zenit")).toHaveValue(simulator.url);
+  // The last board that worked is one tap away; the field is for another one
+  const last = page.getByTestId("last-board");
+  await expect(last.getByRole("heading")).toHaveText(simulator.url);
+  await expect(page.getByLabel("Address of your Zenit")).toHaveValue("");
+  await last.getByRole("button", { name: `Connect to ${simulator.url}` }).click();
+  await expect(page.getByRole("button", { name: /^Connection: WiFi/ })).toBeVisible();
+  await expect(page.getByTestId("live-state")).toBeVisible();
+});
+
+test("does not offer the simulator's address in the hint, but connects to it when typed", async ({
+  page,
+  simulator,
+}) => {
+  await page.goto("/");
+  await expect(page.getByText("For example zenit-1a2b.local or 192.168.1.20.")).toBeVisible();
+  await expect(page.getByText("127.0.0.1")).toHaveCount(0);
+  await expect(page.getByTestId("last-board")).toHaveCount(0);
+  await connectByAddress(page, simulator.url);
 });
 
 test("tells a person what is wrong with an address", async ({ page }) => {
@@ -46,12 +64,13 @@ test("says so when nothing answers at the address", async ({ page }) => {
 
 test("keeps offering the last address that worked after one that failed", async ({ page, simulator }) => {
   await connectByAddress(page, simulator.url);
+  await page.getByRole("button", { name: /^Connection:/ }).click();
   await page.getByRole("button", { name: "Disconnect" }).click();
   await page.getByLabel("Address of your Zenit").fill("ws://127.0.0.1:9");
   await page.getByRole("button", { name: "Connect", exact: true }).click();
   await expect(page.getByRole("alert").first()).toContainText("Could not reach Zenit at that address");
   await page.reload();
-  await expect(page.getByLabel("Address of your Zenit")).toHaveValue(simulator.url);
+  await expect(page.getByTestId("last-board").getByRole("heading")).toHaveText(simulator.url);
 });
 
 test("shows the USB warning, and disables USB with a reason where the browser has no Web Serial", async ({ page }) => {
@@ -59,9 +78,24 @@ test("shows the USB warning, and disables USB with a reason where the browser ha
     Object.defineProperty(navigator, "serial", { configurable: true, value: undefined });
   });
   await page.goto("/");
+  // No Web Serial (most phones): the address comes first and the USB choice is folded, with its reason
+  const folded = page.getByTestId("usb-folded");
+  const address = page.getByLabel("Address of your Zenit");
+  expect((await address.boundingBox())!.y).toBeLessThan((await folded.boundingBox())!.y);
+  await expect(page.getByRole("button", { name: "Connect with USB" })).toBeHidden();
+  await folded.getByText("With a USB cable").click();
+  await expect(page.getByText("This browser cannot use a USB cable.").first()).toBeVisible();
   await expect(page.getByText("Unplug the panel power socket before you connect the USB cable.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Connect with USB" })).toBeDisabled();
-  await expect(page.getByText("This browser cannot use a USB cable.").first()).toBeVisible();
+});
+
+test("with Web Serial, shows the USB choice first and open", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByText("Unplug the panel power socket before you connect the USB cable.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Connect with USB" })).toBeEnabled();
+  await expect(page.getByTestId("usb-folded")).toHaveCount(0);
+  const usb = await page.getByRole("button", { name: "Connect with USB" }).boundingBox();
+  expect(usb!.y).toBeLessThan((await page.getByLabel("Address of your Zenit").boundingBox())!.y);
 });
 
 test("shows the other pages while not connected", async ({ page }) => {
@@ -69,7 +103,7 @@ test("shows the other pages while not connected", async ({ page }) => {
   await page.getByRole("link", { name: "Device" }).click();
   await expect(page.getByRole("heading", { name: "Device", level: 1 })).toBeVisible();
   await expect(page.getByText("Connect to see your Zenit.")).toBeVisible();
-  await page.getByRole("link", { name: "Privacy" }).click();
+  await page.getByRole("contentinfo").getByRole("link", { name: "Privacy" }).click();
   await expect(page.getByRole("heading", { name: "Privacy", level: 1 })).toBeVisible();
   await page.getByRole("link", { name: "Light" }).click();
   await expect(page.getByRole("heading", { name: "Connect to your Zenit" })).toBeVisible();
@@ -86,6 +120,7 @@ test("goes back to the Connect screen after disconnecting, and the Light view ne
   simulator,
 }) => {
   await connectByAddress(page, simulator.url);
+  await page.getByRole("button", { name: /^Connection:/ }).click();
   await page.getByRole("button", { name: "Disconnect" }).click();
   await expect(page.getByRole("heading", { name: "Connect to your Zenit" })).toBeVisible();
   await page.goto("/#/light");
@@ -133,7 +168,7 @@ test("on a secure page of another site in Chrome, reaches a Zenit by its .local 
   await expect(page.getByText("This browser does not let this page reach a Zenit over WiFi.")).toHaveCount(0);
   await page.getByLabel("Address of your Zenit").fill("zenit-a1b2.local");
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByTestId("connection")).toHaveText("Connected over WiFi");
+  await expect(page.getByTestId("connection")).toContainText("WiFi");
 });
 
 test("on a secure page of another site in Chrome, refuses a name that is not on the local network", async ({

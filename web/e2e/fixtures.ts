@@ -75,7 +75,7 @@ export async function connectByAddress(page: Page, url: string): Promise<void> {
   await page.goto("/");
   await page.getByLabel("Address of your Zenit").fill(url);
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByTestId("connection")).toContainText("Connected");
+  await expect(page.getByRole("button", { name: /^Connection: WiFi/ })).toBeVisible();
 }
 
 /**

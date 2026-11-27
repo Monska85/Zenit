@@ -92,15 +92,19 @@ test("shows that the board restarts and connects again by itself", async ({ page
   await expect(page.getByTestId("update-progress")).toContainText("Restarting");
   mock.refuse = true;
   mock.drop();
-  await expect(page.getByTestId("auto-reconnect")).toHaveText("The board is restarting");
-  await expect(
-    page.getByText("The board is restarting. This page connects again by itself in a few seconds."),
-  ).toBeVisible();
+  // One message, and no Reconnect to press: the page connects again by itself
+  await expect(page.getByTestId("auto-reconnect")).toHaveText(
+    "Zenit is restarting. It connects again by itself in a few seconds.",
+  );
+  await expect(page.getByTestId("auto-reconnect")).toHaveRole("status");
+  await expect(page.getByRole("button", { name: "Connection: Restarting..." })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Reconnect" })).toHaveCount(0);
+  await expect(page.getByRole("alert")).toHaveCount(0);
   // The board is back: the app finds it by itself
   mock.refuse = false;
   mock.board.update = { ...mock.board.update, state: "idle", target: null, last_result: "installed", available: null };
   mock.board.info["firmware"] = "9.9.9";
-  await expect(page.getByTestId("connection")).toHaveText("Connected over WiFi", { timeout: 15_000 });
+  await expect(page.getByTestId("connection")).toContainText("WiFi", { timeout: 15_000 });
   await expect(page.getByTestId("firmware-running")).toHaveText("9.9.9");
   expect(mock.connections()).toBeGreaterThanOrEqual(2);
 });

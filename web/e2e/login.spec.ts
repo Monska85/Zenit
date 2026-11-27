@@ -25,10 +25,10 @@ test("asks for the token when the board wants it, and logs in", async ({ page })
   await connectOverWifi(page);
   await expect(page.getByRole("heading", { name: "Log in to your Zenit" })).toBeVisible();
   await expect(page.getByText("The token has 16 letters and digits.")).toBeVisible();
-  await expect(page.getByText("Log in needed")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Connection: Log in needed" })).toBeVisible();
   await page.getByLabel("Token").fill(TOKEN);
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page.getByTestId("connection")).toHaveText("Connected over WiFi");
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await expect(page.getByTestId("connection")).toContainText("WiFi");
   await expect(page.getByTestId("live-effect")).toBeVisible();
   expect(mock.commands()).toEqual(expect.arrayContaining(["auth_challenge", "auth", "settings_get", "status"]));
   // The token itself never crosses the network: the requests carry an HMAC, not the token
@@ -39,8 +39,8 @@ test("keeps the token only in memory", async ({ page }) => {
   await mockBoard(page, protectedBoard());
   await connectOverWifi(page);
   await page.getByLabel("Token").fill(TOKEN);
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page.getByTestId("connection")).toBeVisible();
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await expect(page.getByRole("button", { name: /^Connection: (WiFi|USB)/ })).toBeVisible();
   expect(await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]))).not.toContain(TOKEN);
   expect(page.url()).not.toContain(TOKEN);
   await page.reload();
@@ -51,11 +51,11 @@ test("says when the token is not right, and checks its shape before asking the b
   const mock = await mockBoard(page, protectedBoard());
   await connectOverWifi(page);
   await page.getByLabel("Token").fill("abc");
-  await page.getByRole("button", { name: "Log in" }).click();
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("16 characters");
   expect(mock.commands()).not.toContain("auth");
   await page.getByLabel("Token").fill("zzzzzzzzzzzzzzzz");
-  await page.getByRole("button", { name: "Log in" }).click();
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("That token is not right.");
   await expect(page.getByRole("heading", { name: "Log in to your Zenit" })).toBeVisible();
 });
@@ -65,11 +65,11 @@ test("says the connection was closed after three wrong tokens", async ({ page })
   await connectOverWifi(page);
   for (let i = 0; i < 3; i++) {
     await page.getByLabel("Token").fill("zzzzzzzzzzzzzzzz");
-    await page.getByRole("button", { name: "Log in" }).click();
+    await page.getByRole("button", { name: "Log in", exact: true }).click();
     if (i < 2) await expect(page.getByRole("alert")).toContainText("That token is not right.");
   }
   await expect(page.getByRole("alert")).toContainText("the access token was wrong three times");
-  await expect(page.getByText("Connection lost")).toBeVisible();
+  await expect(page.getByTestId("connection-lost")).toBeVisible();
   await expect(page.getByRole("button", { name: "Reconnect" })).toBeVisible();
 });
 
@@ -88,9 +88,11 @@ test("leaves the login screen for the Connect screen, by the header or the card"
   await connectOverWifi(page);
   await page.getByRole("button", { name: "Use another Zenit" }).click();
   await expect(page.getByRole("heading", { name: "Connect to your Zenit" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Connect", exact: true })).toBeEnabled();
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  const last = page.getByTestId("last-board").getByRole("button", { name: /^Connect to / });
+  await expect(last).toBeEnabled();
+  await last.click();
   await expect(page.getByRole("heading", { name: "Log in to your Zenit" })).toBeVisible();
+  await page.getByRole("button", { name: /^Connection:/ }).click();
   await page.getByRole("button", { name: "Disconnect" }).click();
   await expect(page.getByRole("heading", { name: "Connect to your Zenit" })).toBeVisible();
   expect(mock.connections()).toBe(2);
@@ -105,8 +107,9 @@ test("connects again from the Connect screen after the page reconnected by itsel
   // The board closed the connection and the page opened it again by itself: nothing stays "opening"
   await expect(page.getByRole("heading", { name: "Log in to your Zenit" })).toBeVisible({ timeout: 15_000 });
   await page.getByRole("button", { name: "Use another Zenit" }).click();
-  await expect(page.getByRole("button", { name: "Connect", exact: true })).toBeEnabled();
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  const last = page.getByTestId("last-board").getByRole("button", { name: /^Connect to / });
+  await expect(last).toBeEnabled();
+  await last.click();
   await expect(page.getByRole("heading", { name: "Log in to your Zenit" })).toBeVisible();
   expect(mock.connections()).toBe(3);
 });
@@ -125,8 +128,8 @@ test("warns before the login is turned on over WiFi, then asks for the token aft
   await page.getByRole("alertdialog").getByRole("button", { name: "Turn on" }).click();
   await expect(page.getByRole("heading", { name: "Log in to your Zenit" })).toBeVisible({ timeout: 15_000 });
   await page.getByLabel("Token").fill(TOKEN);
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page.getByTestId("connection")).toBeVisible();
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await expect(page.getByRole("button", { name: /^Connection: (WiFi|USB)/ })).toBeVisible();
   await page.getByRole("link", { name: "Device" }).click();
   await expect(page.getByRole("switch", { name: /Ask for a token to log in/ })).toBeChecked();
   expect(mock.connections()).toBe(2);
@@ -151,7 +154,7 @@ test.describe("the token over USB", () => {
     await installFakeSerial(page, MOCK_USB_URL);
     await page.goto("/");
     await page.getByRole("button", { name: "Connect with USB" }).click();
-    await expect(page.getByTestId("connection")).toHaveText("Connected by USB");
+    await expect(page.getByTestId("connection")).toContainText("USB");
     await page.getByRole("link", { name: "Device" }).click();
     return mock;
   }
@@ -208,6 +211,6 @@ test("keeps the prompt and the typed text when the board closes the idle connect
   expect(mock.connections()).toBe(connections);
   await expect(page.getByRole("heading", { name: "Log in to your Zenit" })).toBeVisible();
   await page.getByLabel("Token").fill(TOKEN);
-  await page.getByRole("button", { name: "Log in" }).click();
-  await expect(page.getByTestId("connection")).toHaveText("Connected over WiFi");
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
+  await expect(page.getByTestId("connection")).toContainText("WiFi");
 });

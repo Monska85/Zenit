@@ -1,18 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { LIMITS, type Settings } from "../../light/model";
+import type { Settings } from "../../light/model";
 import { cn } from "../../lib/utils";
 import { useBoard } from "../board-context";
-import { Banner } from "../components/banner";
 import { Card, CardTitle } from "../components/card";
 import { EffectPicker } from "../light/effect-picker";
 import { EffectSettings } from "../light/effect-settings";
-import { LiveCard } from "../light/live-card";
-import { PowerButton } from "../light/power-button";
-import { SettingSlider } from "../light/setting-slider";
+import { HeroCard } from "../light/hero-card";
 import { TimerCard } from "../light/timer-card";
 import { useCommit } from "../light/use-commit";
 
+/** A lost connection keeps the last values here, greyed; the shell's banner says so and holds Reconnect. */
 export function LightView() {
   const { board, session } = useBoard();
   const { pending, commit } = useCommit();
@@ -23,36 +21,14 @@ export function LightView() {
   return (
     <fieldset disabled={lost} className={cn("m-0 flex min-w-0 flex-col gap-4 border-0 p-0", lost && "opacity-60")}>
       <legend className="sr-only">Light</legend>
-      {lost && (
-        <Banner tone="warning">
-          {board.auto === "restarting"
-            ? "Zenit is restarting. It connects again by itself in a few seconds."
-            : board.auto === "reconnecting"
-              ? "Connecting to Zenit again..."
-              : "Connection lost. These are the last values Zenit reported. Reconnect to change the light."}
-        </Banner>
-      )}
-      <Card className="flex flex-col items-center gap-4">
-        <PowerButton on={light.on} disabled={lost} onToggle={(on) => void session.setPower(on)} />
-        {board.kind === "usb" && (
-          <Banner tone="info">
-            Connected by USB. The light gets no power from USB: plug in the panel power socket and use WiFi to see it.
-          </Banner>
-        )}
-      </Card>
-      <Card aria-labelledby="brightness-title">
-        <h2 id="brightness-title" className="sr-only">
-          Brightness
-        </h2>
-        <SettingSlider
-          label="Brightness"
-          value={settings.brightness}
-          {...LIMITS.brightness}
-          format={(value) => `${value} %`}
-          disabled={lost}
-          onCommit={(brightness) => commit({ brightness })}
-        />
-      </Card>
+      <HeroCard
+        light={light}
+        brightness={settings.brightness}
+        usb={board.kind === "usb"}
+        disabled={lost}
+        onPower={(on) => void session.setPower(on)}
+        onBrightness={(brightness) => commit({ brightness })}
+      />
       <Card aria-labelledby="effect-title">
         <CardTitle id="effect-title">Effect</CardTitle>
         <EffectPicker effects={info.effects} value={settings.effect} onChange={(effect) => void commit({ effect })} />
@@ -63,7 +39,6 @@ export function LightView() {
         light={light}
         onChange={(timer_minutes) => commit({ timer_minutes })}
       />
-      <LiveCard light={light} />
     </fieldset>
   );
 }

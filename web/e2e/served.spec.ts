@@ -12,26 +12,29 @@ test("finds the board that served it and connects by itself, with no Connect scr
   servedSimulator,
 }) => {
   await page.goto(`${servedSimulator.origin}/`);
-  await expect(page.getByTestId("connection")).toHaveText("Connected over WiFi");
+  await expect(page.getByTestId("connection")).toContainText("WiFi");
   await expect(page.getByTestId("hostname")).toHaveText("zenit-0000");
   await expect(page.getByRole("button", { name: "Light", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("heading", { name: "Connect to your Zenit" })).toHaveCount(0);
-  // There is no other board to connect to: no way to disconnect
+  await expect(page.getByRole("button", { name: "Connection: WiFi · zenit-0000" })).toBeVisible();
+  // There is no other board to connect to: the menu has the theme and no way to disconnect
+  await page.getByRole("button", { name: /^Connection:/ }).click();
+  await expect(page.getByRole("group", { name: "Theme" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Disconnect" })).toHaveCount(0);
 });
 
 test("controls the light as over any other connection", async ({ page, servedSimulator }) => {
   await page.goto(`${servedSimulator.origin}/`);
-  await expect(page.getByTestId("connection")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Connection: (WiFi|USB)/ })).toBeVisible();
   await page.getByRole("radio", { name: "Breathing" }).check({ force: true });
   await expect(page.getByTestId("live-effect")).toHaveText("Breathing");
   await page.getByRole("button", { name: "Light", exact: true }).click();
-  await expect(page.getByTestId("power-state")).toHaveText("Off");
+  await expect(page.getByTestId("power-button")).toHaveAttribute("aria-pressed", "false");
 });
 
 test("hides the installer and the USB option, and says why", async ({ page, servedSimulator }) => {
   await page.goto(`${servedSimulator.origin}/#/device`);
-  await expect(page.getByTestId("connection")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Connection: (WiFi|USB)/ })).toBeVisible();
   await expect(page.getByTestId("install-served-note")).toContainText("needs a page from the internet");
   await expect(page.getByRole("button", { name: "Install or update firmware" })).toHaveCount(0);
   await expect(page.getByTestId("firmware-published")).toHaveCount(0);
@@ -59,7 +62,7 @@ test("changes a board setting when it is chosen, and the board keeps it", async 
   const answers: string[] = [];
   page.on("websocket", (socket) => socket.on("framereceived", (frame) => answers.push(String(frame.payload))));
   await page.goto(`${servedSimulator.origin}/#/device`);
-  await expect(page.getByTestId("connection")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Connection: (WiFi|USB)/ })).toBeVisible();
   await page.getByLabel("WiFi strength").selectOption("13");
   await page.getByRole("radio", { name: "Tell me" }).check({ force: true });
   await expect(page.getByTestId("update-mode-hint")).toContainText("tells you");
@@ -76,7 +79,7 @@ test("asks for the token after the login is turned on, and says so when it is wr
   servedSimulator,
 }) => {
   await page.goto(`${servedSimulator.origin}/#/device`);
-  await expect(page.getByTestId("connection")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Connection: (WiFi|USB)/ })).toBeVisible();
   await page.getByRole("switch", { name: /Ask for a token to log in/ }).click();
   const dialog = page.getByRole("alertdialog");
   await expect(dialog).toContainText("Zenit closes this connection, and then asks for the token.");
@@ -85,17 +88,17 @@ test("asks for the token after the login is turned on, and says so when it is wr
   await expect(page.getByRole("heading", { name: "Log in to your Zenit" })).toBeVisible({ timeout: 15_000 });
   const token = page.getByLabel("Token");
   await token.fill("short");
-  await page.getByRole("button", { name: "Log in" }).click();
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("16 characters");
   for (let i = 0; i < 2; i++) {
     await token.fill("zzzzzzzzzzzzzzzz");
-    await page.getByRole("button", { name: "Log in" }).click();
+    await page.getByRole("button", { name: "Log in", exact: true }).click();
     await expect(page.getByRole("alert")).toContainText("That token is not right.");
   }
   await token.fill("zzzzzzzzzzzzzzzz");
-  await page.getByRole("button", { name: "Log in" }).click();
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
   await expect(page.getByText("Zenit closed the connection: the access token was wrong three times")).toBeVisible();
-  await expect(page.getByText("Connection lost")).toBeVisible();
+  await expect(page.getByTestId("connection-lost")).toBeVisible();
   // The token is never stored
   expect(await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]))).not.toContain("zzzz");
 });
@@ -109,7 +112,7 @@ test("makes no request outside its own origin, the board's own WebSocket include
   const sockets: string[] = [];
   page.on("websocket", (socket) => sockets.push(socket.url()));
   await page.goto(`${servedSimulator.origin}/`);
-  await expect(page.getByTestId("connection")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Connection: (WiFi|USB)/ })).toBeVisible();
   for (const name of ["Device", "Privacy", "Light"]) await page.getByRole("link", { name }).click();
   const origin = new URL(servedSimulator.origin).origin;
   expect(requests.filter((url) => new URL(url).origin !== origin && !url.startsWith("data:"))).toEqual([]);
@@ -150,11 +153,11 @@ test("loads itself again when the board that served it installed a new app (clos
   );
   const mock = await mockBoard(page, new FakeBoard().withNetwork(), ["ws://localhost:4173/ws"]);
   await page.goto("/");
-  await expect(page.getByTestId("connection")).toHaveText("Connected over WiFi");
+  await expect(page.getByTestId("connection")).toContainText("WiFi");
   await page.evaluate(() => ((window as unknown as { zenitBefore: boolean }).zenitBefore = true));
   const loaded = page.waitForEvent("load");
   mock.drop(1012);
   await loaded;
   expect(await page.evaluate(() => (window as unknown as { zenitBefore?: boolean }).zenitBefore)).toBeUndefined();
-  await expect(page.getByTestId("connection")).toHaveText("Connected over WiFi");
+  await expect(page.getByTestId("connection")).toContainText("WiFi");
 });

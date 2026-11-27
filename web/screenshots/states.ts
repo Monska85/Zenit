@@ -33,12 +33,16 @@ async function connectedLight(page: Page, fake: FakeBoard = board()): Promise<Mo
   await page.goto("/");
   await page.getByLabel("Address of your Zenit").fill(MOCK_URL);
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByTestId("connection")).toBeVisible();
-  await expect(page.getByTestId("live-effect")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Connection: (WiFi|USB)/ })).toBeVisible();
+  await expect(page.getByTestId("live-state")).toBeVisible();
   return mock;
 }
 
-const timerLine = (page: Page) => [page.getByTestId("timer-line")];
+/** The time left, on the timer card and in the live line of the first card. */
+const timerLine = (page: Page) => [
+  page.getByTestId("timer-line"),
+  page.getByTestId("live-state").getByText(/^fades out in/),
+];
 
 // The privacy view shows the web app version, a Semantic Versioning 2.0.0 version
 const SCREENSHOT_VERSION_LABEL = "Version X.Y.Z";
@@ -74,7 +78,7 @@ async function deviceOverUsb(page: Page, fake: FakeBoard): Promise<Mock> {
   await installFakeSerial(page, MOCK_USB_URL);
   await page.goto("/");
   await page.getByRole("button", { name: "Connect with USB" }).click();
-  await expect(page.getByTestId("connection")).toHaveText("Connected by USB");
+  await expect(page.getByTestId("connection")).toContainText("USB");
   await page.getByRole("link", { name: "Device" }).click();
   await expect(page.getByTestId("wifi-setup")).toBeVisible();
   return mock;
@@ -97,6 +101,28 @@ export const STATES: State[] = [
       await installFakeSerial(page, MOCK_USB_URL);
       await page.goto("/");
       await expect(page.getByRole("heading", { name: "Connect to your Zenit" })).toBeVisible();
+    },
+  },
+  {
+    // The last board that worked, one tap away
+    name: "connect-last-board",
+    dark: true,
+    reach: async (page) => {
+      await installFakeSerial(page, MOCK_USB_URL);
+      await page.addInitScript(() => localStorage.setItem("zenit.address", "zenit-1a2b.local"));
+      await page.goto("/");
+      await expect(page.getByTestId("last-board")).toBeVisible();
+    },
+  },
+  {
+    // A browser with no Web Serial, as on most phones: the address first, the USB choice folded
+    name: "connect-no-usb",
+    reach: async (page) => {
+      await page.addInitScript(() => {
+        Object.defineProperty(navigator, "serial", { configurable: true, value: undefined });
+      });
+      await page.goto("/");
+      await expect(page.getByTestId("usb-folded")).toBeVisible();
     },
   },
   {
@@ -127,6 +153,16 @@ export const STATES: State[] = [
     name: "light",
     dark: true,
     reach: async (page) => void (await connectedLight(page)),
+  },
+  {
+    // The header menu open: how Zenit is connected, the theme and Disconnect
+    name: "light-menu",
+    dark: true,
+    reach: async (page) => {
+      await connectedLight(page, networkBoard());
+      await page.getByRole("button", { name: /^Connection:/ }).click();
+      await expect(page.getByRole("group", { name: "Theme" })).toBeVisible();
+    },
   },
   {
     name: "light-off",
@@ -184,7 +220,8 @@ export const STATES: State[] = [
           fake.settings["timer_minutes"] = 45;
         }),
       );
-      await page.getByRole("radio", { name: "Custom" }).check({ force: true });
+      // A custom value shows on its chip
+      await expect(page.getByRole("radio", { name: "Custom · 45 min" })).toBeChecked();
       await expect(page.getByLabel("Minutes (1 to 360)")).toBeVisible();
     },
     mask: timerLine,
@@ -196,7 +233,7 @@ export const STATES: State[] = [
       await installFakeSerial(page, MOCK_USB_URL);
       await page.goto("/");
       await page.getByRole("button", { name: "Connect with USB" }).click();
-      await expect(page.getByTestId("connection")).toHaveText("Connected by USB");
+      await expect(page.getByTestId("connection")).toContainText("USB");
     },
   },
   {
@@ -205,7 +242,7 @@ export const STATES: State[] = [
     reach: async (page) => {
       const mock = await connectedLight(page);
       mock.drop();
-      await expect(page.getByText("Connection lost", { exact: true })).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByTestId("connection-lost")).toBeVisible({ timeout: 10_000 });
     },
   },
   {
@@ -240,7 +277,7 @@ export const STATES: State[] = [
       await installFakeSerial(page, MOCK_USB_URL);
       await page.goto("/");
       await page.getByRole("button", { name: "Connect with USB" }).click();
-      await expect(page.getByTestId("connection")).toBeVisible();
+      await expect(page.getByRole("button", { name: /^Connection: (WiFi|USB)/ })).toBeVisible();
       await page.getByRole("link", { name: "Device" }).click();
       await page.getByRole("button", { name: "Reset to defaults" }).click();
       await expect(page.getByRole("alertdialog")).toBeVisible();
@@ -350,7 +387,9 @@ export const STATES: State[] = [
       );
       mock.refuse = true;
       mock.drop();
-      await expect(page.getByTestId("auto-reconnect")).toHaveText("The board is restarting");
+      await expect(page.getByTestId("auto-reconnect")).toHaveText(
+        "Zenit is restarting. It connects again by itself in a few seconds.",
+      );
     },
   },
   {
