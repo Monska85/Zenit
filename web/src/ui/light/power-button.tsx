@@ -3,25 +3,19 @@
 import { Power } from "lucide-react";
 import type { CSSProperties } from "react";
 import { own } from "../../lib/own";
-import { COLOR_SWATCHES, swatchInk } from "../../light/model";
+import { COLOR_SWATCHES } from "../../light/model";
 import { cn } from "../../lib/utils";
 
-/** The fill, edge, icon and glow of a lit button: the color the light shows now, or the brand color for one the app
- * has no swatch for. */
-function litStyle(color: string | null): CSSProperties {
+/** The glow of a lit button: the color the light shows now, or the brand color for one the app has no swatch for. */
+function glowStyle(color: string | null): CSSProperties {
   const swatch = color === null ? undefined : own(COLOR_SWATCHES, color);
-  if (swatch === undefined) return { "--glow": "var(--primary)" } as CSSProperties;
-  return {
-    "--glow": swatch,
-    background: swatch,
-    color: swatchInk(swatch),
-    borderColor: `color-mix(in oklab, ${swatch} 65%, var(--foreground))`,
-  } as CSSProperties;
+  return { "--glow": swatch ?? "var(--primary)" } as CSSProperties;
 }
 
 /**
- * The big on/off button. It is a toggle button: assistive technology reads "Light, pressed" when it is on. Lit, it
- * takes the color the light shows and glows in it; the glow breathes only when the person allows motion.
+ * The big on/off button. It is a toggle button: assistive technology reads "Light, pressed" when it is on. Lit, it is
+ * filled with the brand color, so on and off never look alike, and glows in the color the light shows; the glow
+ * breathes only when the person allows motion.
  */
 export function PowerButton({
   on,
@@ -42,7 +36,7 @@ export function PowerButton({
       aria-label="Light"
       disabled={disabled}
       onClick={() => onToggle(!on)}
-      style={on ? litStyle(color) : undefined}
+      style={on ? glowStyle(color) : undefined}
       data-testid="power-button"
       className={cn(
         "flex size-24 shrink-0 items-center justify-center rounded-full border-4 transition-colors disabled:opacity-50",

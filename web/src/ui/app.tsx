@@ -12,6 +12,7 @@ import { useBackAgain } from "./shell/use-back-again";
 import { ConnectView } from "./views/connect-view";
 import { LightView } from "./views/light-view";
 import { LoginView } from "./views/login-view";
+import { DevicePlaceholder } from "./views/device-placeholder";
 
 // The Device and Privacy pages load when they are opened: the first screen is the Light or Connect view.
 const DeviceView = lazy(() => import("./views/device-view").then((module) => ({ default: module.DeviceView })));
@@ -70,7 +71,11 @@ function Shell() {
         <Suspense fallback={null}>
           {screen === "privacy" && <PrivacyView />}
           {screen === "login" && <LoginView go={go} />}
-          {screen === "device" && <DeviceView go={go} />}
+          {screen === "device" && (
+            <Suspense fallback={<DevicePlaceholder />}>
+              <DeviceView go={go} />
+            </Suspense>
+          )}
           {screen === "connect" && <ConnectView go={go} />}
           {screen === "light" && <LightView />}
         </Suspense>

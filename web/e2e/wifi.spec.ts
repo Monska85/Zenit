@@ -181,6 +181,6 @@ test("a board from before the WiFi milestone has no WiFi card", async ({ page })
   await page.getByRole("link", { name: "Device" }).click();
   await expect(page.getByRole("heading", { name: "Your Zenit" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "WiFi", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Firmware updates" })).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Update settings" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Check now" })).toHaveCount(0);
+  await expect(page.getByText("Advanced settings", { exact: true })).toHaveCount(0);
 });

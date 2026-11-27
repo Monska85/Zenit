@@ -2,21 +2,22 @@
 
 import { own } from "../../lib/own";
 import { Copy, Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  BOARD_LIMITS,
   describeWindow,
   formatMinute,
-  hoursProblem,
+  hourOptions,
   ntpServerProblem,
-  parseMinute,
   TIME_ZONES,
+  windowToSend,
+  zoneOfBrowser,
   timezoneProblem,
   UPDATE_MODE_HINTS,
   UPDATE_MODE_LABELS,
   choiceOptions,
   UPDATE_MODES,
 } from "../../device/settings";
+import type { Settings } from "../../protocol/types";
 import { useBoard, useSession } from "../board-context";
 import { Banner } from "../components/banner";
 import { Button } from "../components/button";
@@ -30,50 +31,89 @@ import { useCommit } from "../light/use-commit";
 
 const CUSTOM = "custom";
 
-function InstallWindow({ start, end, disabled }: { start: number; end: number; disabled: boolean }) {
-  const { commit } = useCommit();
+/** How long the install window waits after the last change of a time before it sends both. */
+const WINDOW_SETTLE_MS = 1000;
+
+/**
+ * The install window: two times of day, sent together once both are valid, when a field is left or a second after the
+ * last change (a time field changes at every digit typed). Nothing is sent while one of them is not a time of day.
+ */
+function InstallWindow({
+  start,
+  end,
+  disabled,
+  commit,
+}: {
+  /** What the board holds, with the choices not confirmed yet laid over it. */
+  start: number;
+  end: number;
+  disabled: boolean;
+  /** The card's commit, so a choice in flight stays shown until the board answers the latest one. */
+  commit: (patch: Partial<Settings>) => Promise<void>;
+}) {
   const [from, setFrom] = useState(formatMinute(start));
   const [to, setTo] = useState(formatMinute(end));
   const [problem, setProblem] = useState<string | null>(null);
   const [seen, setSeen] = useState({ start, end });
-  // What the board holds replaces what was typed
+  // A time changed and not sent yet: the board's answer to an earlier part of the same edit must not replace it
+  const [editing, setEditing] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
+  // What the board holds replaces what was typed, unless the person is still changing it into a window that can be
+  // sent: a draft that is not a time of day gives way
   if (seen.start !== start || seen.end !== end) {
     setSeen({ start, end });
-    setFrom(formatMinute(start));
-    setTo(formatMinute(end));
+    if (!editing || windowToSend(from, to, start, end) === "invalid") {
+      setEditing(false);
+      setProblem(null);
+      setFrom(formatMinute(start));
+      setTo(formatMinute(end));
+    }
   }
-  function submit(event: React.FormEvent): void {
-    event.preventDefault();
-    const install_start = parseMinute(from);
-    const install_end = parseMinute(to);
-    if (install_start === null || install_end === null) {
-      setProblem("Choose a time of day for both, like 03:00.");
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  function send(nextFrom: string, nextTo: string, leaving: boolean): void {
+    window.clearTimeout(timer.current);
+    const patch = windowToSend(nextFrom, nextTo, start, end);
+    if (patch === "invalid") {
+      if (leaving) setProblem("Choose a time of day for both, like 03:00.");
       return;
     }
     setProblem(null);
-    void commit({ install_start, install_end });
+    setEditing(false);
+    if (patch !== null) void commit(patch);
+  }
+  function change(nextFrom: string, nextTo: string): void {
+    setEditing(true);
+    setFrom(nextFrom);
+    setTo(nextTo);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => send(nextFrom, nextTo, false), WINDOW_SETTLE_MS);
   }
   const field =
     "block min-h-11 w-full rounded-xl border border-border bg-background px-3 text-base disabled:opacity-50";
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3" aria-labelledby="window-title">
-      <h3 id="window-title" className="text-base font-medium">
-        Install window
-      </h3>
+    <fieldset className="flex min-w-0 flex-col gap-3" disabled={disabled}>
+      <legend className="mb-3 text-base font-medium">Install window</legend>
       <div className="grid grid-cols-2 gap-3">
         <label className="block text-base">
           <span className="mb-1 block">From</span>
           <input
             type="time"
             value={from}
-            disabled={disabled}
-            onChange={(e) => setFrom(e.target.value)}
+            onChange={(e) => change(e.target.value, to)}
+            onBlur={() => send(from, to, true)}
             className={field}
           />
         </label>
         <label className="block text-base">
           <span className="mb-1 block">Until</span>
-          <input type="time" value={to} disabled={disabled} onChange={(e) => setTo(e.target.value)} className={field} />
+          <input
+            type="time"
+            value={to}
+            onChange={(e) => change(from, e.target.value)}
+            onBlur={() => send(from, to, true)}
+            className={field}
+          />
         </label>
       </div>
       <p className="text-sm text-muted-foreground" data-testid="window-summary">
@@ -85,14 +125,13 @@ function InstallWindow({ start, end, disabled }: { start: number; end: number; d
           {problem}
         </p>
       )}
-      <div>
-        <Button type="submit" variant="outline" disabled={disabled}>
-          Set window
-        </Button>
-      </div>
-    </form>
+    </fieldset>
   );
 }
+
+/** Whether the board reports any setting of the Advanced part (the update settings or the time). */
+export const hasAdvancedSettings = (settings: Settings | null): boolean =>
+  settings !== null && (settings.update_mode !== undefined || settings.timezone !== undefined);
 
 /** How Zenit looks for firmware updates: the mode, the firmware switch, how often, and the install window. */
 export function UpdateSettingsCard() {
@@ -136,21 +175,34 @@ export function UpdateSettingsCard() {
           />
         )}
         {settings.check_hours !== undefined && (
-          <ValueForm
-            label="Look for updates every (hours)"
-            inputMode="numeric"
+          <SelectField
+            label="Look for updates"
             value={String(settings.check_hours)}
-            validate={(text) => hoursProblem(text, BOARD_LIMITS.check_hours)}
-            onSubmit={(text) => void commit({ check_hours: Number(text) })}
+            options={hourOptions(board.settings?.check_hours)}
+            onChange={(value) => void commit({ check_hours: Number(value) })}
             disabled={off}
           />
         )}
         {settings.install_start !== undefined && settings.install_end !== undefined && (
-          <InstallWindow start={settings.install_start} end={settings.install_end} disabled={mode !== "automatic"} />
+          <InstallWindow
+            start={settings.install_start}
+            end={settings.install_end}
+            disabled={mode !== "automatic"}
+            commit={commit}
+          />
         )}
       </div>
     </Card>
   );
+}
+
+/** The listed zone of this browser's own time zone, or null when the list has none or the browser does not say. */
+function deviceZone(): { value: string; city: string } | null {
+  try {
+    return zoneOfBrowser(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  } catch {
+    return null;
+  }
 }
 
 /** The time zone and the clock of the board, which the install window and the dates depend on. */
@@ -163,10 +215,24 @@ export function TimeCard() {
   const zone = settings.timezone;
   const listed = TIME_ZONES.some((entry) => entry.value === zone);
   const customShown = custom || !listed;
+  const mine = deviceZone();
   return (
     <Card aria-labelledby="time-title">
       <CardTitle id="time-title">Time</CardTitle>
       <div className="flex flex-col gap-5">
+        {mine !== null && mine.value !== zone && (
+          <div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCustom(false);
+                void commit({ timezone: mine.value });
+              }}
+            >
+              Use this device's time zone ({mine.city})
+            </Button>
+          </div>
+        )}
         <SelectField
           label="Time zone"
           value={customShown ? CUSTOM : zone}
@@ -198,12 +264,11 @@ export function TimeCard() {
           />
         )}
         {settings.time_sync_hours !== undefined && (
-          <ValueForm
-            label="Check the time every (hours)"
-            inputMode="numeric"
+          <SelectField
+            label="Check the time"
             value={String(settings.time_sync_hours)}
-            validate={(text) => hoursProblem(text, BOARD_LIMITS.time_sync_hours)}
-            onSubmit={(text) => void commit({ time_sync_hours: Number(text) })}
+            options={hourOptions(board.settings?.time_sync_hours)}
+            onChange={(value) => void commit({ time_sync_hours: Number(value) })}
           />
         )}
       </div>

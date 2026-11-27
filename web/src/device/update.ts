@@ -3,6 +3,7 @@
 // What the firmware card says about `status.update` (docs/board/wifi-and-updates-v1.md#status), in plain words.
 
 import { own } from "../lib/own";
+import type { FirmwareState } from "../release/manifest";
 import type { Settings, UpdateStatus, WebAppStatus, WifiStatus } from "../protocol/types";
 
 /** Whether the board looks for new versions of the web app: the mode is not off and `update_web` is not false. */
@@ -49,6 +50,10 @@ export function describeUpdateState(update: UpdateStatus): string | null {
       return `Zenit is busy with the update (${update.state}).`;
   }
 }
+
+/** Whether the board is installing new firmware now: not a check, not a download of the web app. */
+export const firmwareBusy = (update: UpdateStatus): boolean =>
+  updateBusy(update) && update.state !== "checking" && update.target !== "web";
 
 /** Whether the board is busy with an update: nothing else may be asked of it. */
 export const updateBusy = (update: UpdateStatus): boolean => update.state !== "idle";
@@ -152,4 +157,62 @@ export function canInstallWeb(update: UpdateStatus, wifi: WifiStatus | null, web
   if (!web || !webUpdatesOn || updateBusy(update) || update.trial) return false;
   if (wifi !== null && wifi.state !== "connected") return false;
   return web.last_result === "available" && web.available !== null;
+}
+
+/** What the board's own check says of its firmware, or null when it says nothing (never checked, failed, off). */
+export function boardVerdict(
+  update: UpdateStatus,
+  settings: Settings | null,
+): "available" | "up_to_date" | "skipped" | null {
+  if (!firmwareUpdatesOn(update, settings)) return null;
+  if (update.last_result === "available") return "available";
+  if (update.last_result === "up_to_date") return "up_to_date";
+  if (update.last_result === "skipped") return "skipped";
+  return null;
+}
+
+/**
+ * Where the state of the firmware comes from: the board's own check when it has a verdict (unless it says up to date
+ * while the published version is newer), else the comparison with the published firmware (`published`, null when
+ * unknown). Both the Firmware card and "Your Zenit" follow it, so they never disagree. `update` is null for a board
+ * that reports no check or is not connected.
+ */
+export function firmwareStateSource(
+  update: UpdateStatus | null,
+  settings: Settings | null,
+  published: FirmwareState | null,
+):
+  | { from: "board"; verdict: "available" | "up_to_date" | "skipped" }
+  | { from: "published"; state: FirmwareState }
+  | null {
+  const verdict = update === null ? null : boardVerdict(update, settings);
+  // The board may have looked before the last release, or read another site: a newer published version is still said
+  if (verdict === "up_to_date" && published === "update_available") return { from: "published", state: published };
+  if (verdict !== null) return { from: "board", verdict };
+  return published === null ? null : { from: "published", state: published };
+}
+
+const BOARD_SUMMARIES = {
+  available: "Update available",
+  up_to_date: "Up to date",
+  skipped: "Update set aside",
+} as const;
+const PUBLISHED_SUMMARIES: Record<FirmwareState, string | null> = {
+  up_to_date: "Up to date",
+  update_available: "Update available",
+  newer: "Newer than published",
+  unknown: null,
+};
+
+/** The short state of the firmware for "Your Zenit" (see `firmwareStateSource`); "Updating" while firmware installs. */
+export function firmwareSummary(
+  update: UpdateStatus | null,
+  settings: Settings | null,
+  published: FirmwareState | null,
+): string | null {
+  if (update !== null && firmwareBusy(update)) return "Updating";
+  const source = firmwareStateSource(update, settings, published);
+  if (source === null) return null;
+  if (source.from === "board") return BOARD_SUMMARIES[source.verdict];
+  return PUBLISHED_SUMMARIES[source.state];
 }
