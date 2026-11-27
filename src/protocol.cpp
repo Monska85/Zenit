@@ -136,6 +136,16 @@ Failure cmd_info(const Context &, JsonDocument &reply)
   JsonArray effects = reply["effects"].to<JsonArray>();
   for (size_t i = 0; i < zenit::EFFECT_COUNT; i++)
     effects.add(zenit::effect_name(static_cast<zenit::Effect>(i)));
+  // What each effect reads, from the engine's own registry: the reply and the restart rule cannot drift.
+  JsonObject effect_settings = reply["effect_settings"].to<JsonObject>();
+  for (size_t i = 0; i < zenit::EFFECT_COUNT; i++)
+  {
+    const zenit::Effect effect = static_cast<zenit::Effect>(i);
+    JsonArray names = effect_settings[zenit::effect_name(effect)].to<JsonArray>();
+    for (const zenit::EffectSetting &setting : zenit::EFFECT_SETTINGS)
+      if (zenit::effect_info(effect).params & setting.param)
+        names.add(setting.name);
+  }
   JsonArray sets = reply["color_sets"].to<JsonArray>();
   for (size_t i = 0; i < zenit::COLOR_SET_COUNT; i++)
     sets.add(zenit::color_set_name(static_cast<zenit::ColorSet>(i)));

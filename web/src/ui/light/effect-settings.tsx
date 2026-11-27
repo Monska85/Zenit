@@ -9,7 +9,7 @@ import {
   LIMITS,
   colorLabel,
   colorSetLabel,
-  effectInfo,
+  effectControls,
   formatHold,
   type ParamName,
   type Settings,
@@ -137,7 +137,10 @@ function PaletteChoice({ info, settings, commit }: { info: BoardInfo; settings: 
   );
 }
 
-/** The settings the selected effect reads, and no others. */
+/** What the app says in place of the controls of a setting it does not know. */
+export const NEWER_EFFECT = "This Zenit has a newer effect. Update the app to adjust its settings.";
+
+/** The settings the selected effect reads, and no others: the ones the board names, or the app's own list. */
 export function EffectSettings({
   info,
   settings,
@@ -149,7 +152,7 @@ export function EffectSettings({
   commit: Commit;
   disabled?: boolean;
 }) {
-  const effect = effectInfo(settings.effect);
+  const effect = effectControls(settings.effect, info);
   const control = (param: ParamName) => {
     switch (param) {
       case "color":
@@ -212,6 +215,11 @@ export function EffectSettings({
       {effect.params.map((param) => (
         <div key={param}>{control(param)}</div>
       ))}
+      {effect.newer && (
+        <p className="text-base text-muted-foreground" data-testid="newer-effect">
+          {NEWER_EFFECT}
+        </p>
+      )}
     </div>
   );
 }

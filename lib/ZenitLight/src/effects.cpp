@@ -19,6 +19,16 @@ const EffectInfo EFFECTS[EFFECT_COUNT] = {
 static_assert(sizeof(EFFECTS) / sizeof(EFFECTS[0]) == EFFECT_COUNT, "one registry row per effect");
 } // namespace
 
+const EffectSetting EFFECT_SETTINGS[EFFECT_SETTING_COUNT] = {
+    {PARAM_COLOR, "color"},
+    {PARAM_COLORS, "colors"},
+    {PARAM_COLOR_SET, "color_set"},
+    {PARAM_HOLD, "hold_seconds"},
+    {PARAM_PERIOD, "period_seconds"},
+    {PARAM_FLOOR, "floor"},
+    {PARAM_STRENGTH, "twinkle_strength"},
+};
+
 const EffectInfo &effect_info(Effect effect)
 {
   size_t index = static_cast<size_t>(effect);

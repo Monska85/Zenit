@@ -76,24 +76,27 @@ What the board is and what it supports. No fields.
 
 ```text
 > {"seq":1,"cmd":"info"}
-< {"seq":1,"ok":true,"protocol":1,"firmware":"1.0.0","board":"esp32c3","boot_id":2864434397,"colors":["white","red","green","blue"],"effects":["static","color_change","breathing","twinkle","fall_asleep","christmas"],"color_sets":["christmas","ice"],"power_limit_mw":1000,"memory":{"free":182340,"largest":110580},"nvs":{"used":96,"free":408},"limits":{"line":1024}}
+< {"seq":1,"ok":true,"protocol":1,"firmware":"1.0.0","board":"esp32c3","boot_id":2864434397,"colors":["white","red","green","blue"],"effects":["static","color_change","breathing","twinkle","fall_asleep","christmas"],"effect_settings":{"static":["color"],"color_change":["colors","hold_seconds","floor"],"breathing":["color","period_seconds","floor"],"twinkle":["color","twinkle_strength"],"fall_asleep":["color","floor"],"christmas":["color_set","hold_seconds","floor"]},"color_sets":["christmas","ice"],"power_limit_mw":1000,"memory":{"free":182340,"largest":110580},"nvs":{"used":96,"free":408},"limits":{"line":1024}}
 ```
 
-| Field            | Meaning                                                                                                     |
-| ---------------- | ----------------------------------------------------------------------------------------------------------- |
-| `protocol`       | The protocol version, `1`. A client reads it before anything else.                                          |
-| `firmware`       | The firmware version, see [Firmware version](#firmware-version).                                            |
-| `board`          | `esp32c3`, or `simulator`.                                                                                  |
-| `boot_id`        | A random number chosen at every start. A change means the board restarted.                                 |
-| `colors`         | The colors the board can light.                                                                             |
-| `effects`        | The effects the board knows, in the order a client shows them.                                              |
-| `color_sets`     | The preset lists of the `christmas` effect.                                                                 |
-| `power_limit_mw` | The power limit of the light, in mW.                                                                        |
-| `memory`         | `free` bytes and the `largest` allocatable block, for diagnosis; `0` for both in the simulator.             |
-| `nvs`            | `used` and `free` entries of the settings memory, for diagnosis; `0` for both in the simulator.             |
-| `limits`         | `line`: the longest line the board reads.                                                                   |
+| Field             | Meaning                                                                                                                                                     |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `protocol`        | The protocol version, `1`. A client reads it before anything else.                                                                                          |
+| `firmware`        | The firmware version, see [Firmware version](#firmware-version).                                                                                            |
+| `board`           | `esp32c3`, or `simulator`.                                                                                                                                  |
+| `boot_id`         | A random number chosen at every start. A change means the board restarted.                                                                                  |
+| `colors`          | The colors the board can light.                                                                                                                             |
+| `effects`         | The effects the board knows, in the order a client shows them.                                                                                              |
+| `effect_settings` | Optional. An object with one entry per effect of `effects`: the names of the light settings the effect reads, in the order a client shows them (see below). |
+| `color_sets`      | The preset lists of the `christmas` effect.                                                                                                                 |
+| `power_limit_mw`  | The power limit of the light, in mW.                                                                                                                        |
+| `memory`          | `free` bytes and the `largest` allocatable block, for diagnosis; `0` for both in the simulator.                                                             |
+| `nvs`             | `used` and `free` entries of the settings memory, for diagnosis; `0` for both in the simulator.                                                             |
+| `limits`          | `line`: the longest line the board reads.                                                                                                                   |
 
 A client offers only the colors, effects and color sets the board lists, so later firmware can add them.
+
+`effect_settings` lists, for each effect, the parameters of [light-v1](../board/light-v1.md#effects): the settings of `settings_get` that the effect reads and a client shows with it, each once, in the order of the settings table of [`settings_get`](#settings_get-settings_set). `brightness` and `timer_minutes` are settings of the whole light and are never listed. An effect that reads no setting has an empty list. A firmware from before this field leaves it out. The names are open words, as the effect names are: a later firmware may list a setting a client does not know. A client shows a control for each setting it knows, in the listed order, and says plainly that a setting is missing for the others; it ignores an entry for an effect `effects` does not list. For an effect with no entry (the field missing) a client uses its own knowledge of the effect, and says plainly that it cannot show the settings of an effect it does not know.
 
 ### `status`
 
@@ -222,7 +225,7 @@ From the WiFi and updates milestone. Firmware and web app updates from the proje
 | Line read by the board, newline excluded | 1,024 bytes |
 | JSON nesting in a request                | 4 levels    |
 
-Lines sent by the board can be longer; clients accept lines up to 4,096 bytes.
+Lines sent by the board can be longer; clients accept lines up to 4,096 bytes. The board builds replies of at most 1,536 bytes; `info`, with the longest values a build reports (a firmware version of 64 characters, `effect_settings` included), stays under 1,024 bytes.
 
 ## Versions
 

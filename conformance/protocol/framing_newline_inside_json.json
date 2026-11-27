@@ -44,6 +44,34 @@
           "fall_asleep",
           "christmas"
         ],
+        "effect_settings": {
+          "static": [
+            "color"
+          ],
+          "color_change": [
+            "colors",
+            "hold_seconds",
+            "floor"
+          ],
+          "breathing": [
+            "color",
+            "period_seconds",
+            "floor"
+          ],
+          "twinkle": [
+            "color",
+            "twinkle_strength"
+          ],
+          "fall_asleep": [
+            "color",
+            "floor"
+          ],
+          "christmas": [
+            "color_set",
+            "hold_seconds",
+            "floor"
+          ]
+        },
         "color_sets": [
           "christmas",
           "ice"

@@ -11,6 +11,8 @@ export interface BoardInfo {
   boot_id: number;
   colors: string[];
   effects: string[];
+  /** The settings each effect reads, in the order the app shows them; missing on a board from before it. */
+  effect_settings?: Record<string, string[]>;
   color_sets: string[];
   power_limit_mw: number;
   memory: { free: number; largest: number };

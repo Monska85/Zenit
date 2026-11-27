@@ -24,8 +24,17 @@ export const LIMITS = {
 export const TIMER_PRESETS = [15, 30, 60, 120] as const;
 
 /** The settings an effect reads, in the order the view shows them. */
-export type ParamName =
-  "color" | "colors" | "color_set" | "hold_seconds" | "period_seconds" | "floor" | "twinkle_strength";
+const PARAM_NAMES = [
+  "color",
+  "colors",
+  "color_set",
+  "hold_seconds",
+  "period_seconds",
+  "floor",
+  "twinkle_strength",
+] as const;
+export type ParamName = (typeof PARAM_NAMES)[number];
+const isParamName = (name: string): name is ParamName => (PARAM_NAMES as readonly string[]).includes(name);
 
 export interface EffectInfo {
   label: string;
@@ -33,7 +42,10 @@ export interface EffectInfo {
   params: readonly ParamName[];
 }
 
-/** What each effect reads is what lib/ZenitLight does: docs/board/light-v1.md#effects. */
+/**
+ * Labels and descriptions of the effects this app knows. `params` is what each effect reads in lib/ZenitLight
+ * (docs/board/light-v1.md#effects), used only for a board that does not report `info.effect_settings`.
+ */
 export const EFFECTS: Record<string, EffectInfo> = {
   static: { label: "Steady", description: "One color, always the same.", params: ["color"] },
   color_change: {
@@ -67,6 +79,27 @@ const words = (identifier: string): string => {
 /** An effect the app knows, or a plain description of one it does not: its name in words, no settings. */
 export function effectInfo(name: string): EffectInfo {
   return own(EFFECTS, name) ?? { label: words(name), description: "", params: [] };
+}
+
+/** The controls of an effect: the settings the app shows, in order, and whether one it cannot show is missing. */
+export interface EffectControls {
+  params: ParamName[];
+  newer: boolean;
+}
+
+/**
+ * The settings to show for `name`: the list the board reports in `info.effect_settings`, or this app's own table for a
+ * board that reports none for it. A setting this app does not know, or an effect it does not know with no list from the
+ * board, leaves a control missing: `newer` is then true.
+ */
+export function effectControls(name: string, info: BoardInfo): EffectControls {
+  const reported = info.effect_settings === undefined ? undefined : own(info.effect_settings, name);
+  if (reported !== undefined) {
+    const params = reported.filter(isParamName);
+    return { params, newer: params.length !== reported.length };
+  }
+  const known = own(EFFECTS, name);
+  return known === undefined ? { params: [], newer: true } : { params: [...known.params], newer: false };
 }
 
 const COLOR_LABELS: Record<string, string> = { white: "Warm white", red: "Red", green: "Green", blue: "Blue" };

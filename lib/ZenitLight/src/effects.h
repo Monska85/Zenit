@@ -3,10 +3,12 @@
 // The effects of docs/board/light-v1.md#effects. Each effect is one class with two static functions, listed in one
 // registry table (effects.cpp). Adding an effect: its value in Effect and its name (light_settings), its class
 // declaration here and its definition in its own file, a row in the table, its specification and its conformance
-// cases. A new setting an effect reads also needs a bit in EffectParam and a line in effect_changes().
+// cases. A new setting an effect reads also needs a bit in EffectParam, a line in effect_changes() and a row in
+// EFFECT_SETTINGS.
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 #include "light_settings.h"
@@ -51,6 +53,17 @@ enum EffectParam : uint16_t
   PARAM_STRENGTH = 1 << 6,
   PARAM_TIMER = 1 << 7 // the effect follows the countdown: a timer change restarts it with a transition
 };
+
+// The settings a client shows with an effect, in the order it shows them (docs/board/light-v1.md#effects): one row per
+// bit of EffectParam but PARAM_TIMER, which follows the light-wide `timer_minutes` and is shown on its own. `info`
+// reports, for each effect, the names of the rows whose bit its registry row reads.
+struct EffectSetting
+{
+  EffectParam param;
+  const char *name; // the setting's name in the protocol
+};
+constexpr size_t EFFECT_SETTING_COUNT = 7;
+extern const EffectSetting EFFECT_SETTINGS[EFFECT_SETTING_COUNT];
 
 struct EffectInfo
 {

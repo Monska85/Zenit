@@ -280,6 +280,14 @@ def distinct_texts(low, high):
     return lambda value: conforms(value, [is_text]) and low <= len(value) <= high and len(set(value)) == len(value)
 
 
+def settings_by_effect(value):
+    """`info.effect_settings`: an object from effect name to the settings it reads, each named once. Names are open
+    words: an effect or a setting this client does not know is any text."""
+    return isinstance(value, dict) and all(
+        conforms(names, [is_text]) and len(set(names)) == len(names) for names in value.values()
+    )
+
+
 def one_of(*words):
     return lambda value: is_text(value) and value in words
 
@@ -427,6 +435,7 @@ REPLIES = {
         "boot_id": is_int,
         "colors": [is_text],
         "effects": [is_text],
+        "effect_settings": Maybe(settings_by_effect),
         "color_sets": [is_text],
         "power_limit_mw": is_int,
         "memory": {"free": is_int, "largest": is_int},

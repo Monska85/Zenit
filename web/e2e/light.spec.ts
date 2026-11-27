@@ -107,6 +107,7 @@ for (const [effect, shown] of EFFECT_SETTINGS) {
       if (shown.includes(name)) await expect(control, name).toHaveCount(1);
       else await expect(control, name).toHaveCount(0);
     }
+    await expect(settings.getByTestId("newer-effect")).toHaveCount(0);
   });
 }
 

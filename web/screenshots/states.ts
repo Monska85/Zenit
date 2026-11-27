@@ -137,6 +137,20 @@ export const STATES: State[] = [
       )),
   },
   {
+    // An effect this app does not know, selected: its card and the line in place of its settings
+    name: "light-newer-effect",
+    reach: async (page) => {
+      await connectedLight(
+        page,
+        board((fake) => {
+          fake.info["effects"] = [...(fake.info["effects"] as string[]), "northern_lights"];
+          fake.settings["effect"] = "northern_lights";
+        }),
+      );
+      await expect(page.getByTestId("newer-effect")).toBeVisible();
+    },
+  },
+  {
     name: "light-color-change",
     dark: true,
     reach: async (page) => {

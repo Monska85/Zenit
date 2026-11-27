@@ -820,8 +820,29 @@ void test_core_longest_reply_fits()
               "\"timer_minutes\":360}"));
   TEST_ASSERT_TRUE(reply(0)["ok"].as<bool>());
   TEST_ASSERT_TRUE(written[0].size() < zenit::proto::MAX_REPLY_LINE);
-  send(framed("{\"seq\":1,\"cmd\":\"info\"}"));
-  TEST_ASSERT_TRUE(written[1].size() < 900);
+}
+
+// `info` with `effect_settings` stays under the line the board reads (1,024 bytes), the strictest bound of the
+// protocol, so under the reply buffer and what clients accept too.
+void test_core_longest_info_reply_fits()
+{
+  start();
+  protocol::begin(4294967295u); // the longest boot_id
+  const std::string saved = platform::firmware_version();
+  // The longest version the simulator takes (47 characters); a build can report up to 64 (tools/fw_version.py).
+  const std::string version = "999999.999999.999999-" + std::string(26, 'a');
+  TEST_ASSERT_EQUAL(47, version.size());
+  TEST_ASSERT_TRUE(sim_control::handle("!version " + version, 0));
+  send(framed("{\"seq\":4294967295,\"cmd\":\"info\"}"));
+  platform::sim_set_version(saved.c_str());
+  JsonDocument doc = reply(0);
+  TEST_ASSERT_TRUE(doc["ok"].as<bool>());
+  TEST_ASSERT_EQUAL_STRING(version.c_str(), doc["firmware"].as<const char *>());
+  TEST_ASSERT_EQUAL(zenit::EFFECT_COUNT, doc["effect_settings"].as<JsonObjectConst>().size());
+  // The simulator reports 0 for memory and settings memory: a board's numbers take at most 10 digits each.
+  const size_t growth = (64 - version.size()) + 4 * 9;
+  TEST_ASSERT_TRUE(written[0].size() + growth < zenit::proto::MAX_LINE);
+  TEST_ASSERT_TRUE(zenit::proto::MAX_LINE < zenit::proto::MAX_REPLY_LINE);
 }
 
 void test_core_longest_settings_reply_fits()
@@ -933,6 +954,7 @@ int main()
   RUN_TEST(test_core_light_reply_reflects_the_request);
   RUN_TEST(test_core_status_lightness_has_one_decimal);
   RUN_TEST(test_core_longest_reply_fits);
+  RUN_TEST(test_core_longest_info_reply_fits);
   RUN_TEST(test_core_longest_settings_reply_fits);
   RUN_TEST(test_core_longest_status_reply_fits);
   return UNITY_END();
