@@ -605,8 +605,10 @@ export class BoardSession {
       const client = this.client;
       if (!client || generation !== this.generation || client.busy || this.visibility?.hidden()) return;
       try {
-        const status = toStatus(await client.call("status"));
-        if (generation !== this.generation) return;
+        // A request the person makes meanwhile goes first: the poll gives way and asks again next time
+        const reply = await client.poll("status");
+        if (reply === null || generation !== this.generation) return;
+        const status = toStatus(reply);
         // Most polls bring what the page already shows: do not wake every subscriber for them. `time.epoch` moves every
         // second on a synced board and nothing on the page shows it, so it does not count as a change.
         const patch = statusPatch(status);
