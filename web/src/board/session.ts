@@ -58,6 +58,9 @@ export interface BoardState {
   auto: "restarting" | "reconnecting" | null;
 }
 
+/** The board's name as it reports it: the board that served the page, or the name it has on the network. */
+export const boardName = (board: BoardState): string | null => board.served?.hostname ?? board.wifi?.hostname ?? null;
+
 /** A connection that could not be opened; the message is the sentence for the banner. */
 export class OpenFailed extends Error {}
 

@@ -113,3 +113,20 @@ test("the installer is not loaded before it is needed", async ({ page }) => {
   await page.getByRole("button", { name: "Continue" }).click();
   await expect.poll(() => scripts.some((url) => /installer/.test(url))).toBe(true);
 });
+
+test("shows the outlines of the Device page while it loads", async ({ page }) => {
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await page.route(/device-view-[^/]*\.js$/, async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.goto("/#/device");
+  const placeholder = page.getByTestId("device-placeholder");
+  await expect(placeholder).toBeVisible();
+  await expect(placeholder.getByRole("heading", { level: 1 })).toHaveText("Device");
+  await expect(placeholder.getByRole("status")).toHaveText("Loading the Device page...");
+  release();
+  await expect(placeholder).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Maintenance" })).toBeVisible();
+});

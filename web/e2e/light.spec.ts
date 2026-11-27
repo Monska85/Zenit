@@ -203,6 +203,7 @@ test("sets a custom timer, and refuses a number outside 1 to 360", async ({ page
 test("the Device view shows the device and says a reset needs USB", async ({ page }) => {
   await page.getByRole("link", { name: "Device" }).click();
   await expect(page.getByRole("heading", { name: "Your Zenit" })).toBeVisible();
+  await page.getByText("Details for technicians").click();
   await expect(page.getByText("simulator", { exact: true })).toBeVisible();
   await expect(page.getByText("1 W", { exact: true })).toBeVisible();
   await expect(page.getByText("Resetting needs a USB cable.")).toBeVisible();

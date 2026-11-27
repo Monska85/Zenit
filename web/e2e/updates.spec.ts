@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// The firmware update card and the update and time settings, against the mock board.
+// The Firmware card and the update and time settings under Advanced, against the mock board.
 
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
@@ -19,11 +19,31 @@ async function deviceView(page: Page, update: Update = {}, patch: (board: FakeBo
   await page.getByLabel("Address of your Zenit").fill(MOCK_URL);
   await page.getByRole("button", { name: "Connect", exact: true }).click();
   await page.getByRole("link", { name: "Device" }).click();
-  await expect(page.getByRole("heading", { name: "Firmware updates" })).toBeVisible();
+  await expect(page.getByTestId("update-result").or(page.getByTestId("update-off"))).toBeVisible();
   return mock;
 }
 
+/** Opens the folded Advanced settings. */
+async function openAdvanced(page: Page): Promise<void> {
+  await page.getByText("Advanced settings", { exact: true }).click();
+  await expect(page.getByRole("region", { name: "Update settings" })).toBeVisible();
+}
+
 const result = (page: Page) => page.getByTestId("update-result");
+
+/** The site publishes this firmware version. */
+async function publishFirmware(page: Page, version: string): Promise<void> {
+  await page.route("**/firmware/manifest.json", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        name: "Zenit",
+        version,
+        builds: [{ chipFamily: "ESP32-C3", parts: [{ path: "zenit-esp32c3-factory.bin", offset: 0 }] }],
+      }),
+    }),
+  );
+}
 
 test("shows the running version, the last check in local time and the result", async ({ page }) => {
   await deviceView(page, { last_check: 1_800_000_000, last_result: "up_to_date" });
@@ -148,6 +168,70 @@ test("needs WiFi to look for updates", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Check now" })).toBeDisabled();
 });
 
+test("says an available update once, in the one Firmware card, with its actions", async ({ page }) => {
+  await publishFirmware(page, "1.2.0");
+  await deviceView(page, { last_result: "available", available: "1.2.0" });
+  const card = page.getByRole("region", { name: "Firmware", exact: true });
+  await expect(card.getByTestId("firmware-running")).toHaveText("1.0.0");
+  await expect(card.getByTestId("firmware-published")).toHaveText("1.2.0");
+  await expect(card.getByTestId("update-result")).toHaveText("Version 1.2.0 is available.");
+  await expect(card.getByTestId("firmware-state")).toHaveCount(0);
+  await expect(card.getByRole("button", { name: "Check now" })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Install 1.2.0" })).toBeVisible();
+  await expect(page.getByText(/is available\./)).toHaveCount(1);
+});
+
+test("compares with the published firmware while the board's own check says nothing", async ({ page }) => {
+  await publishFirmware(page, "1.2.0");
+  await deviceView(page, { last_result: "never", available: null });
+  await expect(page.getByTestId("update-result")).toHaveText("Zenit has not looked for an update yet.");
+  await expect(page.getByTestId("firmware-state")).toHaveText("An update is available.");
+});
+
+test("says once that this site has a newer version than the board's last check found", async ({ page }) => {
+  await publishFirmware(page, "1.2.0");
+  await deviceView(page, { last_result: "up_to_date", available: null });
+  const card = page.getByRole("region", { name: "Firmware", exact: true });
+  await expect(card.getByTestId("update-result")).toHaveText(
+    "This site has a newer version than the one Zenit found when it last looked.",
+  );
+  await expect(card.getByTestId("firmware-state")).toHaveCount(0);
+  await expect(card.getByText("Your Zenit has the latest firmware.")).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Your Zenit" }).locator("dd").nth(2)).toHaveText(
+    "1.0.0 · Update available",
+  );
+});
+
+test("keeps saying a newer version is published while firmware updates are off", async ({ page }) => {
+  await publishFirmware(page, "1.2.0");
+  await deviceView(page, { last_result: "up_to_date", available: null }, (board) => {
+    board.settings["update_firmware"] = false;
+  });
+  const card = page.getByRole("region", { name: "Firmware", exact: true });
+  await expect(card.getByTestId("update-off")).toBeVisible();
+  await expect(card.getByTestId("firmware-state")).toHaveText("An update is available.");
+});
+
+test("names the board, its connection and its firmware first, and folds the rest for technicians", async ({ page }) => {
+  await deviceView(page, { last_result: "up_to_date", available: null });
+  const card = page.getByRole("region", { name: "Your Zenit" });
+  await expect(card.locator("dl").first().locator("dt")).toHaveText(["Name", "Connection", "Firmware"]);
+  await expect(card.locator("dl").first().locator("dd")).toHaveText(["zenit-a1b2", MOCK_URL, "1.0.0 · Up to date"]);
+  const details = card.getByTestId("technician-details");
+  await expect(details).toBeHidden();
+  await card.getByText("Details for technicians").click();
+  await expect(details.locator("dt")).toHaveText([
+    "Hardware",
+    "Light power limit",
+    "Colors",
+    "Effects",
+    "Palettes",
+    "Protocol",
+    "Free memory",
+    "Settings memory",
+  ]);
+});
+
 test.describe("the app on Zenit", () => {
   const card = (page: Page) => page.getByRole("region", { name: "App on Zenit" });
 
@@ -183,6 +267,7 @@ test.describe("the app on Zenit", () => {
 
   test("sends the app switch when it is chosen", async ({ page }) => {
     const mock = await deviceView(page);
+    await openAdvanced(page);
     await page.getByRole("switch", { name: /Update the app on Zenit/ }).click();
     await expect.poll(() => mock.board.settings["update_web"]).toBe(false);
     await expect(card(page).getByTestId("web-off")).toBeVisible();
@@ -192,54 +277,120 @@ test.describe("the app on Zenit", () => {
 test.describe("the settings", () => {
   const sets = (mock: Mock) => mock.board.requests.filter((request) => request["cmd"] === "settings_set");
 
+  test("folds the update and time settings under Advanced", async ({ page }) => {
+    await deviceView(page);
+    const advanced = page.getByTestId("advanced");
+    await expect(advanced.getByRole("region", { name: "Update settings" })).toBeHidden();
+    await expect(advanced.getByRole("region", { name: "Time", exact: true })).toBeHidden();
+    await openAdvanced(page);
+    await expect(advanced.getByRole("region", { name: "Time", exact: true })).toBeVisible();
+    // The order of the page: the everyday cards first, Advanced, Access, Maintenance last
+    await expect(page.locator("main h2").or(page.getByText("Advanced settings", { exact: true }))).toHaveText([
+      "Your Zenit",
+      "WiFi",
+      "Firmware",
+      "App on Zenit",
+      "Advanced settings",
+      "Update settings",
+      "Time",
+      "Access over WiFi",
+      "Maintenance",
+    ]);
+  });
+
   test("sends the update mode and the firmware switch when they are chosen", async ({ page }) => {
     const mock = await deviceView(page);
+    await openAdvanced(page);
     await page.getByRole("radio", { name: "Tell me" }).check({ force: true });
     await expect.poll(() => mock.board.settings["update_mode"]).toBe("notify");
-    await page.getByRole("switch", { name: /Update the firmware/ }).click();
+    const firmware = page.getByRole("switch", { name: /Update the firmware/ });
+    await expect(firmware).toBeChecked();
+    await firmware.click();
     await expect.poll(() => mock.board.settings["update_firmware"]).toBe(false);
+    await expect(firmware).not.toBeChecked();
   });
 
-  test("sends the check interval only when Set is pressed, and refuses numbers out of range", async ({ page }) => {
+  test("sends the check interval as soon as it is chosen from the list", async ({ page }) => {
     const mock = await deviceView(page);
-    const card = page.getByRole("region", { name: "Update settings" });
-    const field = card.getByLabel("Look for updates every (hours)");
-    await field.fill("12");
-    expect(sets(mock)).toHaveLength(0);
-    await field.fill("169");
-    await card.getByRole("button", { name: "Set", exact: true }).click();
-    await expect(card.getByRole("alert")).toContainText("from 1 to 168");
-    expect(sets(mock)).toHaveLength(0);
-    await field.fill("12");
-    await card.getByRole("button", { name: "Set", exact: true }).click();
+    await openAdvanced(page);
+    const list = page.getByRole("region", { name: "Update settings" }).getByLabel("Look for updates");
+    await expect(list.locator("option")).toHaveText([
+      "Every hour",
+      "Every 3 hours",
+      "Every 6 hours",
+      "Every 12 hours",
+      "Every 24 hours",
+    ]);
+    await list.selectOption({ label: "Every 12 hours" });
     await expect.poll(() => mock.board.settings["check_hours"]).toBe(12);
+    expect(sets(mock)).toHaveLength(1);
   });
 
-  test("sends the install window as minutes after midnight, and explains it", async ({ page }) => {
+  test("keeps a stored interval that is not in the list, shown and chosen", async ({ page }) => {
+    const mock = await deviceView(page, {}, (board) => {
+      board.settings["check_hours"] = 48;
+    });
+    await openAdvanced(page);
+    const list = page.getByLabel("Look for updates");
+    await expect(list).toHaveValue("48");
+    await expect(list.locator("option:checked")).toHaveText("Every 48 hours");
+    await list.selectOption({ label: "Every 3 hours" });
+    await expect.poll(() => mock.board.settings["check_hours"]).toBe(3);
+    // The stored value stays selectable until the page knows the new one
+    await list.selectOption({ label: "Every 24 hours" });
+    await expect.poll(() => mock.board.settings["check_hours"]).toBe(24);
+  });
+
+  test("sends the install window once both times are valid, and explains it", async ({ page }) => {
     const mock = await deviceView(page);
+    await openAdvanced(page);
     await expect(page.getByTestId("window-summary")).toContainText("Any time of day.");
+    await expect(page.getByRole("button", { name: "Set window" })).toHaveCount(0);
     await page.getByLabel("From").fill("23:00");
     await page.getByLabel("Until").fill("02:30");
-    await page.getByRole("button", { name: "Set window" }).click();
-    await expect.poll(() => mock.board.settings["install_start"]).toBe(1380);
-    expect(mock.board.settings["install_end"]).toBe(150);
+    await page.getByLabel("Until").blur();
+    await expect.poll(() => mock.board.settings["install_end"]).toBe(150);
+    expect(mock.board.settings["install_start"]).toBe(1380);
     await expect(page.getByTestId("window-summary")).toContainText("From 23:00 to 02:30 (past midnight).");
     await expect(page.getByTestId("window-summary")).toContainText("If both times are the same");
+  });
+
+  test("sends the install window a moment after the last change, without leaving the field", async ({ page }) => {
+    const mock = await deviceView(page);
+    await openAdvanced(page);
+    await page.getByLabel("Until").fill("05:00");
+    await expect.poll(() => mock.board.settings["install_end"]).toBe(300);
+  });
+
+  test("sends nothing while a time of the window is not complete", async ({ page }) => {
+    const mock = await deviceView(page);
+    await openAdvanced(page);
+    await page.getByLabel("From").fill("");
+    await page.getByLabel("From").blur();
+    await expect(page.getByRole("region", { name: "Update settings" }).getByRole("alert")).toHaveText(
+      "Choose a time of day for both, like 03:00.",
+    );
+    await page.waitForTimeout(1500);
+    expect(sets(mock)).toHaveLength(0);
   });
 
   test("keeps the install window for the automatic mode", async ({ page }) => {
     await deviceView(page, {}, (board) => {
       board.settings["update_mode"] = "notify";
     });
-    await expect(page.getByRole("button", { name: "Set window" })).toBeDisabled();
+    await openAdvanced(page);
+    await expect(page.getByLabel("From")).toBeDisabled();
+    await expect(page.getByLabel("Until")).toBeDisabled();
   });
 
   test("chooses a time zone from the list, or types one and checks it", async ({ page }) => {
     const mock = await deviceView(page);
+    await openAdvanced(page);
     await page.getByLabel("Time zone", { exact: true }).selectOption({ label: "Rome, Paris, Berlin, Madrid" });
     await expect.poll(() => mock.board.settings["timezone"]).toBe("CET-1CEST,M3.5.0,M10.5.0/3");
-    await page.getByLabel("Time zone", { exact: true }).selectOption({ label: "Another time zone..." });
     const card = page.getByRole("region", { name: "Time", exact: true });
+    await expect(card.getByLabel("Time zone text")).toHaveCount(0);
+    await page.getByLabel("Time zone", { exact: true }).selectOption({ label: "Another time zone..." });
     const text = card.getByLabel("Time zone text");
     await text.fill("bad zone");
     await card.getByRole("button", { name: "Set", exact: true }).first().click();
@@ -251,8 +402,11 @@ test.describe("the settings", () => {
     await expect(page.getByLabel("Time zone", { exact: true })).toHaveValue("custom");
   });
 
-  test("sends the time server and the time check interval after a check of what was typed", async ({ page }) => {
+  test("sends the time server after a check of what was typed, and the time check interval when chosen", async ({
+    page,
+  }) => {
     const mock = await deviceView(page);
+    await openAdvanced(page);
     const server = page.getByLabel("Time server");
     await server.fill("bad host");
     await server.press("Enter");
@@ -262,9 +416,31 @@ test.describe("the settings", () => {
     await server.fill("time.example.org");
     await server.press("Enter");
     await expect.poll(() => mock.board.settings["ntp_server"]).toBe("time.example.org");
-    const hours = page.getByLabel("Check the time every (hours)");
-    await hours.fill("24");
-    await hours.press("Enter");
-    await expect.poll(() => mock.board.settings["time_sync_hours"]).toBe(24);
+    await page.getByLabel("Check the time").selectOption({ label: "Every 3 hours" });
+    await expect.poll(() => mock.board.settings["time_sync_hours"]).toBe(3);
+  });
+});
+
+test.describe("the time zone of this device", () => {
+  test.use({ timezoneId: "Europe/Rome" });
+
+  test("offers the device's own zone when the list has it, and saves it", async ({ page }) => {
+    const mock = await deviceView(page);
+    await openAdvanced(page);
+    const offer = page.getByRole("button", { name: "Use this device's time zone (Rome)" });
+    await offer.click();
+    await expect.poll(() => mock.board.settings["timezone"]).toBe("CET-1CEST,M3.5.0,M10.5.0/3");
+    await expect(offer).toHaveCount(0);
+    await expect(page.getByLabel("Time zone", { exact: true })).toHaveValue("CET-1CEST,M3.5.0,M10.5.0/3");
+  });
+});
+
+test.describe("a zone the list does not have", () => {
+  test.use({ timezoneId: "Asia/Kolkata" });
+
+  test("offers nothing", async ({ page }) => {
+    await deviceView(page);
+    await openAdvanced(page);
+    await expect(page.getByRole("button", { name: /Use this device's time zone/ })).toHaveCount(0);
   });
 });

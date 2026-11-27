@@ -65,7 +65,7 @@ async function deviceOverWifi(page: Page, fake: FakeBoard): Promise<Mock> {
   await page.getByLabel("Address of your Zenit").fill(MOCK_URL);
   await page.getByRole("button", { name: "Connect", exact: true }).click();
   await page.getByRole("link", { name: "Device" }).click();
-  await expect(page.getByRole("heading", { name: "Firmware updates" })).toBeVisible();
+  await expect(page.getByTestId("update-result")).toBeVisible();
   return mock;
 }
 
@@ -165,7 +165,9 @@ export const STATES: State[] = [
     },
   },
   {
+    // The power button off, in both themes: it must look clearly unlike the lit one
     name: "light-off",
+    dark: true,
     reach: async (page) =>
       void (await connectedLight(
         page,
@@ -312,6 +314,16 @@ export const STATES: State[] = [
     },
   },
   {
+    // The folded settings opened: update settings with the hour list and the install window, the time, the switches
+    name: "device-advanced",
+    dark: true,
+    reach: async (page) => {
+      await deviceOverWifi(page, networkBoard());
+      await page.getByText("Advanced settings", { exact: true }).click();
+      await expect(page.getByRole("region", { name: "Time", exact: true })).toBeVisible();
+    },
+  },
+  {
     name: "device-update-downloading",
     reach: async (page) => {
       await deviceOverWifi(
@@ -408,7 +420,7 @@ export const STATES: State[] = [
       await served(page, networkBoard());
       await page.goto("/#/device");
       await expect(page.getByTestId("install-served-note")).toBeVisible();
-      await expect(page.getByRole("heading", { name: "Firmware updates" })).toBeVisible();
+      await expect(page.getByTestId("update-result")).toBeVisible();
     },
   },
   {

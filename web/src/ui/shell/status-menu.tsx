@@ -2,7 +2,7 @@
 
 import { ChevronDown, Monitor, Moon, Sun, Unplug } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
-import type { BoardState } from "../../board/session";
+import { boardName, type BoardState } from "../../board/session";
 import { chooseTheme, currentTheme } from "../../lib/theme";
 import type { ThemeChoice } from "../../lib/storage";
 import { cn } from "../../lib/utils";
@@ -23,9 +23,6 @@ const DOTS: Record<Dot, string> = {
   wait: "bg-amber-500 dark:bg-amber-400",
   off: "bg-muted-foreground",
 };
-
-/** The board's name as it reports it: the board that served the page, or the name it has on the network. */
-export const boardName = (board: BoardState): string | null => board.served?.hostname ?? board.wifi?.hostname ?? null;
 
 /** The pill's words and dot for each phase. The dot only repeats what the words say. */
 export function pillState(board: BoardState): { text: string; dot: Dot } {

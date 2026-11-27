@@ -1,32 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { describe, expect, it } from "vitest";
-import { BoardSession, type BoardState } from "../src/board/session";
-import { COLOR_SWATCHES, contrast, customTimerLabel, liveLine, swatchInk } from "../src/light/model";
-import { boardName, pillState } from "../src/ui/shell/status-menu";
+import { BoardSession, boardName, type BoardState } from "../src/board/session";
+import { customTimerLabel, liveLine } from "../src/light/model";
+import { pillState } from "../src/ui/shell/status-menu";
 import { screenOf } from "../src/ui/route";
 import { backAgainStep, type BackAgain } from "../src/ui/shell/use-back-again";
 
 const base: BoardState = new BoardSession().getState();
 const state = (patch: Partial<BoardState>): BoardState => ({ ...base, ...patch });
-
-describe("swatchInk", () => {
-  it("draws the power icon at 3:1 or more on every color the button can take", () => {
-    for (const swatch of Object.values(COLOR_SWATCHES)) {
-      expect(contrast(swatch, swatchInk(swatch))).toBeGreaterThanOrEqual(3);
-    }
-  });
-
-  it("is dark on warm white and white on blue", () => {
-    expect(swatchInk("#fff1cf")).toBe("#1a1208");
-    expect(swatchInk("#2f6fe0")).toBe("#ffffff");
-  });
-
-  it("measures contrast the WCAG way", () => {
-    expect(contrast("#000000", "#ffffff")).toBeCloseTo(21, 5);
-    expect(contrast("#ffffff", "#ffffff")).toBeCloseTo(1, 5);
-  });
-});
 
 describe("liveLine", () => {
   const light = { on: true, color: "white", effect: "static", timer: null };

@@ -15,13 +15,19 @@ import {
   choiceOptions,
   describeWindow,
   formatMinute,
-  hoursProblem,
+  HOUR_CHOICES,
+  hourOptions,
+  windowToSend,
+  zoneOfBrowser,
   ntpServerProblem,
   parseMinute,
   timezoneProblem,
 } from "../src/device/settings";
 import {
+  boardVerdict,
   canCheck,
+  firmwareStateSource,
+  firmwareSummary,
   canInstallWeb,
   describeResult,
   describeRetry,
@@ -88,15 +94,6 @@ describe("ntpServerProblem", () => {
       expect(ntpServerProblem(good)).toBeNull();
     for (const bad of ["", "a".repeat(65), "pool ntp.org", "pool_ntp.org", "ntp.org/x", "ntp.org:123"])
       expect(ntpServerProblem(bad)).not.toBeNull();
-  });
-});
-
-describe("hoursProblem", () => {
-  it("takes whole numbers within the limit", () => {
-    expect(hoursProblem("1", BOARD_LIMITS.check_hours)).toBeNull();
-    expect(hoursProblem("168", BOARD_LIMITS.check_hours)).toBeNull();
-    for (const bad of ["0", "169", "", "1.5", "-1", "6h", "1e1"])
-      expect(hoursProblem(bad, BOARD_LIMITS.check_hours)).not.toBeNull();
   });
 });
 
@@ -385,5 +382,160 @@ describe("the sentences of the app on Zenit", () => {
     const off = update({ mode: "off" });
     expect(canCheck(off, WIFI_STATUS)).toBe(false);
     expect(canCheck(off, WIFI_STATUS, true)).toBe(true);
+  });
+});
+
+describe("hourOptions", () => {
+  it("offers every hour, 3, 6, 12 and 24 hours, inside the protocol's limits", () => {
+    expect(hourOptions(6)).toEqual([
+      { value: "1", label: "Every hour" },
+      { value: "3", label: "Every 3 hours" },
+      { value: "6", label: "Every 6 hours" },
+      { value: "12", label: "Every 12 hours" },
+      { value: "24", label: "Every 24 hours" },
+    ]);
+    for (const hours of HOUR_CHOICES) {
+      expect(hours).toBeGreaterThanOrEqual(BOARD_LIMITS.check_hours.min);
+      expect(hours).toBeLessThanOrEqual(BOARD_LIMITS.time_sync_hours.max);
+    }
+  });
+
+  it("keeps a stored value that is not offered, in its place", () => {
+    expect(hourOptions(48).map((option) => option.value)).toEqual(["1", "3", "6", "12", "24", "48"]);
+    expect(hourOptions(2).map((option) => option.label)).toContain("Every 2 hours");
+    expect(hourOptions(2)[1]).toEqual({ value: "2", label: "Every 2 hours" });
+    expect(hourOptions(undefined)).toHaveLength(5);
+  });
+});
+
+describe("windowToSend", () => {
+  it("sends both times as minutes after midnight when they change", () => {
+    expect(windowToSend("23:00", "02:30", 180, 300)).toEqual({ install_start: 1380, install_end: 150 });
+  });
+
+  it("sends nothing when both equal what the board holds", () => {
+    expect(windowToSend("03:00", "05:00", 180, 300)).toBeNull();
+  });
+
+  it("refuses a time that is empty or not a time of day", () => {
+    expect(windowToSend("", "05:00", 180, 300)).toBe("invalid");
+    expect(windowToSend("03:00", "24:00", 180, 300)).toBe("invalid");
+  });
+});
+
+describe("zoneOfBrowser", () => {
+  it("finds the listed zone of a browser's zone, named by its city", () => {
+    expect(zoneOfBrowser("Europe/Rome")).toEqual({ value: "CET-1CEST,M3.5.0,M10.5.0/3", city: "Rome" });
+    expect(zoneOfBrowser("America/New_York")).toEqual({ value: "EST5EDT,M3.2.0,M11.1.0", city: "New York" });
+  });
+
+  it("finds nothing for a zone the list does not stand for", () => {
+    expect(zoneOfBrowser("America/Mexico_City")).toBeNull();
+    expect(zoneOfBrowser("Asia/Kolkata")).toBeNull();
+  });
+
+  it("names every browser zone at most once", () => {
+    const names = TIME_ZONES.flatMap((zone) => zone.iana);
+    expect(new Set(names).size).toBe(names.length);
+  });
+});
+
+describe("boardVerdict", () => {
+  const base: UpdateStatus = {
+    mode: "notify",
+    state: "idle",
+    progress: null,
+    last_check: null,
+    last_result: "available",
+    available: "1.2.0",
+    trial: false,
+    rolled_back: null,
+    skipped: null,
+  };
+
+  it("says available or up to date only from a check that found it, with firmware updates on", () => {
+    expect(boardVerdict(base, null)).toBe("available");
+    expect(boardVerdict({ ...base, last_result: "up_to_date", available: null }, null)).toBe("up_to_date");
+    expect(boardVerdict({ ...base, last_result: "skipped", skipped: "1.2.0" }, null)).toBe("skipped");
+    expect(boardVerdict({ ...base, last_result: "never", available: null }, null)).toBeNull();
+    expect(boardVerdict({ ...base, mode: "off" }, null)).toBeNull();
+    expect(boardVerdict(base, { ...DEFAULT_SETTINGS, ...BOARD_SETTINGS, update_firmware: false })).toBeNull();
+  });
+});
+
+describe("firmwareStateSource", () => {
+  const checked: UpdateStatus = {
+    mode: "notify",
+    state: "idle",
+    progress: null,
+    last_check: null,
+    last_result: "up_to_date",
+    available: null,
+    trial: false,
+    rolled_back: null,
+    skipped: null,
+  };
+
+  it("takes the board's verdict over the published comparison, and the comparison when the board has none", () => {
+    expect(firmwareStateSource(checked, null, "up_to_date")).toEqual({ from: "board", verdict: "up_to_date" });
+    expect(firmwareStateSource({ ...checked, last_result: "never" }, null, "update_available")).toEqual({
+      from: "published",
+      state: "update_available",
+    });
+    expect(firmwareStateSource(null, null, "newer")).toEqual({ from: "published", state: "newer" });
+    expect(firmwareStateSource(null, null, null)).toBeNull();
+    // A board that found nothing new before the last release does not hide it
+    expect(firmwareStateSource(checked, null, "update_available")).toEqual({
+      from: "published",
+      state: "update_available",
+    });
+    // An available update the board names without its version is still the board's
+    expect(firmwareStateSource({ ...checked, last_result: "available" }, null, "update_available")).toEqual({
+      from: "board",
+      verdict: "available",
+    });
+  });
+});
+
+describe("firmwareSummary", () => {
+  const update: UpdateStatus = {
+    mode: "notify",
+    state: "idle",
+    progress: null,
+    target: null,
+    last_check: null,
+    last_result: "available",
+    available: "1.2.0",
+    trial: false,
+    rolled_back: null,
+    skipped: null,
+  };
+
+  it("takes the board's own check first", () => {
+    expect(firmwareSummary(update, null, "up_to_date")).toBe("Update available");
+    expect(firmwareSummary({ ...update, last_result: "up_to_date", available: null }, null, null)).toBe("Up to date");
+    expect(firmwareSummary({ ...update, state: "downloading", target: "firmware" }, null, null)).toBe("Updating");
+    expect(firmwareSummary({ ...update, state: "restarting" }, null, null)).toBe("Updating");
+    // A check, or a download of the web app, is not the firmware updating
+    expect(firmwareSummary({ ...update, state: "checking" }, null, null)).toBe("Update available");
+    expect(firmwareSummary({ ...update, state: "downloading", target: "web" }, null, null)).toBe("Update available");
+    expect(firmwareSummary({ ...update, last_result: "skipped" }, null, "update_available")).toBe("Update set aside");
+  });
+
+  it("falls back to the published firmware when the board's check says nothing either way", () => {
+    expect(firmwareSummary({ ...update, mode: "off" }, null, "update_available")).toBe("Update available");
+    expect(
+      firmwareSummary(update, { ...DEFAULT_SETTINGS, ...BOARD_SETTINGS, update_firmware: false }, null),
+    ).toBeNull();
+    expect(firmwareSummary({ ...update, last_result: "unreachable" }, null, "newer")).toBe("Newer than published");
+    expect(firmwareSummary({ ...update, last_result: "never", available: null }, null, null)).toBeNull();
+  });
+
+  it("compares with the published firmware when the board has no check of its own", () => {
+    expect(firmwareSummary(null, null, "update_available")).toBe("Update available");
+    expect(firmwareSummary(null, null, "up_to_date")).toBe("Up to date");
+    expect(firmwareSummary(null, null, "newer")).toBe("Newer than published");
+    expect(firmwareSummary(null, null, "unknown")).toBeNull();
+    expect(firmwareSummary(null, null, null)).toBeNull();
   });
 });

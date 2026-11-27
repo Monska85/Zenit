@@ -5,7 +5,6 @@ import type { FirmwareManifest } from "../../release/manifest";
 import { useBoard } from "../board-context";
 import { Banner } from "../components/banner";
 import { Button } from "../components/button";
-import { Card, CardTitle } from "../components/card";
 import { ConfirmDialog } from "../components/confirm-dialog";
 import type { Route } from "../route";
 
@@ -15,6 +14,8 @@ const Installer = lazy(() => import("./installer"));
 /** Where the manifest of the installer is, next to the app. */
 const MANIFEST_PATH = "firmware/manifest.json";
 
+/** The install over a USB cable, as a part of the Maintenance card: its root stays a <section>, which the card's
+ * divider between parts relies on. */
 export function FirmwareInstall({ published, go }: { published: FirmwareManifest | null; go: (route: Route) => void }) {
   const { board, session } = useBoard();
   const [asking, setAsking] = useState(false);
@@ -35,8 +36,10 @@ export function FirmwareInstall({ published, go }: { published: FirmwareManifest
   }
 
   return (
-    <Card aria-labelledby="install-title">
-      <CardTitle id="install-title">Install or update the firmware</CardTitle>
+    <section aria-labelledby="install-title">
+      <h3 id="install-title" className="mb-2 text-base font-semibold">
+        Install or update the firmware
+      </h3>
       {installing ? (
         <div className="flex flex-col gap-3">
           <Banner tone="warning">Keep the USB cable plugged in until the installer says it is done.</Banner>
@@ -107,6 +110,6 @@ export function FirmwareInstall({ published, go }: { published: FirmwareManifest
           </Banner>
         )}
       </ConfirmDialog>
-    </Card>
+    </section>
   );
 }

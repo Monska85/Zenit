@@ -41,21 +41,87 @@ export const UPDATE_MODE_HINTS: Record<string, string> = {
   automatic: "Zenit installs new firmware by itself, inside the time window below.",
 };
 
-/** The time zones offered, as POSIX TZ strings. Anything else is typed in as a custom one. */
-export const TIME_ZONES: ReadonlyArray<{ value: string; label: string }> = [
-  { value: "UTC0", label: "UTC (no daylight saving)" },
-  { value: "GMT0BST,M3.5.0/1,M10.5.0", label: "London, Dublin" },
-  { value: "WET0WEST,M3.5.0/1,M10.5.0", label: "Lisbon" },
-  { value: "CET-1CEST,M3.5.0,M10.5.0/3", label: "Rome, Paris, Berlin, Madrid" },
-  { value: "EET-2EEST,M3.5.0/3,M10.5.0/4", label: "Athens, Helsinki, Kyiv" },
-  { value: "MSK-3", label: "Moscow, Istanbul" },
-  { value: "EST5EDT,M3.2.0,M11.1.0", label: "New York, Toronto" },
-  { value: "CST6CDT,M3.2.0,M11.1.0", label: "Chicago, Mexico City" },
-  { value: "MST7MDT,M3.2.0,M11.1.0", label: "Denver" },
-  { value: "PST8PDT,M3.2.0,M11.1.0", label: "Los Angeles, Vancouver" },
-  { value: "JST-9", label: "Tokyo, Seoul" },
-  { value: "AEST-10AEDT,M10.1.0,M4.1.0/3", label: "Sydney, Melbourne" },
+/** The time zones offered, as POSIX TZ strings, with the browser's (IANA) zones each one stands for. Anything else is
+ * typed in as a custom one. */
+export const TIME_ZONES: ReadonlyArray<{ value: string; label: string; iana: readonly string[] }> = [
+  { value: "UTC0", label: "UTC (no daylight saving)", iana: ["UTC", "Etc/UTC", "Etc/GMT"] },
+  { value: "GMT0BST,M3.5.0/1,M10.5.0", label: "London, Dublin", iana: ["Europe/London", "Europe/Dublin"] },
+  {
+    value: "WET0WEST,M3.5.0/1,M10.5.0",
+    label: "Lisbon",
+    iana: ["Europe/Lisbon", "Atlantic/Canary", "Atlantic/Madeira"],
+  },
+  {
+    value: "CET-1CEST,M3.5.0,M10.5.0/3",
+    label: "Rome, Paris, Berlin, Madrid",
+    iana: [
+      "Europe/Rome",
+      "Europe/Paris",
+      "Europe/Berlin",
+      "Europe/Madrid",
+      "Europe/Amsterdam",
+      "Europe/Brussels",
+      "Europe/Vienna",
+      "Europe/Zurich",
+      "Europe/Stockholm",
+      "Europe/Oslo",
+      "Europe/Copenhagen",
+      "Europe/Warsaw",
+      "Europe/Prague",
+      "Europe/Budapest",
+      "Europe/Ljubljana",
+      "Europe/Zagreb",
+      "Europe/Luxembourg",
+      "Europe/Malta",
+      "Europe/Monaco",
+      "Europe/San_Marino",
+      "Europe/Vatican",
+    ],
+  },
+  {
+    value: "EET-2EEST,M3.5.0/3,M10.5.0/4",
+    label: "Athens, Helsinki, Kyiv",
+    iana: [
+      "Europe/Athens",
+      "Europe/Helsinki",
+      "Europe/Kyiv",
+      "Europe/Kiev",
+      "Europe/Bucharest",
+      "Europe/Sofia",
+      "Europe/Riga",
+      "Europe/Tallinn",
+      "Europe/Vilnius",
+    ],
+  },
+  { value: "MSK-3", label: "Moscow, Istanbul", iana: ["Europe/Moscow", "Europe/Istanbul"] },
+  {
+    value: "EST5EDT,M3.2.0,M11.1.0",
+    label: "New York, Toronto",
+    iana: ["America/New_York", "America/Toronto", "America/Detroit"],
+  },
+  { value: "CST6CDT,M3.2.0,M11.1.0", label: "Chicago", iana: ["America/Chicago", "America/Winnipeg"] },
+  { value: "MST7MDT,M3.2.0,M11.1.0", label: "Denver", iana: ["America/Denver", "America/Edmonton"] },
+  {
+    value: "PST8PDT,M3.2.0,M11.1.0",
+    label: "Los Angeles, Vancouver",
+    iana: ["America/Los_Angeles", "America/Vancouver"],
+  },
+  { value: "JST-9", label: "Tokyo, Seoul", iana: ["Asia/Tokyo", "Asia/Seoul"] },
+  {
+    value: "AEST-10AEDT,M10.1.0,M4.1.0/3",
+    label: "Sydney, Melbourne",
+    iana: ["Australia/Sydney", "Australia/Melbourne", "Australia/Canberra", "Australia/Hobart"],
+  },
 ];
+
+/** The listed zone the browser's IANA zone stands for, with the city to name it by ("Rome"), or null when the list has
+ * none. */
+export function zoneOfBrowser(iana: string): { value: string; city: string } | null {
+  const entry = TIME_ZONES.find((zone) => zone.iana.includes(iana));
+  if (!entry) return null;
+  const city = (iana.split("/").pop() ?? iana).replaceAll("_", " ");
+  return { value: entry.value, city };
+}
 
 /** Why a POSIX TZ string is not acceptable, or null: 1 to 64 printable ASCII characters other than space. */
 export function timezoneProblem(text: string): string | null {
@@ -73,13 +139,33 @@ export function ntpServerProblem(text: string): string | null {
   return null;
 }
 
-/** Why a number of hours is not acceptable, or null. */
-export function hoursProblem(text: string, limit: { min: number; max: number }): string | null {
-  const value = Number(text);
-  if (!/^[0-9]+$/.test(text.trim()) || value < limit.min || value > limit.max) {
-    return `Choose a whole number of hours from ${limit.min} to ${limit.max}.`;
-  }
-  return null;
+/** The intervals offered for the hour settings, inside the protocol's 1 to 168. */
+export const HOUR_CHOICES = [1, 3, 6, 12, 24] as const;
+
+/** The options of an hour setting: the offered intervals, and the stored value in its place when it is not one of them. */
+export function hourOptions(current: number | undefined): Array<{ value: string; label: string }> {
+  const values: number[] = [...HOUR_CHOICES];
+  if (current !== undefined && !values.includes(current)) values.push(current);
+  return values
+    .sort((a, b) => a - b)
+    .map((hours) => ({ value: String(hours), label: hours === 1 ? "Every hour" : `Every ${hours} hours` }));
+}
+
+/**
+ * What the install window sends for the two typed times: the patch, `"invalid"` when one is not a time of day, or null
+ * when both equal what the board holds.
+ */
+export function windowToSend(
+  from: string,
+  to: string,
+  start: number,
+  end: number,
+): { install_start: number; install_end: number } | "invalid" | null {
+  const install_start = parseMinute(from);
+  const install_end = parseMinute(to);
+  if (install_start === null || install_end === null) return "invalid";
+  if (install_start === start && install_end === end) return null;
+  return { install_start, install_end };
 }
 
 /** "07:30" for minutes after midnight. */
