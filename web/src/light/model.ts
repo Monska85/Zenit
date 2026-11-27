@@ -172,3 +172,53 @@ export function formatTimer(minutes: number): string {
   const rest = minutes % 60;
   return rest === 0 ? `${minutes / 60} h` : `${Math.floor(minutes / 60)} h ${rest} min`;
 }
+
+const INK_DARK = "#1a1208";
+const INK_LIGHT = "#ffffff";
+
+function luminance(hex: string): number {
+  const channel = (start: number): number => {
+    const value = parseInt(hex.slice(start, start + 2), 16) / 255;
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
+}
+
+/** The WCAG contrast ratio of two `#rrggbb` colors. */
+export function contrast(a: string, b: string): number {
+  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+  return (light + 0.05) / (dark + 0.05);
+}
+
+/** The icon color on a button filled with `fill` (`#rrggbb`): dark or white, whichever stands out more. */
+export const swatchInk = (fill: string): string =>
+  contrast(fill, INK_DARK) >= contrast(fill, INK_LIGHT) ? INK_DARK : INK_LIGHT;
+
+/** The time left of a running timer in words that never count seconds: "12 min", "1 h 5 min", "less than a minute". */
+export const timeLeft = (seconds: number): string => (seconds < 60 ? "less than a minute" : formatSeconds(seconds));
+
+/** What the light does now in one line: "Warm white · Steady · fades out in 12 min", or "Off". */
+export function liveLine(light: {
+  on: boolean;
+  color: string | null;
+  effect: string;
+  timer: { remaining: number } | null;
+}): {
+  color: string;
+  effect: string;
+  timer: string | null;
+} | null {
+  if (!light.on) return null;
+  return {
+    color: light.color === null ? "On" : colorLabel(light.color),
+    effect: effectInfo(light.effect).label,
+    timer: light.timer !== null && light.timer.remaining > 0 ? `fades out in ${timeLeft(light.timer.remaining)}` : null,
+  };
+}
+
+/** The label of the timer's Custom choice: with the stored value when it is a custom one. */
+export function customTimerLabel(minutes: number): string {
+  return minutes !== 0 && !(TIMER_PRESETS as readonly number[]).includes(minutes)
+    ? `Custom · ${formatTimer(minutes)}`
+    : "Custom";
+}

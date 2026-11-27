@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { Monitor, Moon, Sparkles, Sun, Unplug } from "lucide-react";
-import { lazy, Suspense, useState } from "react";
-import { chooseTheme, currentTheme, NEXT_THEME } from "../lib/theme";
-import type { ThemeChoice } from "../lib/storage";
+import { Lightbulb, SlidersHorizontal, Sparkles } from "lucide-react";
+import { lazy, Suspense } from "react";
 import { cn } from "../lib/utils";
-import { BoardProvider, useBoard, useSession } from "./board-context";
-import { Banner } from "./components/banner";
-import { Button } from "./components/button";
-import { useRoute, type Route } from "./route";
+import { BoardProvider, useBoard } from "./board-context";
+import { BottomMessage } from "./components/bottom-message";
+import { screenOf, useRoute, type Route } from "./route";
+import { LostBanner } from "./shell/lost-banner";
+import { StatusMenu } from "./shell/status-menu";
+import { useBackAgain } from "./shell/use-back-again";
 import { ConnectView } from "./views/connect-view";
 import { LightView } from "./views/light-view";
 import { LoginView } from "./views/login-view";
@@ -17,151 +17,88 @@ import { LoginView } from "./views/login-view";
 const DeviceView = lazy(() => import("./views/device-view").then((module) => ({ default: module.DeviceView })));
 const PrivacyView = lazy(() => import("./views/privacy-view").then((module) => ({ default: module.PrivacyView })));
 
-const THEME_ICONS: Record<ThemeChoice, typeof Sun> = { system: Monitor, light: Sun, dark: Moon };
-const THEME_NAMES: Record<ThemeChoice, string> = { system: "Match my device", light: "Light", dark: "Dark" };
-
-function ThemeButton() {
-  const [choice, setChoice] = useState<ThemeChoice>(currentTheme);
-  const Icon = THEME_ICONS[choice];
-  const next = NEXT_THEME[choice];
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={() => {
-        chooseTheme(next);
-        setChoice(next);
-      }}
-      aria-label={`Theme: ${THEME_NAMES[choice]}. Change to ${THEME_NAMES[next]}.`}
-    >
-      <Icon aria-hidden className="size-5" />
-    </Button>
-  );
-}
-
-function DisconnectButton({ go }: { go: (route: Route) => void }) {
-  const session = useSession();
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      aria-label="Disconnect"
-      onClick={() => {
-        void session.disconnect();
-        go("connect");
-      }}
-    >
-      <Unplug aria-hidden className="size-5" />
-    </Button>
-  );
-}
-
-function ConnectionChip({ go }: { go: (route: Route) => void }) {
-  const { board, session } = useBoard();
-  if (board.phase === "connecting") return <span className="text-sm text-muted-foreground">Connecting...</span>;
-  if (board.phase === "login") {
-    return (
-      <div className="flex items-center gap-1">
-        <span className="text-sm font-medium">Log in needed</span>
-        {/* The page is the board's own: there is no other place to connect to */}
-        {!board.served && <DisconnectButton go={go} />}
-      </div>
-    );
-  }
-  if (board.phase === "connected") {
-    return (
-      <div className="flex items-center gap-1">
-        <span className="text-sm" data-testid="connection" title={board.label}>
-          {board.kind === "usb" ? "Connected by USB" : "Connected over WiFi"}
-        </span>
-        {board.served && (
-          <span className="text-sm text-muted-foreground" data-testid="hostname">
-            {board.served.hostname}
-          </span>
-        )}
-        {/* The page is the board's own: there is no other place to connect to */}
-        {!board.served && <DisconnectButton go={go} />}
-      </div>
-    );
-  }
-  if (board.phase === "lost") {
-    if (board.auto !== null) {
-      return (
-        <span role="status" className="text-sm font-medium" data-testid="auto-reconnect">
-          {board.auto === "restarting" ? "The board is restarting" : "Connecting again..."}
-        </span>
-      );
-    }
-    return (
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-danger">Connection lost</span>
-        <Button variant="outline" disabled={board.opening} onClick={() => void session.reconnect()}>
-          Reconnect
-        </Button>
-      </div>
-    );
-  }
-  return null;
-}
+const TABS: Array<{ route: Route; label: string; Icon: typeof Lightbulb }> = [
+  { route: "light", label: "Light", Icon: Lightbulb },
+  { route: "device", label: "Device", Icon: SlidersHorizontal },
+];
 
 function Shell() {
   const { board, session } = useBoard();
   const [current, go] = useRoute();
-  const tabs: Array<{ route: Route; label: string }> = [
-    { route: "light", label: "Light" },
-    { route: "device", label: "Device" },
-    { route: "privacy", label: "Privacy" },
-  ];
-  // The Light view is the front page: without a connection it is the Connect screen.
-  // A lost connection keeps its last values on the Light view, greyed, with Reconnect in the header.
-  const connectScreen =
-    current === "connect" || (current === "light" && (board.phase === "disconnected" || board.phase === "connecting"));
+  const [backAgain, hideBackAgain] = useBackAgain(board.phase, board.opening);
+  const screen = screenOf(current, board.phase);
+  // A lost connection has one banner, with its reason and Reconnect, above any view but the Connect screen (where the
+  // person is already choosing a board); the reason is then not said twice
+  const lostBanner = board.phase === "lost" && screen !== "connect";
+  const error = lostBanner ? null : board.error;
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-4 px-4 pt-3 pb-8">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <a href="#/light" className="flex min-h-11 items-center gap-2 text-xl font-semibold">
+    <div className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-4 px-4 pt-3 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-8">
+      <header className="flex items-center justify-between gap-2">
+        <a href="#/light" className="flex min-h-11 shrink-0 items-center gap-2 text-xl font-semibold">
           <Sparkles aria-hidden className="size-6 text-primary" />
           Zenit
         </a>
-        <div className="flex items-center gap-1">
-          <ConnectionChip go={go} />
-          <ThemeButton />
-        </div>
+        <StatusMenu go={go} />
       </header>
-      <nav aria-label="Pages" className="flex gap-1 rounded-2xl border border-border bg-card p-1">
-        {tabs.map((tab) => {
-          const active = tab.route === current || (tab.route === "light" && current === "connect");
+      <nav
+        aria-label="Pages"
+        className="fixed inset-x-0 bottom-0 z-20 flex border-t border-border bg-card pb-[env(safe-area-inset-bottom)] sm:static sm:gap-1 sm:rounded-2xl sm:border sm:p-1"
+      >
+        {TABS.map(({ route, label, Icon }) => {
+          const active = route === current || (route === "light" && current === "connect");
           return (
             <a
-              key={tab.route}
-              href={`#/${tab.route}`}
+              key={route}
+              href={`#/${route}`}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex min-h-11 flex-1 items-center justify-center rounded-xl px-3 text-base font-medium",
-                active ? "bg-primary text-primary-foreground" : "hover:bg-muted",
+                "flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-sm font-medium sm:min-h-11 sm:flex-row sm:gap-2 sm:rounded-xl sm:px-3 sm:text-base",
+                active
+                  ? "text-primary sm:bg-primary sm:text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted sm:text-foreground",
               )}
             >
-              {tab.label}
+              <Icon aria-hidden className="size-6 sm:size-5" />
+              {label}
             </a>
           );
         })}
       </nav>
-      {board.error && (
-        <Banner tone="error" onClose={() => session.dismissError()}>
-          {board.error}
-        </Banner>
-      )}
+      {lostBanner && <LostBanner />}
       <main className="flex flex-col gap-4">
         <Suspense fallback={null}>
-          {current === "privacy" && <PrivacyView />}
-          {current !== "privacy" && board.phase === "login" && <LoginView go={go} />}
-          {current === "device" && board.phase !== "login" && <DeviceView go={go} />}
-          {(current === "light" || current === "connect") &&
-            board.phase !== "login" &&
-            (connectScreen ? <ConnectView go={go} /> : <LightView />)}
+          {screen === "privacy" && <PrivacyView />}
+          {screen === "login" && <LoginView go={go} />}
+          {screen === "device" && <DeviceView go={go} />}
+          {screen === "connect" && <ConnectView go={go} />}
+          {screen === "light" && <LightView />}
         </Suspense>
       </main>
+      <footer className="mt-auto flex justify-center pt-4 text-sm">
+        <a
+          href="#/privacy"
+          aria-current={current === "privacy" ? "page" : undefined}
+          className="inline-flex min-h-11 items-center px-3 text-muted-foreground underline hover:text-foreground"
+        >
+          Privacy
+        </a>
+      </footer>
+      {/* Kept in the page, so a screen reader hears the confirmation when it appears */}
+      <p role="status" className="sr-only">
+        {error === null && backAgain ? "Connected again." : ""}
+      </p>
+      {error !== null ? (
+        <BottomMessage tone="error" onClose={() => session.dismissError()}>
+          {error}
+        </BottomMessage>
+      ) : (
+        backAgain && (
+          <BottomMessage tone="done" onClose={hideBackAgain}>
+            Connected again.
+          </BottomMessage>
+        )
+      )}
     </div>
   );
 }

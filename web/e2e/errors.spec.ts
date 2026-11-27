@@ -11,7 +11,7 @@ async function connect(page: Page): Promise<Mock> {
   await page.goto("/");
   await page.getByLabel("Address of your Zenit").fill(MOCK_URL);
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByTestId("connection")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Connection: (WiFi|USB)/ })).toBeVisible();
   return mock;
 }
 
@@ -59,6 +59,25 @@ test("shows what the board holds, with a sentence, when it refuses a value", asy
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
+test("shows an error at the bottom of the screen, where a phone user is looking", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 700 });
+  const mock = await connect(page);
+  mock.board.errors.set("settings_set", "bad_request");
+  await page.getByRole("radio", { name: "Christmas" }).check({ force: true });
+  const message = page.getByTestId("bottom-message");
+  await expect(message).toHaveRole("alert");
+  await expect(message).toHaveText("Zenit did not accept that value.");
+  // Anchored above the tab bar, whatever the scroll
+  const box = (await message.boundingBox())!;
+  const nav = (await page.getByRole("navigation", { name: "Pages" }).boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(nav.y);
+  expect(box.y).toBeGreaterThan(700 / 2);
+  await page.mouse.wheel(0, 600);
+  expect((await message.boundingBox())!.y).toBeCloseTo(box.y, 0);
+  await message.getByRole("button", { name: "Close this message" }).click();
+  await expect(message).toHaveCount(0);
+});
+
 test("says a value could not be saved, without showing the board's own message", async ({ page }) => {
   const mock = await connect(page);
   mock.board.errors.set("settings_set", "storage_error");
@@ -81,10 +100,26 @@ test("clears the error with the next request that works", async ({ page }) => {
 test("keeps the last values greyed and disabled when the board stops answering", async ({ page }) => {
   const mock = await connect(page);
   mock.board.silent = true;
-  await expect(page.getByText("Connection lost", { exact: true })).toBeVisible({ timeout: 25_000 });
+  await expect(page.getByTestId("connection-lost")).toBeVisible({ timeout: 25_000 });
+  // One message for one problem: the reason, the last values and Reconnect, in one banner
+  await expect(page.getByRole("alert")).toHaveCount(1);
   await expect(page.getByRole("alert")).toContainText("Zenit did not answer");
-  await expect(page.getByRole("button", { name: "Reconnect" })).toBeEnabled();
+  await expect(page.getByTestId("bottom-message")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Reconnect" })).toHaveCount(1);
+  await expect(page.getByTestId("connection-lost").getByRole("button", { name: "Reconnect" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Connection: Not connected" })).toBeVisible();
   await expect(page.getByRole("slider", { name: "Brightness" })).toHaveAttribute("aria-valuenow", "60");
+});
+
+test("keeps the lost banner and Reconnect on the Privacy page, and says the reason once", async ({ page }) => {
+  const mock = await connect(page);
+  mock.board.silent = true;
+  await expect(page.getByTestId("connection-lost")).toBeVisible({ timeout: 25_000 });
+  await page.getByRole("link", { name: "Privacy" }).click();
+  await expect(page.getByRole("heading", { name: "Privacy", level: 1 })).toBeVisible();
+  await expect(page.getByTestId("connection-lost").getByRole("button", { name: "Reconnect" })).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(1);
+  await expect(page.getByTestId("bottom-message")).toHaveCount(0);
 });
 
 test("shows the last values, disabled, after the link drops, and reconnects to the same address", async ({ page }) => {
@@ -92,22 +127,29 @@ test("shows the last values, disabled, after the link drops, and reconnects to t
   await page.getByRole("radio", { name: "Twinkle" }).check({ force: true });
   await expect(page.getByTestId("live-effect")).toHaveText("Twinkle");
   mock.drop();
-  await expect(page.getByText("Connection lost", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId("connection-lost")).toBeVisible({ timeout: 10_000 });
   // The Light view stays, greyed, with the last values: no Connect screen
   await expect(page.getByRole("heading", { name: "Connect to your Zenit" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Light", exact: true })).toBeDisabled();
   await expect(page.getByRole("slider", { name: "Brightness" })).toHaveAttribute("data-disabled", "");
   await expect(page.getByRole("radio", { name: "Steady" })).toBeDisabled();
   await expect(page.getByRole("radio", { name: "Twinkle" })).toBeChecked();
-  await expect(page.getByText("Connection lost. These are the last values Zenit reported.")).toBeVisible();
+  await expect(page.getByTestId("connection-lost")).toContainText("Connection lost.");
+  await expect(page.getByTestId("connection-lost")).toContainText("These are the last values Zenit reported.");
+  await expect(page.getByRole("alert")).toHaveCount(1);
   // Reconnect opens the same address again, with nothing typed
   const before = mock.commands().filter((command) => command === "info").length;
   await page.getByRole("button", { name: "Reconnect" }).click();
-  await expect(page.getByTestId("connection")).toHaveText("Connected over WiFi");
+  await expect(page.getByTestId("connection")).toContainText("WiFi");
   expect(mock.commands().filter((command) => command === "info").length).toBe(before + 1);
   await expect(page.getByRole("button", { name: "Light", exact: true })).toBeEnabled();
   await expect(page.getByRole("radio", { name: "Twinkle" })).toBeChecked();
   await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.getByTestId("connection-lost")).toHaveCount(0);
+  // A short confirmation, read by a screen reader, that goes by itself
+  await expect(page.getByTestId("bottom-message")).toHaveText("Connected again.");
+  await expect(page.getByRole("status").filter({ hasText: "Connected again." })).toHaveCount(1);
+  await expect(page.getByTestId("bottom-message")).toHaveCount(0, { timeout: 10_000 });
 });
 
 test("sends one save for a run of key presses after a click that changed nothing", async ({ page }) => {
@@ -173,7 +215,7 @@ async function connectWithEffectSettings(page: Page, effectSettings: Record<stri
   await page.goto("/");
   await page.getByLabel("Address of your Zenit").fill(MOCK_URL);
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByTestId("connection")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Connection: (WiFi|USB)/ })).toBeVisible();
   return mock;
 }
 
@@ -239,5 +281,5 @@ test("says the timer ended, and the light stays off", async ({ page }) => {
   await page.getByLabel("Address of your Zenit").fill(MOCK_URL);
   await page.getByRole("button", { name: "Connect", exact: true }).click();
   await expect(page.getByTestId("timer-line")).toHaveText("The timer ended. The light stays off until you turn it on.");
-  await expect(page.getByTestId("power-state")).toHaveText("Off");
+  await expect(page.getByTestId("power-button")).toHaveAttribute("aria-pressed", "false");
 });

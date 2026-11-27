@@ -163,11 +163,6 @@ export function DeviceView({ go }: { go: (route: Route) => void }) {
   return (
     <>
       <h1 className="text-2xl font-semibold">Device</h1>
-      {board.phase === "lost" && board.auto === "restarting" && (
-        <Banner tone="info">
-          <p role="status">The board is restarting. This page connects again by itself in a few seconds.</p>
-        </Banner>
-      )}
       {board.info ? (
         <BoardCard />
       ) : (

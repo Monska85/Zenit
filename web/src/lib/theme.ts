@@ -24,5 +24,3 @@ export function startTheme(): void {
   applyTheme(loadTheme());
   query().addEventListener("change", () => applyTheme(loadTheme()));
 }
-
-export const NEXT_THEME: Record<ThemeChoice, ThemeChoice> = { system: "light", light: "dark", dark: "system" };

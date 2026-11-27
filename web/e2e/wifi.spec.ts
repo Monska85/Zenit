@@ -18,7 +18,7 @@ async function deviceOverUsb(page: Page, reply: Reply, board = new FakeBoard().w
   await installFakeSerial(page, MOCK_USB_URL);
   await page.goto("/");
   await page.getByRole("button", { name: "Connect with USB" }).click();
-  await expect(page.getByTestId("connection")).toHaveText("Connected by USB");
+  await expect(page.getByTestId("connection")).toContainText("USB");
   await page.getByRole("link", { name: "Device" }).click();
   await expect(page.getByTestId("wifi-setup")).toBeVisible();
   return { mock, improv };

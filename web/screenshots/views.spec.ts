@@ -17,8 +17,11 @@ for (const state of STATES) {
         await state.reach(page);
         // Let the last transition and the focus settle, and take no hover from the pointer
         await page.mouse.move(0, 0);
+        // A window as tall as the page, rather than a full-page capture: what is fixed to the bottom of the window (the
+        // tab bar of a phone, a message) is drawn at the bottom of the image, not where the first screen ended
+        const height = await page.evaluate(() => document.documentElement.scrollHeight);
+        await page.setViewportSize({ width: size.width, height: Math.max(size.height, height) });
         await expect(page).toHaveScreenshot(`${state.name}-${size.name}-${theme}.png`, {
-          fullPage: true,
           mask: state.mask?.(page) ?? [],
         });
       });

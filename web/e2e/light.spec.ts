@@ -30,7 +30,7 @@ test.beforeEach(async ({ page, simulator }) => {
 });
 
 test("shows the default light: on, 60 %, steady, no timer", async ({ page }) => {
-  await expect(page.getByTestId("power-state")).toHaveText("On");
+  await expect(page.getByTestId("power-button")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("slider", { name: "Brightness" })).toHaveAttribute("aria-valuenow", "60");
   await expect(page.getByRole("radio", { name: "Steady" })).toBeChecked();
   await expect(page.getByRole("radio", { name: "Off", exact: true })).toBeChecked();
@@ -43,10 +43,10 @@ test("turns the light off and on, and the state follows the board", async ({ pag
   await expect(power).toHaveAttribute("aria-pressed", "true");
   await power.click();
   await expect(power).toHaveAttribute("aria-pressed", "false");
-  await expect(page.getByTestId("power-state")).toHaveText("Off");
-  await expect(page.getByTestId("live-color")).toHaveText("Off");
+  await expect(page.getByTestId("power-button")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByTestId("live-state")).toHaveText("Off");
   await power.click();
-  await expect(page.getByTestId("power-state")).toHaveText("On");
+  await expect(page.getByTestId("power-button")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("live-color")).toHaveText("Warm white");
 });
 
@@ -56,8 +56,12 @@ test("sends the brightness when the slider is released and keeps it", async ({ p
   expect(Number(value)).toBeGreaterThan(10);
   expect(Number(value)).toBeLessThan(30);
   // the board kept it: a new connection reads it back
+  await page.getByRole("button", { name: /^Connection:/ }).click();
   await page.getByRole("button", { name: "Disconnect" }).click();
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await page
+    .getByTestId("last-board")
+    .getByRole("button", { name: /^Connect to / })
+    .click();
   await expect(page.getByRole("slider", { name: "Brightness" })).toHaveAttribute("aria-valuenow", value!);
 });
 
@@ -72,8 +76,12 @@ test("sends a slider moved with the keyboard after a pause", async ({ page }) =>
   expect(saves).toHaveLength(0);
   await expect.poll(() => saves.length).toBe(1);
   expect(saves[0]).toContain('"brightness":57');
+  await page.getByRole("button", { name: /^Connection:/ }).click();
   await page.getByRole("button", { name: "Disconnect" }).click();
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await page
+    .getByTestId("last-board")
+    .getByRole("button", { name: /^Connect to / })
+    .click();
   await expect(page.getByRole("slider", { name: "Brightness" })).toHaveAttribute("aria-valuenow", "57");
 });
 
@@ -114,8 +122,12 @@ for (const [effect, shown] of EFFECT_SETTINGS) {
 test("keeps the effect after a reconnect", async ({ page }) => {
   await page.getByRole("radio", { name: "Twinkle" }).check({ force: true });
   await expect(page.getByTestId("live-effect")).toHaveText("Twinkle");
+  await page.getByRole("button", { name: /^Connection:/ }).click();
   await page.getByRole("button", { name: "Disconnect" }).click();
-  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await page
+    .getByTestId("last-board")
+    .getByRole("button", { name: /^Connect to / })
+    .click();
   await expect(page.getByRole("radio", { name: "Twinkle" })).toBeChecked();
 });
 
@@ -162,8 +174,11 @@ test("shows a hint on Fall asleep while there is no timer", async ({ page }) => 
 test("starts and stops the sleep timer and shows the time left", async ({ page }) => {
   await page.getByRole("radio", { name: "30 min" }).check({ force: true });
   await expect(page.getByTestId("timer-line")).toHaveText(/^Fades out in (29|30) min\.$/);
+  await expect(page.getByTestId("live-state")).toContainText(/fades out in (29|30) min/);
   await page.getByRole("radio", { name: "Off", exact: true }).check({ force: true });
-  await expect(page.getByTestId("timer-line")).toHaveText("");
+  // Nothing to say: no line, and no gap where it was
+  await expect(page.getByTestId("timer-line")).toHaveCount(0);
+  await expect(page.getByTestId("live-state")).not.toContainText("fades out");
 });
 
 test("sets a custom timer, and refuses a number outside 1 to 360", async ({ page }) => {
@@ -177,9 +192,11 @@ test("sets a custom timer, and refuses a number outside 1 to 360", async ({ page
   await field.fill("45");
   await page.getByRole("button", { name: "Set" }).click();
   await expect(page.getByTestId("timer-line")).toHaveText(/^Fades out in (44|45) min\.$/);
-  await expect(page.getByRole("radio", { name: "Custom" })).toBeChecked();
+  // The chip says the value it holds
+  await expect(page.getByRole("radio", { name: "Custom · 45 min" })).toBeChecked();
   // a preset is not custom
   await page.getByRole("radio", { name: "1 h" }).check({ force: true });
+  await expect(page.getByRole("radio", { name: "Custom", exact: true })).not.toBeChecked();
   await expect(page.getByLabel("Minutes (1 to 360)")).toHaveCount(0);
 });
 
