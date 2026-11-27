@@ -2,12 +2,15 @@
 
 Firmware for Zenit, a star projector: one RGBW power LED under a perforated dome projects a starry sky or Christmas shapes on the ceiling. An ESP32-C3 SuperMini drives the four colors through MOSFET modules with a perceptual brightness curve, a power limit, effects, smooth transitions and a switch-off timer. A simulator runs the same code on your computer, without any hardware.
 
+New to Zenit? Start with the [getting started guide](docs/guide/getting-started.md): first setup, everyday use and help.
+
 The project is under construction. This version holds the light engine, the command protocol over USB and WiFi, WiFi setup with Improv, a board that serves the web app itself, over-the-air updates with a trial boot and rollback, the simulator, a command line client, the web app, and releases.
 
 ## Documentation
 
 | Document                                                             | Content                                                       |
 | -------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [`docs/guide/getting-started.md`](docs/guide/getting-started.md)     | For a new owner: first setup, everyday use and help           |
 | [`docs/requirements/firmware-v1.md`](docs/requirements/firmware-v1.md) | What the firmware must do and the decisions taken             |
 | [`docs/reference/hardware.md`](docs/reference/hardware.md)           | The board, the LED, the MOSFET modules, pins and limits       |
 | [`docs/adr/`](docs/adr/)                                             | Architecture decision records                                 |
