@@ -112,6 +112,38 @@ void test_effect_changes_follow_the_parameters_read()
   TEST_ASSERT_TRUE(zenit::effect_changes(a, b)); // color_change reads hold_seconds
 }
 
+// The settings `info` reports for an effect are the ones whose change restarts it: each row's name is a light setting,
+// and changing that setting restarts exactly the effects whose registry row reads the row's bit.
+void test_effect_settings_name_the_parameters_read()
+{
+  uint16_t seen = 0;
+  for (const zenit::EffectSetting &setting : zenit::EFFECT_SETTINGS)
+  {
+    TEST_ASSERT_EQUAL_UINT16(0, seen & setting.param); // each bit once
+    TEST_ASSERT_NOT_EQUAL(zenit::PARAM_TIMER, setting.param);
+    seen |= setting.param;
+    const zenit::LightField *field = zenit::find_light_field(setting.name);
+    TEST_ASSERT_NOT_NULL_MESSAGE(field, setting.name);
+    for (size_t i = 0; i < zenit::EFFECT_COUNT; i++)
+    {
+      LightSettings a, b;
+      a.effect = b.effect = static_cast<Effect>(i);
+      if (field->kind == zenit::FieldKind::Number)
+        TEST_ASSERT_TRUE(field->store(b, field->max, nullptr));
+      else if (field->kind == zenit::FieldKind::Name)
+        TEST_ASSERT_TRUE(field->store(b, 0, "red") || field->store(b, 0, "ice"));
+      else
+        b.colors = zenit::color_set_colors(zenit::ColorSet::Ice);
+      TEST_ASSERT_TRUE_MESSAGE(a != b, setting.name);
+      const bool reads = (zenit::effect_info(a.effect).params & setting.param) != 0;
+      TEST_ASSERT_EQUAL_MESSAGE(reads, zenit::effect_changes(a, b), setting.name);
+    }
+  }
+  // Every bit a registry row reads is either a row of the table or the timer.
+  for (size_t i = 0; i < zenit::EFFECT_COUNT; i++)
+    TEST_ASSERT_EQUAL_UINT16(0, zenit::effect_info(static_cast<Effect>(i)).params & ~(seen | zenit::PARAM_TIMER));
+}
+
 void test_xorshift_never_sticks_at_zero()
 {
   uint32_t state = 0;
@@ -650,6 +682,7 @@ int main()
   RUN_TEST(test_color_lists);
   RUN_TEST(test_text_settings);
   RUN_TEST(test_effect_changes_follow_the_parameters_read);
+  RUN_TEST(test_effect_settings_name_the_parameters_read);
   RUN_TEST(test_xorshift_never_sticks_at_zero);
   RUN_TEST(test_on_and_off_are_idempotent);
   RUN_TEST(test_settings_while_off_apply_at_the_next_on);

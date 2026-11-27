@@ -6,6 +6,7 @@ import {
   COLOR_SWATCHES,
   EFFECTS,
   LIMITS,
+  effectControls,
   effectInfo,
   formatHold,
   formatSeconds,
@@ -66,6 +67,58 @@ describe("effects", () => {
       const documented = [...(row?.[1] ?? "").matchAll(/`([a-z_]+)`/g)].map((match) => match[1]);
       expect(documented, name).toEqual(effect.params);
     }
+  });
+
+  it("are the ones the board reports in the info conformance case", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const root = join(import.meta.dirname, "..", "..");
+    const spec = readFileSync(join(root, "docs", "board", "light-v1.md"), "utf8");
+    const exchange = JSON.parse(readFileSync(join(root, "conformance", "protocol", "command_info.json"), "utf8")) as {
+      steps: { expect: { effects: string[]; effect_settings: Record<string, string[]> } }[];
+    };
+    const reply = exchange.steps[0]!.expect;
+    expect(Object.keys(reply.effect_settings)).toEqual(reply.effects);
+    for (const name of reply.effects) {
+      const row = new RegExp("\\| `" + name + "`\\s+\\| ([^|]+)\\|").exec(spec);
+      const documented = [...(row?.[1] ?? "").matchAll(/`([a-z_]+)`/g)].map((match) => match[1]);
+      expect(reply.effect_settings[name], name).toEqual(documented);
+    }
+  });
+
+  it("show the settings the board names, in its order", () => {
+    const named = { ...info, effect_settings: { breathing: ["floor", "color"], northern_lights: ["color"] } };
+    expect(effectControls("breathing", named)).toEqual({ params: ["floor", "color"], newer: false });
+    // An effect the app does not know, with settings it knows: nothing is missing
+    expect(effectControls("northern_lights", named)).toEqual({ params: ["color"], newer: false });
+    expect(effectControls("static", { ...info, effect_settings: { static: [] } })).toEqual({
+      params: [],
+      newer: false,
+    });
+  });
+
+  it("say a setting is missing when the board names one the app does not know", () => {
+    const named = { ...info, effect_settings: { twinkle: ["color", "sparkle", "twinkle_strength"] } };
+    expect(effectControls("twinkle", named)).toEqual({ params: ["color", "twinkle_strength"], newer: true });
+    expect(effectControls("static", { ...info, effect_settings: { static: ["constructor"] } })).toEqual({
+      params: [],
+      newer: true,
+    });
+  });
+
+  it("fall back to the app's table for a board that names none for the effect", () => {
+    const older = { ...info };
+    delete older.effect_settings;
+    expect(effectControls("color_change", older)).toEqual({
+      params: ["colors", "hold_seconds", "floor"],
+      newer: false,
+    });
+    expect(effectControls("christmas", { ...info, effect_settings: {} })).toEqual({
+      params: ["color_set", "hold_seconds", "floor"],
+      newer: false,
+    });
+    expect(effectControls("constructor", { ...info, effect_settings: {} })).toEqual({ params: [], newer: true });
+    expect(effectControls("northern_lights", older)).toEqual({ params: [], newer: true });
   });
 
   it("have a swatch and a name for every color, and the color sets of the specification", () => {

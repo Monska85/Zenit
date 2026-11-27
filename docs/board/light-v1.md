@@ -61,6 +61,8 @@ The `effect` setting chooses one of these. Parameters are settings; each effect 
 
 `floor` is a percentage of the full factor: `floor = 20` means `F = 200`.
 
+`info.effect_settings` reports the Parameters column of this table, in this order ([protocol](../protocol/protocol-v1.md#info)). It is built from the same registry in `lib/ZenitLight` that decides which parameter changes restart an effect. `fall_asleep` also follows the countdown of `timer_minutes`, a setting of the whole light that is not listed (see [Timer](#timer)).
+
 ### `static`
 
 `color`, `F = 1000`.

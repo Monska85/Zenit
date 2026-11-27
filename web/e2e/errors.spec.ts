@@ -145,7 +145,7 @@ test("keeps showing the last choice while an earlier one is answered late", asyn
   await expect(page.getByTestId("live-effect")).toHaveText("Twinkle", { timeout: 5000 });
 });
 
-test("offers an effect it does not know, as a plain card with no settings", async ({ page }) => {
+test("offers an effect it does not know, as a plain card and a line in place of its settings", async ({ page }) => {
   const mock = await mockBoard(page);
   const answer = mock.board.answer;
   mock.board.answer = (request) =>
@@ -160,6 +160,49 @@ test("offers an effect it does not know, as a plain card with no settings", asyn
   await card.check({ force: true });
   await expect(page.getByTestId("live-effect")).toHaveText("Northern lights");
   await expect(page.getByTestId("effect-settings").locator("input, [role=slider]")).toHaveCount(0);
+  await expect(page.getByTestId("newer-effect")).toHaveText(
+    "This Zenit has a newer effect. Update the app to adjust its settings.",
+  );
+});
+
+/** Connects to a scripted board whose `info` reports `effect_settings` as given (undefined leaves the field out). */
+async function connectWithEffectSettings(page: Page, effectSettings: Record<string, string[]> | undefined) {
+  const mock = await mockBoard(page);
+  if (effectSettings === undefined) delete mock.board.info["effect_settings"];
+  else mock.board.info["effect_settings"] = effectSettings;
+  await page.goto("/");
+  await page.getByLabel("Address of your Zenit").fill(MOCK_URL);
+  await page.getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(page.getByTestId("connection")).toBeVisible();
+  return mock;
+}
+
+test("shows the settings the board names for an effect, in its order", async ({ page }) => {
+  await connectWithEffectSettings(page, { static: ["floor", "color"] });
+  const settings = page.getByTestId("effect-settings");
+  await expect(settings.getByRole("slider", { name: "Dimmest level" })).toHaveCount(1);
+  await expect(settings.getByRole("group", { name: "Color", exact: true })).toHaveCount(1);
+  const text = await settings.innerText();
+  expect(text.indexOf("Dimmest level")).toBeLessThan(text.indexOf("Color"));
+  await expect(page.getByTestId("newer-effect")).toHaveCount(0);
+});
+
+test("says the effect is newer when the board names a setting the app does not know", async ({ page }) => {
+  await connectWithEffectSettings(page, { static: ["color", "sparkle"] });
+  const settings = page.getByTestId("effect-settings");
+  await expect(settings.getByRole("group", { name: "Color", exact: true })).toHaveCount(1);
+  await expect(settings.getByTestId("newer-effect")).toHaveText(
+    "This Zenit has a newer effect. Update the app to adjust its settings.",
+  );
+});
+
+test("uses its own list of settings with a board that reports none", async ({ page }) => {
+  await connectWithEffectSettings(page, undefined);
+  await page.getByRole("radio", { name: "Breathing" }).check({ force: true });
+  const settings = page.getByTestId("effect-settings");
+  await expect(settings.getByRole("slider", { name: "Length of a breath" })).toHaveCount(1);
+  await expect(settings.getByRole("slider", { name: "Dimmest level" })).toHaveCount(1);
+  await expect(settings.getByTestId("newer-effect")).toHaveCount(0);
 });
 
 test("offers only the colors the board lists", async ({ page }) => {

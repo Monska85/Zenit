@@ -61,6 +61,16 @@ const distinctTexts =
     (value as string[]).length >= low &&
     (value as string[]).length <= high &&
     new Set(value as string[]).size === (value as string[]).length;
+/** `info.effect_settings`: an object from effect name to the settings it reads, each named once. Names are open words: an
+ * effect or a setting this app does not know is any text. */
+const settingsByEffect: Check = (value) =>
+  typeof value === "object" &&
+  value !== null &&
+  !Array.isArray(value) &&
+  !(value instanceof JsonFloat) &&
+  Object.values(value).every(
+    (names) => arrayOf(isText)(names) && new Set(names as string[]).size === (names as string[]).length,
+  );
 /** A text that matches the pattern entirely. */
 const matching =
   (pattern: RegExp): Check =>
@@ -210,19 +220,22 @@ const LIGHT = shape({
 
 /** The known fields of a successful reply, by command. */
 export const REPLIES: Record<string, Check> = {
-  info: shape({
-    protocol: isInt,
-    firmware: isText,
-    board: isText,
-    boot_id: isInt,
-    colors: arrayOf(isText),
-    effects: arrayOf(isText),
-    color_sets: arrayOf(isText),
-    power_limit_mw: isInt,
-    memory: shape({ free: isInt, largest: isInt }),
-    nvs: shape({ used: isInt, free: isInt }),
-    limits: shape({ line: isInt }),
-  }),
+  info: shape(
+    {
+      protocol: isInt,
+      firmware: isText,
+      board: isText,
+      boot_id: isInt,
+      colors: arrayOf(isText),
+      effects: arrayOf(isText),
+      color_sets: arrayOf(isText),
+      power_limit_mw: isInt,
+      memory: shape({ free: isInt, largest: isInt }),
+      nvs: shape({ used: isInt, free: isInt }),
+      limits: shape({ line: isInt }),
+    },
+    { effect_settings: settingsByEffect },
+  ),
   status: shape({ light: LIGHT }, { wifi: WIFI, time: TIME, update: UPDATE }),
   light: shape({ light: LIGHT }),
   settings_get: shape({ settings: SETTINGS }),
