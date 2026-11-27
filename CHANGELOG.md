@@ -2,6 +2,25 @@
 
 All notable changes to the firmware are listed here, in the format of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Release-please writes a section for each release from the commits on `main`.
 
+## [1.1.0](https://github.com/Monska85/Zenit/compare/v1.0.0...v1.1.0) (2026-11-27)
+
+
+### Added
+
+* **protocol:** report the settings each effect reads ([#23](https://github.com/Monska85/Zenit/issues/23)) ([ee30966](https://github.com/Monska85/Zenit/commit/ee309668b11fb67d4d9638df28328d90046613c5))
+
+
+### Fixed
+
+* **firmware:** improv deadline, image version skip, login revoke and read errors ([#17](https://github.com/Monska85/Zenit/issues/17)) ([4900018](https://github.com/Monska85/Zenit/commit/4900018d937b9b1a3c041ddb0d4a9ee92f8d2535))
+* **firmware:** stop downloads on a network change, close only the judged client and keep every simulator millisecond ([#21](https://github.com/Monska85/Zenit/issues/21)) ([5fd2174](https://github.com/Monska85/Zenit/commit/5fd2174b104e255d9033e86069eee9f86a955ce5))
+* **web:** connect over wifi from the published site in chrome ([1f4cc1d](https://github.com/Monska85/Zenit/commit/1f4cc1de8502389528b071ab0f571a430e4785ba))
+
+
+### Changed
+
+* remove dead code and duplication and fix stale docs ([#22](https://github.com/Monska85/Zenit/issues/22)) ([7f86293](https://github.com/Monska85/Zenit/commit/7f862932ec9e6d7de38875b5566e7daf1eab2dd5))
+
 ## 1.0.0 (2026-11-24)
 
 
