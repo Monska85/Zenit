@@ -77,7 +77,3 @@ GPIO ── TRIG/PWM                                    ESP32 GND ── module 
 - Never connect the ESP32's own USB-C port while the panel socket is powered: on the SuperMini the USB 5 V is tied to the 5V pin. To flash the firmware, disconnect the panel socket (or the 5V wire) first. On USB alone the board runs and can be configured, but the LED has no power.
 - Without the heat sink: white only, at most 50 % PWM, short sessions.
 - Do not look at the LED from close by at full power.
-
-## Future rotation
-
-The base keeps room for a dome rotation upgrade, not part of the 2026 units: a NEMA 17 pancake stepper motor with a TMC2209 driver in StealthChop, controlled over UART, possibly with a shielded 5 to 9 V boost converter. The firmware keeps the motor as its own future module and reserves no pins for it yet.
