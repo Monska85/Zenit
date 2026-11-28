@@ -2,7 +2,7 @@
 
 Date: 2026-11-21
 
-Status: proposed
+Status: proposed; decision 13 (dome rotation) withdrawn 2026-11-28
 
 ## Context
 
@@ -46,7 +46,7 @@ Constraints that shape the firmware:
 10. **Updates are firmware only.** Modes `off`, `notify` and `automatic` (the default) with an install window. There is no content release.
 11. **The web app** is built in `web/`: React, TypeScript, Vite, a static site on GitHub Pages, Web Serial and WebSocket, firmware install with ESP Web Tools.
 12. **Simulator.** The firmware sources compiled for the host with the LEDC driver replaced by a recorder. It writes the duty of each channel over time, plays in real time in the terminal, and serves the protocol on a local WebSocket for the web app and its end-to-end tests.
-13. **Rotation later.** A future dome motor (NEMA 17 with a TMC2209 over UART) will be its own module next to the light engine. No pin or code is reserved for it now.
+13. **Withdrawn 2026-11-28.** The dome rotation upgrade was dropped; no motor module is planned.
 14. **Process.** Full rigor from the first release: specifications and conformance cases worked out by hand, native tests, web unit and end-to-end tests, reference screenshots, release-please, CI with path filters. The work is delivered in four milestones: foundation and light engine, protocol over USB with settings and releases, web app, WiFi and OTA.
 
 ## Consequences

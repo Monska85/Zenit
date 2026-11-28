@@ -28,7 +28,6 @@ ESP32-C3 SuperMini, one CREE RGBW-1225 LED driven by four low-side MOSFET module
    - set or clear the switch-off timer.
 4. **Timer:** optional, its duration chosen in the app. It starts again from the beginning at every power-on. When it ends, the light switches off with a gradual fade.
 5. **Effects:** the list is decided later. Adding an effect must be simple. Examples discussed: slow breathing, color change.
-6. **Rotation (future):** a dome motor may be added later. Not in scope now, but the code stays organized so it can be added as its own module.
 
 ## Connection and web app (decided 2026-11-21)
 
@@ -63,3 +62,4 @@ ESP32-C3 SuperMini, one CREE RGBW-1225 LED driven by four low-side MOSFET module
 2. **New effects:** shooting star (a sky at 45 % with a flash every 10 to 60 seconds), guided breathing (a pacer with the 4-7-8 or box pattern, a new setting), jingle (pulses in the rhythm of the Jingle Bells chorus, each note in the next color of a palette) and hop (a new color of a palette every 0.7 seconds).
 3. **New palettes:** aurora (green, blue), sunset (red, white) and all (red, green, blue, white).
 4. **At most 3 light changes a second** in every effect, for photosensitive safety. The formulas are in [Light](../board/light-v1.md#effects).
+5. **No dome rotation:** the rotating dome upgrade is dropped, and no motor module is planned.
