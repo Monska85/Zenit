@@ -11,6 +11,8 @@ import {
   colorSetLabel,
   effectControls,
   formatHold,
+  patternHint,
+  patternLabel,
   type ParamName,
   type Settings,
 } from "../../light/model";
@@ -137,6 +139,23 @@ function PaletteChoice({ info, settings, commit }: { info: BoardInfo; settings: 
   );
 }
 
+/** The pattern of Guided breathing, from the patterns the board lists. */
+function PatternChoice({ patterns, settings, commit }: { patterns: string[]; settings: Settings; commit: Commit }) {
+  return (
+    <ChoiceGroup
+      legend="Breathing pattern"
+      groupName="breath-pattern"
+      value={settings.breath_pattern ?? null}
+      onChange={(breath_pattern) => void commit({ breath_pattern })}
+      options={patterns.map((pattern) => ({
+        value: pattern,
+        label: patternLabel(pattern),
+        hint: patternHint(pattern),
+      }))}
+    />
+  );
+}
+
 /** What the app says in place of the controls of a setting it does not know. */
 export const NEWER_EFFECT = "This Zenit has a newer effect. Update the app to adjust its settings.";
 
@@ -183,6 +202,8 @@ export function EffectSettings({
             onCommit={(period_seconds) => commit({ period_seconds })}
           />
         );
+      case "breath_pattern":
+        return <PatternChoice patterns={info.breath_patterns ?? []} settings={settings} commit={commit} />;
       case "floor":
         return (
           <SettingSlider

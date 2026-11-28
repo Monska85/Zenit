@@ -472,7 +472,7 @@ void test_write_settings_defaults()
   TEST_ASSERT_EQUAL_STRING(
       "{\"brightness\":60,\"effect\":\"static\",\"color\":\"white\","
       "\"colors\":[\"red\",\"green\",\"blue\",\"white\"],\"color_set\":\"christmas\","
-      "\"hold_seconds\":30,\"period_seconds\":8,\"floor\":20,\"twinkle_strength\":20,"
+      "\"hold_seconds\":30,\"period_seconds\":8,\"breath_pattern\":\"4-7-8\",\"floor\":20,\"twinkle_strength\":20,"
       "\"timer_minutes\":0,\"wifi_power\":\"auto\",\"update_mode\":\"automatic\","
       "\"update_firmware\":true,\"update_web\":true,\"check_hours\":6,\"install_start\":0,\"install_end\":0,"
       "\"timezone\":\"UTC0\",\"time_sync_hours\":6,\"ntp_server\":\"pool.ntp.org\","
@@ -553,8 +553,9 @@ void test_core_answers_info_with_the_limits()
   TEST_ASSERT_EQUAL_UINT32(1000, doc["power_limit_mw"].as<uint32_t>());
   TEST_ASSERT_EQUAL_UINT32(1024, doc["limits"]["line"].as<uint32_t>());
   TEST_ASSERT_EQUAL_size_t(4, doc["colors"].size());
-  TEST_ASSERT_EQUAL_size_t(6, doc["effects"].size());
-  TEST_ASSERT_EQUAL_size_t(2, doc["color_sets"].size());
+  TEST_ASSERT_EQUAL_size_t(10, doc["effects"].size());
+  TEST_ASSERT_EQUAL_size_t(5, doc["color_sets"].size());
+  TEST_ASSERT_EQUAL_size_t(2, doc["breath_patterns"].size());
 }
 
 void test_core_repeated_request_runs_once()
@@ -814,9 +815,10 @@ void test_core_longest_reply_fits()
 {
   start();
   // Every setting at its longest value.
-  send(framed("{\"seq\":4294967295,\"cmd\":\"settings_set\",\"brightness\":100,\"effect\":\"fall_asleep\","
+  send(framed("{\"seq\":4294967295,\"cmd\":\"settings_set\",\"brightness\":100,\"effect\":\"guided_breathing\","
               "\"color\":\"green\",\"colors\":[\"green\",\"white\",\"blue\",\"red\"],\"color_set\":\"christmas\","
-              "\"hold_seconds\":600,\"period_seconds\":20,\"floor\":80,\"twinkle_strength\":50,"
+              "\"hold_seconds\":600,\"period_seconds\":20,\"breath_pattern\":\"4-7-8\",\"floor\":80,"
+              "\"twinkle_strength\":50,"
               "\"timer_minutes\":360}"));
   TEST_ASSERT_TRUE(reply(0)["ok"].as<bool>());
   TEST_ASSERT_TRUE(written[0].size() < zenit::proto::MAX_REPLY_LINE);
@@ -855,9 +857,10 @@ void test_core_longest_settings_reply_fits()
   for (char c : quotes)
     timezone += std::string("\\") + c;
   const std::string server(64, 'n');
-  send(framed("{\"seq\":4294967295,\"cmd\":\"settings_set\",\"brightness\":100,\"effect\":\"fall_asleep\","
+  send(framed("{\"seq\":4294967295,\"cmd\":\"settings_set\",\"brightness\":100,\"effect\":\"guided_breathing\","
               "\"color\":\"green\",\"colors\":[\"green\",\"white\",\"blue\",\"red\"],\"hold_seconds\":600,"
-              "\"period_seconds\":20,\"floor\":80,\"twinkle_strength\":50,\"timer_minutes\":360,"
+              "\"period_seconds\":20,\"breath_pattern\":\"4-7-8\",\"floor\":80,\"twinkle_strength\":50,"
+              "\"timer_minutes\":360,"
               "\"wifi_power\":\"auto\",\"update_mode\":\"automatic\",\"check_hours\":168,\"install_start\":1439,"
               "\"install_end\":1438,\"time_sync_hours\":168,\"timezone\":\"" +
               timezone + "\",\"ntp_server\":\"" + server + "\"}"));

@@ -23,6 +23,9 @@ bool memory_open = false;
 // so it is never written over until a restart reads it.
 bool settings_read = true;
 bool update_read = true;
+// The size of the light record in the blob as stored, and whether a version 1 layout is kept (keep_old_layout).
+size_t stored_light_size = zenit::LIGHT_RECORD_SIZE;
+bool keep_layout = false;
 // The light record and the board record (docs/board/light-v1.md#stored-settings,
 // docs/board/wifi-and-updates-v1.md#stored-settings) are stored together as one blob under one key, so a save of both
 // is one atomic write: it is all or nothing even when the power fails.
@@ -30,17 +33,23 @@ constexpr const char *SETTINGS_KEY = "settings";
 constexpr const char *UPDATE_KEY = "update";
 constexpr size_t SETTINGS_BLOB_SIZE = zenit::LIGHT_RECORD_SIZE + zenit::net::BOARD_RECORD_SIZE;
 
-// Writes both records in one step.
-bool write_settings(const zenit::LightSettings &light, const zenit::net::BoardSettings &board)
+// Writes both records in one step. `light_size` LIGHT_RECORD_V1_SIZE keeps the layout of firmware 1.1.0 and earlier
+// (docs/board/light-v1.md#stored-settings), for a write at start that a rollback to that firmware may still read.
+bool write_settings(const zenit::LightSettings &light, const zenit::net::BoardSettings &board,
+                    size_t light_size = zenit::LIGHT_RECORD_SIZE)
 {
   uint8_t blob[SETTINGS_BLOB_SIZE];
   uint8_t light_record[zenit::LIGHT_RECORD_SIZE];
   uint8_t board_record[zenit::net::BOARD_RECORD_SIZE];
   zenit::encode_light_record(light, light_record);
+  if (light_size == zenit::LIGHT_RECORD_V1_SIZE)
+    light_record[0] = 1; // version 1 is the first 17 bytes of version 2
+  else
+    light_size = zenit::LIGHT_RECORD_SIZE;
   zenit::net::encode_board_record(board, board_record);
-  std::memcpy(blob, light_record, sizeof(light_record));
-  std::memcpy(blob + sizeof(light_record), board_record, sizeof(board_record));
-  return store::write(SETTINGS_KEY, blob, sizeof(blob));
+  std::memcpy(blob, light_record, light_size);
+  std::memcpy(blob + light_size, board_record, sizeof(board_record));
+  return store::write(SETTINGS_KEY, blob, light_size + sizeof(board_record));
 }
 
 void make_token(zenit::net::BoardSettings &target) { zenit::net::make_token(target.token, platform::random_bytes); }
@@ -54,21 +63,28 @@ void begin()
   uint8_t blob[SETTINGS_BLOB_SIZE];
   size_t blob_size = 0;
   const store::Read blob_read = store::read(SETTINGS_KEY, blob, sizeof(blob), blob_size);
-  // A missing blob, or one of another size (damaged): both records take their defaults. After a failed read every value
-  // keeps its default too, and nothing is written: the stored settings may be fine.
+  // A missing blob, or a damaged one (a size that is not the one of its light record's version): both records take
+  // their defaults. A blob of light record version 1 (firmware 1.1.0 and earlier) keeps every value and is written as
+  // version 2 at the next save. After a failed read every value keeps its default too, and nothing is written: the
+  // stored settings may be fine.
   settings_read = blob_read != store::Read::Failed;
-  if (blob_read == store::Read::Found && blob_size == sizeof(blob))
+  const size_t light_size = blob_read == store::Read::Found
+                                ? zenit::light_record_size_in_blob(blob, blob_size, zenit::net::BOARD_RECORD_SIZE)
+                                : 0;
+  stored_light_size = light_size ? light_size : zenit::LIGHT_RECORD_SIZE;
+  if (light_size)
   {
-    values = zenit::decode_light_record(blob, zenit::LIGHT_RECORD_SIZE);
-    zenit::net::decode_board_record(blob + zenit::LIGHT_RECORD_SIZE, zenit::net::BOARD_RECORD_SIZE, board_values);
+    values = zenit::decode_light_record(blob, light_size);
+    zenit::net::decode_board_record(blob + light_size, zenit::net::BOARD_RECORD_SIZE, board_values);
   }
   if (!zenit::net::valid_token(board_values.token))
   {
-    // First start, or a damaged token: a new one, written at once so every later boot has the same.
+    // First start, or a damaged token: a new one, written at once so every later boot has the same. A version 1 blob
+    // stays version 1 here: this firmware may still be on trial, and the previous one reads only that layout.
     make_token(board_values);
     if (!settings_read)
       platform::log("the settings could not be read: running on the defaults, nothing is saved until a restart");
-    else if (!write_settings(values, board_values))
+    else if (!write_settings(values, board_values, stored_light_size))
       platform::log("the new token could not be saved");
   }
 
@@ -99,6 +115,8 @@ zenit::net::BoardSettings fresh_board_settings()
   return fresh;
 }
 
+void keep_old_layout(bool keep) { keep_layout = keep; }
+
 Commit commit(const zenit::LightSettings &next) { return commit_both(next, board_values); }
 
 Commit commit_board(const zenit::net::BoardSettings &next) { return commit_both(values, next); }
@@ -113,8 +131,13 @@ Commit commit_both(const zenit::LightSettings &light, const zenit::net::BoardSet
   if (light == values && board == board_values)
     return Commit::Ok;
   // One write for both records: all or nothing, with no state in between to repair
-  if (!write_settings(light, board))
+  const size_t light_size = keep_layout && stored_light_size == zenit::LIGHT_RECORD_V1_SIZE &&
+                                    light.breath_pattern == zenit::LightSettings().breath_pattern
+                                ? zenit::LIGHT_RECORD_V1_SIZE
+                                : zenit::LIGHT_RECORD_SIZE;
+  if (!write_settings(light, board, light_size))
     return Commit::Failed;
+  stored_light_size = light_size;
   values = light;
   board_values = board;
   return Commit::Ok;

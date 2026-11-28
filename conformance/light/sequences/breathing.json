@@ -1,9 +1,11 @@
 {
-  "description": "Breathing, period 8 s, floor 20, brightness 100: full at 0, floor at half the period.",
+  "description": "Breathing, period 8 s, floor 20, brightness 100: a = t / 8000, phase = 2 pi a + 0.45 sin(2 pi a / 3.7), depth = 0.86 + 0.14 sin(2 pi a / 5.3 + 1.1), F = 200 + 800 depth (1 + cos(phase)) / 2: 525.59 at 2 s, 222.58 at 4 s, 934.74 at 8 s, 223.84 at 20 s, 200.25 at 123.45 s.",
   "settings": { "effect": "breathing", "brightness": 100 },
   "expect": [
-    { "at": 2000, "duties": [0, 0, 0, 4607] },
-    { "at": 4000, "duties": [0, 0, 0, 490] },
-    { "at": 8000, "duties": [0, 0, 0, 16383] }
+    { "at": 2000, "duties": [0, 0, 0, 3382] },
+    { "at": 4000, "duties": [0, 0, 0, 588] },
+    { "at": 8000, "duties": [0, 0, 0, 13771] },
+    { "at": 20000, "duties": [0, 0, 0, 594] },
+    { "at": 123450, "duties": [0, 0, 0, 491] }
   ]
 }

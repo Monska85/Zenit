@@ -209,7 +209,20 @@ export const STATES: State[] = [
         page,
         board((fake) => (fake.settings["effect"] = "breathing")),
       );
-      await expect(page.getByRole("radio", { name: "Breathing" })).toBeChecked();
+      await expect(page.getByRole("radio", { name: "Breathing", exact: true })).toBeChecked();
+    },
+  },
+  {
+    name: "light-guided-breathing",
+    reach: async (page) => {
+      await connectedLight(
+        page,
+        board((fake) => {
+          fake.settings["effect"] = "guided_breathing";
+          fake.settings["breath_pattern"] = "box";
+        }),
+      );
+      await expect(page.getByRole("radio", { name: /^Box/ })).toBeChecked();
     },
   },
   {

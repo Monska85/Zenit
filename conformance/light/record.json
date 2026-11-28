@@ -1,7 +1,7 @@
 {
-  "description": "The stored record of the light settings, docs/board/light-v1.md#stored-settings. `encode` cases give settings (missing ones take their defaults) and the bytes they are stored as; `decode` cases give bytes and the settings they load as.",
+  "description": "The stored record of the light settings, docs/board/light-v1.md#stored-settings. `encode` cases give settings (missing ones take their defaults) and the bytes they are stored as (version 2, 18 bytes); `decode` cases give bytes and the settings they load as, version 2 and version 1 (17 bytes, the default `breath_pattern`).",
   "encode": [
-    { "settings": {}, "record": [1, 60, 0, 0, 4, 1, 2, 3, 0, 0, 30, 0, 8, 20, 20, 0, 0] },
+    { "settings": {}, "record": [2, 60, 0, 0, 4, 1, 2, 3, 0, 0, 30, 0, 8, 20, 20, 0, 0, 0] },
     {
       "settings": {
         "brightness": 100,
@@ -11,24 +11,56 @@
         "color_set": "ice",
         "hold_seconds": 600,
         "period_seconds": 20,
+        "breath_pattern": "box",
         "floor": 80,
         "twinkle_strength": 50,
         "timer_minutes": 360
       },
-      "record": [1, 100, 5, 3, 2, 3, 0, 0, 0, 1, 88, 2, 20, 80, 50, 104, 1]
+      "record": [2, 100, 5, 3, 2, 3, 0, 0, 0, 1, 88, 2, 20, 80, 50, 104, 1, 1]
+    },
+    { "settings": { "effect": "shooting_star" }, "record": [2, 60, 6, 0, 4, 1, 2, 3, 0, 0, 30, 0, 8, 20, 20, 0, 0, 0] },
+    {
+      "settings": { "effect": "guided_breathing", "color_set": "aurora" },
+      "record": [2, 60, 7, 0, 4, 1, 2, 3, 0, 2, 30, 0, 8, 20, 20, 0, 0, 0]
+    },
+    {
+      "settings": { "effect": "jingle", "color_set": "sunset" },
+      "record": [2, 60, 8, 0, 4, 1, 2, 3, 0, 3, 30, 0, 8, 20, 20, 0, 0, 0]
+    },
+    {
+      "settings": { "effect": "hop", "color_set": "all" },
+      "record": [2, 60, 9, 0, 4, 1, 2, 3, 0, 4, 30, 0, 8, 20, 20, 0, 0, 0]
     }
   ],
   "decode": [
     {
+      "record": [2, 1, 9, 2, 3, 3, 2, 1, 0, 4, 5, 0, 4, 5, 5, 1, 0, 1],
+      "settings": { "brightness": 1, "effect": "hop", "color": "green", "colors": ["blue", "green", "red"], "color_set": "all", "hold_seconds": 5, "period_seconds": 4, "breath_pattern": "box", "floor": 5, "twinkle_strength": 5, "timer_minutes": 1 }
+    },
+    {
+      "record": [2, 80, 7, 0, 4, 1, 2, 3, 0, 0, 30, 0, 8, 20, 20, 0, 0, 2],
+      "settings": { "brightness": 80, "effect": "guided_breathing" }
+    },
+    {
+      "record": [2, 0, 99, 2, 2, 2, 2, 0, 0, 7, 4, 0, 3, 81, 51, 105, 1, 0],
+      "settings": { "color": "green" }
+    },
+    { "record": [2, 80, 10, 4, 5, 1, 2, 3, 0, 5, 0, 0, 21, 4, 4, 0, 0, 2], "settings": { "brightness": 80 } },
+    {
       "record": [1, 1, 4, 2, 3, 3, 2, 1, 0, 0, 5, 0, 4, 5, 5, 1, 0],
       "settings": { "brightness": 1, "effect": "fall_asleep", "color": "green", "colors": ["blue", "green", "red"], "hold_seconds": 5, "period_seconds": 4, "floor": 5, "twinkle_strength": 5, "timer_minutes": 1 }
+    },
+    {
+      "record": [1, 80, 1, 1, 2, 1, 2, 0, 0, 1, 30, 0, 8, 20, 20, 0, 0],
+      "settings": { "brightness": 80, "effect": "color_change", "color": "red", "colors": ["red", "green"], "color_set": "ice" }
     },
     {
       "record": [1, 0, 99, 2, 2, 2, 2, 0, 0, 7, 4, 0, 3, 81, 51, 105, 1],
       "settings": { "color": "green" }
     },
     { "record": [2, 80, 1, 1, 2, 1, 2, 0, 0, 0, 30, 0, 8, 20, 20, 0, 0], "settings": {} },
-    { "record": [1, 80, 1, 1, 2, 1, 2, 0, 0, 0, 30, 0, 8, 20, 20, 0], "settings": {} },
-    { "record": [1, 80, 6, 4, 5, 1, 2, 3, 0, 2, 0, 0, 21, 4, 4, 0, 0], "settings": { "brightness": 80 } }
+    { "record": [1, 80, 1, 1, 2, 1, 2, 0, 0, 0, 30, 0, 8, 20, 20, 0, 0, 0], "settings": {} },
+    { "record": [3, 80, 1, 1, 2, 1, 2, 0, 0, 0, 30, 0, 8, 20, 20, 0, 0, 0], "settings": {} },
+    { "record": [1, 80, 1, 1, 2, 1, 2, 0, 0, 0, 30, 0, 8, 20, 20, 0], "settings": {} }
   ]
 }

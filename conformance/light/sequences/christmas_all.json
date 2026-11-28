@@ -1,0 +1,11 @@
+{
+  "description": "Christmas with the all palette (red, green, blue, white), hold 5 s, brightness 100: four colors of 7 s, then red again.",
+  "settings": { "effect": "christmas", "color_set": "all", "hold_seconds": 5, "brightness": 100 },
+  "expect": [
+    { "at": 3000, "duties": [16383, 0, 0, 0] },
+    { "at": 7500, "duties": [0, 3018, 0, 0] },
+    { "at": 17000, "duties": [0, 0, 16383, 0] },
+    { "at": 24000, "duties": [0, 0, 0, 16383] },
+    { "at": 31000, "duties": [16383, 0, 0, 0] }
+  ]
+}

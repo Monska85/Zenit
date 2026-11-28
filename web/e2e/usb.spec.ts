@@ -35,7 +35,7 @@ test("never touches the control lines of the port", async ({ page }) => {
 
 test("controls the light over USB, and ignores the board's log lines", async ({ page }) => {
   const mock = await connectUsb(page);
-  await page.getByRole("radio", { name: "Breathing" }).check({ force: true });
+  await page.getByRole("radio", { name: "Breathing", exact: true }).check({ force: true });
   await expect(page.getByTestId("live-effect")).toHaveText("Breathing");
   await page.getByRole("button", { name: "Light", exact: true }).click();
   await expect(page.getByTestId("power-button")).toHaveAttribute("aria-pressed", "false");

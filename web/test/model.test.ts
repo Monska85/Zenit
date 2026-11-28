@@ -11,6 +11,9 @@ import {
   formatHold,
   formatSeconds,
   formatTimer,
+  colorSetLabel,
+  patternHint,
+  patternLabel,
   settingsProblem,
 } from "../src/light/model";
 import { toInfo, toSettings } from "../src/protocol/types";
@@ -44,17 +47,27 @@ describe("limits", () => {
     expect(spec).toMatch(/\| `floor`\s+\| integer \| `20`\s+\| 5 to 80\./);
     expect(spec).toMatch(/\| `twinkle_strength`\s+\| integer \| `20`\s+\| 5 to 50\./);
     expect(spec).toMatch(/\| `timer_minutes`\s+\| integer \| `0`\s+\| 0 \(no timer\), or 1 to 360\./);
+    // The pattern is a word the board lists, with the default of both documents
+    expect(spec).toMatch(/\| `breath_pattern`\s+\| string\s+\| `4-7-8`\s+\| One of `info.breath_patterns`\./);
+    const light = readFileSync(join(import.meta.dirname, "..", "..", "docs", "board", "light-v1.md"), "utf8");
+    expect(light).toMatch(/\| `breath_pattern`\s+\| `4-7-8` or `box`\s+\|/);
+    expect(light).toMatch(/\| `guided_breathing` \| `color`, `breath_pattern`, `floor`\s+\| `white`, `4-7-8`, 20\s+\|/);
   });
 });
 
 describe("effects", () => {
   it("show only the settings each effect reads (docs/board/light-v1.md#effects)", () => {
     expect(EFFECTS["static"]?.params).toEqual(["color"]);
+    // The list of a board without info.effect_settings (firmware 1.0.0 and earlier), where they still read floor
     expect(EFFECTS["color_change"]?.params).toEqual(["colors", "hold_seconds", "floor"]);
     expect(EFFECTS["breathing"]?.params).toEqual(["color", "period_seconds", "floor"]);
     expect(EFFECTS["twinkle"]?.params).toEqual(["color", "twinkle_strength"]);
     expect(EFFECTS["fall_asleep"]?.params).toEqual(["color", "floor"]);
     expect(EFFECTS["christmas"]?.params).toEqual(["color_set", "hold_seconds", "floor"]);
+    expect(EFFECTS["shooting_star"]?.params).toEqual(["color"]);
+    expect(EFFECTS["guided_breathing"]?.params).toEqual(["color", "breath_pattern", "floor"]);
+    expect(EFFECTS["jingle"]?.params).toEqual(["color_set"]);
+    expect(EFFECTS["hop"]?.params).toEqual(["color_set"]);
   });
 
   it("match the effect table of the light specification", async () => {
@@ -65,7 +78,10 @@ describe("effects", () => {
       const row = new RegExp("\\| `" + name + "`\\s+\\| ([^|]+)\\|").exec(spec);
       expect(row, name).not.toBeNull();
       const documented = [...(row?.[1] ?? "").matchAll(/`([a-z_]+)`/g)].map((match) => match[1]);
-      expect(documented, name).toEqual(effect.params);
+      // Color change and Christmas stopped reading floor when the board started reporting its lists; the app's list
+      // is for the boards before that, which still read it
+      const before = name === "color_change" || name === "christmas" ? [...documented, "floor"] : documented;
+      expect(before, name).toEqual(effect.params);
     }
   });
 
@@ -123,7 +139,43 @@ describe("effects", () => {
 
   it("have a swatch and a name for every color, and the color sets of the specification", () => {
     for (const color of INFO.colors) expect(COLOR_SWATCHES[color]).toMatch(/^#[0-9a-f]{6}$/);
-    expect(COLOR_SET_COLORS).toEqual({ christmas: ["red", "green", "white"], ice: ["blue", "white"] });
+    expect(COLOR_SET_COLORS).toEqual({
+      christmas: ["red", "green", "white"],
+      ice: ["blue", "white"],
+      aurora: ["green", "blue"],
+      sunset: ["red", "white"],
+      all: ["red", "green", "blue", "white"],
+    });
+    expect(INFO.color_sets.map(colorSetLabel)).toEqual(["Christmas", "Ice", "Aurora", "Sunset", "All colors"]);
+  });
+
+  it("have the palettes of the light specification", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const spec = readFileSync(join(import.meta.dirname, "..", "..", "docs", "board", "light-v1.md"), "utf8");
+    const table = spec.slice(spec.indexOf("### Palettes"), spec.indexOf("### At most 3 light changes"));
+    for (const [name, colors] of Object.entries(COLOR_SET_COLORS)) {
+      const row = new RegExp("\\| `" + name + "`\\s+\\| ([^|]+)\\|").exec(table);
+      expect(row, name).not.toBeNull();
+      expect(
+        [...(row?.[1] ?? "").matchAll(/`([a-z]+)`/g)].map((match) => match[1]),
+        name,
+      ).toEqual(colors);
+    }
+  });
+
+  it("show the pattern choice only when the board lists the patterns", () => {
+    expect(effectControls("guided_breathing", info)).toEqual({
+      params: ["color", "breath_pattern", "floor"],
+      newer: false,
+    });
+    const unlisted = { ...info };
+    delete unlisted.breath_patterns;
+    expect(effectControls("guided_breathing", unlisted)).toEqual({ params: ["color", "floor"], newer: true });
+    expect(patternLabel("box")).toBe("Box");
+    expect(patternLabel("4-7-8")).toBe("4-7-8");
+    expect(patternLabel("slow_wave")).toBe("Slow wave");
+    expect(patternHint("4-7-8")).toBe("In 4 s, hold 7 s, out 8 s.");
   });
 
   it("describe an effect the app does not know in words, with no settings", () => {
@@ -177,6 +229,8 @@ describe("settingsProblem", () => {
     expect(settingsProblem(settings({ effect: "disco" }), info)).not.toBeNull();
     expect(settingsProblem(settings({ color: "pink" }), info)).not.toBeNull();
     expect(settingsProblem(settings({ color_set: "neon" }), info)).not.toBeNull();
+    expect(settingsProblem(settings({ breath_pattern: "triangle" }), info)).toContain("breathing pattern");
+    expect(settingsProblem(settings({ breath_pattern: "box", color_set: "all" }), info)).toBeNull();
     expect(settingsProblem(settings({ colors: ["red"] }), info)).not.toBeNull();
     expect(settingsProblem(settings({ colors: ["red", "red"] }), info)).not.toBeNull();
     expect(settingsProblem(settings({ colors: ["red", "pink"] }), info)).not.toBeNull();

@@ -34,7 +34,7 @@ test("sends a setting only when the slider is released", async ({ page }) => {
 
 test("sends each choice as one setting, and only that", async ({ page }) => {
   const mock = await connect(page);
-  await page.getByRole("radio", { name: "Breathing" }).check({ force: true });
+  await page.getByRole("radio", { name: "Breathing", exact: true }).check({ force: true });
   await expect.poll(() => mock.board.requests.filter((request) => request["cmd"] === "settings_set")).toHaveLength(1);
   const sent = mock.board.requests.filter((request) => request["cmd"] === "settings_set");
   expect(sent[0]).toMatchObject({ effect: "breathing" });
@@ -52,7 +52,7 @@ test("asks the board for its status every second while the page is visible", asy
 test("shows what the board holds, with a sentence, when it refuses a value", async ({ page }) => {
   const mock = await connect(page);
   mock.board.errors.set("settings_set", "bad_request");
-  await page.getByRole("radio", { name: "Breathing" }).check({ force: true });
+  await page.getByRole("radio", { name: "Breathing", exact: true }).check({ force: true });
   await expect(page.getByRole("alert")).toHaveText("Zenit did not accept that value.");
   await expect(page.getByRole("radio", { name: "Steady" })).toBeChecked();
   await page.getByRole("button", { name: "Close this message" }).click();
@@ -177,13 +177,13 @@ test("keeps showing the last choice while an earlier one is answered late", asyn
     setTimeout(() => (firstAnswered = true), 650);
     return 600;
   };
-  await page.getByRole("radio", { name: "Breathing" }).check({ force: true });
+  await page.getByRole("radio", { name: "Breathing", exact: true }).check({ force: true });
   await page.getByRole("radio", { name: "Twinkle" }).check({ force: true });
   // After the first answer, the second is still on its way: the choice on screen is the second
   await expect.poll(() => mock.board.settings["effect"], { timeout: 5000 }).toBe("twinkle");
   await expect.poll(() => firstAnswered).toBe(true);
   await expect(page.getByRole("radio", { name: "Twinkle" })).toBeChecked();
-  await expect(page.getByRole("radio", { name: "Breathing" })).not.toBeChecked();
+  await expect(page.getByRole("radio", { name: "Breathing", exact: true })).not.toBeChecked();
   await expect(page.getByTestId("live-effect")).toHaveText("Twinkle", { timeout: 5000 });
 });
 
@@ -240,7 +240,7 @@ test("says the effect is newer when the board names a setting the app does not k
 
 test("uses its own list of settings with a board that reports none", async ({ page }) => {
   await connectWithEffectSettings(page, undefined);
-  await page.getByRole("radio", { name: "Breathing" }).check({ force: true });
+  await page.getByRole("radio", { name: "Breathing", exact: true }).check({ force: true });
   const settings = page.getByTestId("effect-settings");
   await expect(settings.getByRole("slider", { name: "Length of a breath" })).toHaveCount(1);
   await expect(settings.getByRole("slider", { name: "Dimmest level" })).toHaveCount(1);

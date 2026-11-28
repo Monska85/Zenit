@@ -149,6 +149,9 @@ Failure cmd_info(const Context &, JsonDocument &reply)
   JsonArray sets = reply["color_sets"].to<JsonArray>();
   for (size_t i = 0; i < zenit::COLOR_SET_COUNT; i++)
     sets.add(zenit::color_set_name(static_cast<zenit::ColorSet>(i)));
+  JsonArray patterns = reply["breath_patterns"].to<JsonArray>();
+  for (size_t i = 0; i < zenit::BREATH_PATTERN_COUNT; i++)
+    patterns.add(zenit::breath_pattern_name(static_cast<zenit::BreathPattern>(i)));
   reply["power_limit_mw"] = zenit::POWER_LIMIT_MW;
   const platform::MemoryInfo memory = platform::memory_info();
   reply["memory"]["free"] = memory.free;

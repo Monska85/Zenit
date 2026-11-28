@@ -1,0 +1,11 @@
+{
+  "description": "Twinkle, strength 50, seed 3, brightness 100, during the fade-in: the second knot (385 ms, 456 long) is a deep dip, its draw 2 gives x mod 100 < 7 and its target 1000 - 700 + (x mod 201) = 355. Factor 679.13 at 600 ms (fade-in 0.6), 355 at 841 ms (0.841), then the third knot toward 993.85 (654.31 at 1.2 s) and the fourth toward 511.15 (748.31 at 2 s).",
+  "settings": { "effect": "twinkle", "twinkle_strength": 50, "brightness": 100 },
+  "seed": 3,
+  "expect": [
+    { "at": 600, "duties": [0, 0, 0, 1918] },
+    { "at": 841, "duties": [0, 0, 0, 1012] },
+    { "at": 1200, "duties": [0, 0, 0, 5668] },
+    { "at": 2000, "duties": [0, 0, 0, 7865] }
+  ]
+}

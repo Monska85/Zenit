@@ -1,16 +1,16 @@
 {
-  "description": "Color change of red and green, hold 5 s, brightness 100. A floor change at 6.8 s holds red at factor 360 and fades it down; the change back at 7.1 s comes when the effect is green, so the fade-down goes on to 72 at 7.3 s and the effect starts again with red at 1000, reached at 7.8 s.",
+  "description": "Color change of red and green, hold 5 s, brightness 100. A hold change at 6.8 s holds red at factor 200 (fading to dark) and fades it down; the change back at 7.1 s comes when the effect is green, so the fade-down goes on to 40 at 7.3 s and the effect starts again with red at 1000, reached at 7.8 s.",
   "settings": { "effect": "color_change", "colors": ["red", "green"], "hold_seconds": 5, "brightness": 100 },
   "events": [
-    { "at": 6800, "set": { "floor": 30 } },
-    { "at": 7100, "set": { "floor": 20 } }
+    {"at": 6800, "set": {"hold_seconds": 6}},
+    {"at": 7100, "set": {"hold_seconds": 5}}
   ],
   "expect": [
-    { "at": 6800, "duties": [1476, 0, 0, 0] },
-    { "at": 7100, "duties": [439, 0, 0, 0] },
-    { "at": 7200, "duties": [255, 0, 0, 0] },
-    { "at": 7300, "duties": [131, 0, 0, 0] },
-    { "at": 7550, "duties": [3539, 0, 0, 0] },
+    { "at": 6800, "duties": [490, 0, 0, 0] },
+    { "at": 7100, "duties": [193, 0, 0, 0] },
+    { "at": 7200, "duties": [131, 0, 0, 0] },
+    { "at": 7300, "duties": [73, 0, 0, 0] },
+    { "at": 7550, "duties": [3300, 0, 0, 0] },
     { "at": 7800, "duties": [16383, 0, 0, 0] }
   ]
 }

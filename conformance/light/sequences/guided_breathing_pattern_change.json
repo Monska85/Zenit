@@ -1,0 +1,12 @@
+{
+  "description": "Guided breathing 4-7-8 at full (6 s), brightness 100, the pattern changed to box: the factor goes down to 200 by 6.5 s, then box starts at its floor and the fade-in moves from 200 to its own factor (207.69 at 250 ms, so 203.84 halfway), 230.45 at 7 s and 446.93 at 8 s.",
+  "settings": { "effect": "guided_breathing", "brightness": 100 },
+  "events": [{ "at": 6000, "set": { "breath_pattern": "box" } }],
+  "expect": [
+    { "at": 6250, "duties": [0, 0, 0, 4607] },
+    { "at": 6500, "duties": [0, 0, 0, 490] },
+    { "at": 6750, "duties": [0, 0, 0, 506] },
+    { "at": 7000, "duties": [0, 0, 0, 625] },
+    { "at": 8000, "duties": [0, 0, 0, 2347] }
+  ]
+}

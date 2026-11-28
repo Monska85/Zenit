@@ -76,7 +76,7 @@ What the board is and what it supports. No fields.
 
 ```text
 > {"seq":1,"cmd":"info"}
-< {"seq":1,"ok":true,"protocol":1,"firmware":"1.0.0","board":"esp32c3","boot_id":2864434397,"colors":["white","red","green","blue"],"effects":["static","color_change","breathing","twinkle","fall_asleep","christmas"],"effect_settings":{"static":["color"],"color_change":["colors","hold_seconds","floor"],"breathing":["color","period_seconds","floor"],"twinkle":["color","twinkle_strength"],"fall_asleep":["color","floor"],"christmas":["color_set","hold_seconds","floor"]},"color_sets":["christmas","ice"],"power_limit_mw":1000,"memory":{"free":182340,"largest":110580},"nvs":{"used":96,"free":408},"limits":{"line":1024}}
+< {"seq":1,"ok":true,"protocol":1,"firmware":"1.0.0","board":"esp32c3","boot_id":2864434397,"colors":["white","red","green","blue"],"effects":["static","color_change","breathing","twinkle","fall_asleep","christmas","shooting_star","guided_breathing","jingle","hop"],"effect_settings":{"static":["color"],"color_change":["colors","hold_seconds"],"breathing":["color","period_seconds","floor"],"twinkle":["color","twinkle_strength"],"fall_asleep":["color","floor"],"christmas":["color_set","hold_seconds"],"shooting_star":["color"],"guided_breathing":["color","breath_pattern","floor"],"jingle":["color_set"],"hop":["color_set"]},"color_sets":["christmas","ice","aurora","sunset","all"],"breath_patterns":["4-7-8","box"],"power_limit_mw":1000,"memory":{"free":182340,"largest":110580},"nvs":{"used":96,"free":408},"limits":{"line":1024}}
 ```
 
 | Field             | Meaning                                                                                                                                                     |
@@ -88,15 +88,16 @@ What the board is and what it supports. No fields.
 | `colors`          | The colors the board can light.                                                                                                                             |
 | `effects`         | The effects the board knows, in the order a client shows them.                                                                                              |
 | `effect_settings` | Optional. An object with one entry per effect of `effects`: the names of the light settings the effect reads, in the order a client shows them (see below). |
-| `color_sets`      | The preset lists of the `christmas` effect.                                                                                                                 |
+| `color_sets`      | The palettes, the preset lists of colors of the effects that read `color_set`.                                                                              |
+| `breath_patterns` | Optional. The patterns of the `guided_breathing` effect, the values of `breath_pattern`. A firmware from before that effect leaves it out.                  |
 | `power_limit_mw`  | The power limit of the light, in mW.                                                                                                                        |
 | `memory`          | `free` bytes and the `largest` allocatable block, for diagnosis; `0` for both in the simulator.                                                             |
 | `nvs`             | `used` and `free` entries of the settings memory, for diagnosis; `0` for both in the simulator.                                                             |
 | `limits`          | `line`: the longest line the board reads.                                                                                                                   |
 
-A client offers only the colors, effects and color sets the board lists, so later firmware can add them.
+A client offers only the colors, effects, color sets and breathing patterns the board lists, so later firmware can add them.
 
-`effect_settings` lists, for each effect, the parameters of [light-v1](../board/light-v1.md#effects): the settings of `settings_get` that the effect reads and a client shows with it, each once, in the order of the settings table of [`settings_get`](#settings_get-settings_set). `brightness` and `timer_minutes` are settings of the whole light and are never listed. An effect that reads no setting has an empty list. A firmware from before this field leaves it out. The names are open words, as the effect names are: a later firmware may list a setting a client does not know. A client shows a control for each setting it knows, in the listed order, and says plainly that a setting is missing for the others; it ignores an entry for an effect `effects` does not list. For an effect with no entry (the field missing) a client uses its own knowledge of the effect, and says plainly that it cannot show the settings of an effect it does not know.
+`effect_settings` lists, for each effect, the parameters of [light-v1](../board/light-v1.md#effects): the settings of `settings_get` that the effect reads and a client shows with it, each once, in the order of the settings table of [`settings_get`](#settings_get-settings_set). `brightness` and `timer_minutes` are settings of the whole light and are never listed. An effect that reads no setting has an empty list. The list belongs to the firmware: a later firmware may change what an effect reads (from the firmware that added `guided_breathing`, `color_change` and `christmas` no longer read `floor`), so a client follows the list of the board it talks to. A firmware from before this field leaves it out. The names are open words, as the effect names are: a later firmware may list a setting a client does not know. A client shows a control for each setting it knows, in the listed order, and says plainly that a setting is missing for the others; it ignores an entry for an effect `effects` does not list. For an effect with no entry (the field missing) a client uses its own knowledge of the effect, and says plainly that it cannot show the settings of an effect it does not know.
 
 ### `status`
 
@@ -134,6 +135,7 @@ Light settings, specified in [Light](../board/light-v1.md):
 | `color_set`        | string  | `christmas`                         | One of `info.color_sets`.                                       |
 | `hold_seconds`     | integer | `30`                                | 5 to 600.                                                       |
 | `period_seconds`   | integer | `8`                                 | 4 to 20.                                                        |
+| `breath_pattern`   | string  | `4-7-8`                             | One of `info.breath_patterns`. A firmware from before `guided_breathing` has no such setting: it leaves it out of `settings_get`, and the field is `bad_request` in `settings_set`. |
 | `floor`            | integer | `20`                                | 5 to 80.                                                        |
 | `twinkle_strength` | integer | `20`                                | 5 to 50.                                                        |
 | `timer_minutes`    | integer | `0`                                 | 0 (no timer), or 1 to 360.                                      |
@@ -231,7 +233,7 @@ Lines sent by the board can be longer; clients accept lines up to 4,096 bytes. T
 
 ### Protocol version
 
-Version 1 grows only by addition: new commands, new optional request fields, new reply fields, new error codes, new colors, effects and color sets. Removing or changing the meaning of anything makes protocol 2.
+Version 1 grows only by addition: new commands, new optional request fields, new reply fields, new error codes, new colors, effects, color sets and breathing patterns, and new settings. Removing or changing the meaning of anything makes protocol 2.
 
 Open words: the words that name a state, a result or a choice (`status.wifi.state`, `status.update.mode`, `status.update.state`, `status.update.last_result`, and the settings `wifi_power` and `update_mode`) may get new values in a later firmware. A client accepts any text there, shows an unknown word plainly, and applies a rule that depends on a word (an address only while `connected`, a percentage only while `downloading`) only to the words it knows. What the specification closes stays strict: ranges, whole numbers, versions of the form `X.Y.Z`, the token, the nonce, the host name and the null rules above.
 

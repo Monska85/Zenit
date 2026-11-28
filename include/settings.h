@@ -45,6 +45,10 @@ enum class Commit
 Commit commit_both(const zenit::LightSettings &light, const zenit::net::BoardSettings &board);
 // commit_both with the current board settings.
 Commit commit(const zenit::LightSettings &next);
+// While the firmware is on trial, the previous firmware may boot again and read the blob: a blob stored with a light
+// record of version 1 keeps that layout at every save that keeps the default `breath_pattern`
+// (docs/board/light-v1.md#stored-settings). The update logic sets it at start and clears it when the firmware confirms.
+void keep_old_layout(bool keep);
 // commit_both with the current light settings.
 Commit commit_board(const zenit::net::BoardSettings &next);
 // Stores the update record.

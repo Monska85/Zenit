@@ -111,7 +111,7 @@ The board checks the project's site for a newer firmware (`firmware/update.json`
 
 ## Web app
 
-The web app in [`web/`](web/) controls a Zenit from a phone or a laptop: a big on/off button, brightness, the six effects with only the settings each one reads, a sleep timer and the live state, over USB (Web Serial, in Chrome and Edge) or over a WebSocket. Its Device page shows the firmware version against the latest published one and installs or updates the firmware with [ESP Web Tools](https://esphome.github.io/esp-web-tools/). It is a static site that sends nothing anywhere but to the board. The specification is [`docs/web/web-app-v1.md`](docs/web/web-app-v1.md).
+The web app in [`web/`](web/) controls a Zenit from a phone or a laptop: a big on/off button, brightness, the ten effects with only the settings each one reads, a sleep timer and the live state, over USB (Web Serial, in Chrome and Edge) or over a WebSocket. Its Device page shows the firmware version against the latest published one and installs or updates the firmware with [ESP Web Tools](https://esphome.github.io/esp-web-tools/). It is a static site that sends nothing anywhere but to the board. The specification is [`docs/web/web-app-v1.md`](docs/web/web-app-v1.md).
 
 To try it without a board, run it against the simulator:
 

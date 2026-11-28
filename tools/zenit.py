@@ -325,6 +325,8 @@ SETTINGS = {
     "color_set": is_text,
     "hold_seconds": int_in(5, 600),
     "period_seconds": int_in(4, 20),
+    # A firmware from before guided_breathing has no breath_pattern
+    "breath_pattern": Maybe(is_text),
     "floor": int_in(5, 80),
     "twinkle_strength": int_in(5, 50),
     "timer_minutes": int_in(0, 360),
@@ -437,6 +439,7 @@ REPLIES = {
         "effects": [is_text],
         "effect_settings": Maybe(settings_by_effect),
         "color_sets": [is_text],
+        "breath_patterns": Maybe([is_text]),
         "power_limit_mw": is_int,
         "memory": {"free": is_int, "largest": is_int},
         "nvs": {"used": is_int, "free": is_int},

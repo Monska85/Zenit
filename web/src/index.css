@@ -163,6 +163,81 @@ body {
   }
 }
 
+/* A dim sky with one quick flash, fading back. */
+@keyframes preview-shooting-star {
+  0%,
+  70% {
+    opacity: 0.45;
+  }
+  73% {
+    opacity: 1;
+  }
+  90%,
+  100% {
+    opacity: 0.45;
+  }
+}
+
+/* Breathe in, hold, breathe out, hold. */
+@keyframes preview-guided {
+  0% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  25%,
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  75%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+}
+
+/* Four pulses in the rhythm of the chorus (short, short, long, rest), each in the next color. */
+@keyframes preview-jingle {
+  0% {
+    background: #e5322d;
+    opacity: 1;
+  }
+  20% {
+    background: #e5322d;
+    opacity: 0.35;
+  }
+  25% {
+    background: #2fa84f;
+    opacity: 1;
+  }
+  45% {
+    background: #2fa84f;
+    opacity: 0.35;
+  }
+  50% {
+    background: #fff1cf;
+    opacity: 1;
+  }
+  100% {
+    background: #fff1cf;
+    opacity: 0.3;
+  }
+}
+
+/* A new color every 0.7 s. */
+@keyframes preview-hop {
+  0%,
+  100% {
+    background: #e5322d;
+  }
+  33.333% {
+    background: #2fa84f;
+  }
+  66.667% {
+    background: #fff1cf;
+  }
+}
+
 /* An infinite animation with a tiny duration would show a random frame at each repaint: run it once, at once. */
 @media (prefers-reduced-motion: reduce) {
   *,

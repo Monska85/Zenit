@@ -72,7 +72,7 @@ void usage()
   std::puts(
       "usage: program [options]\n"
       "  --duration SECONDS     virtual time to run, whole seconds (default 60)\n"
-      "  --seed N               seed of the twinkle effect (default 1)\n"
+      "  --seed N               seed of the random sequence of the effects (default 1)\n"
       "  --set KEY=VALUE        a stored setting at the start (repeat), e.g. --set effect=breathing\n"
       "  --event MS:on|off      turn the light on or off at MS milliseconds (repeat)\n"
       "  --event MS:KEY=VALUE   change a setting at MS milliseconds, as the app does (repeat)\n"
@@ -88,7 +88,7 @@ void usage()
       "                         acknowledged with the line `!wifi-closed`); a wifi transport keeps every `\\r`,\n"
       "                         as a WebSocket message has no line ending\n"
       "Settings: brightness, effect, color, colors (comma separated), color_set, hold_seconds, period_seconds,\n"
-      "floor, twinkle_strength, timer_minutes.");
+      "breath_pattern, floor, twinkle_strength, timer_minutes.");
 }
 
 // A whole number from 0 to `max`, digits only.

@@ -26,7 +26,7 @@ test("finds the board that served it and connects by itself, with no Connect scr
 test("controls the light as over any other connection", async ({ page, servedSimulator }) => {
   await page.goto(`${servedSimulator.origin}/`);
   await expect(page.getByRole("button", { name: /^Connection: (WiFi|USB)/ })).toBeVisible();
-  await page.getByRole("radio", { name: "Breathing" }).check({ force: true });
+  await page.getByRole("radio", { name: "Breathing", exact: true }).check({ force: true });
   await expect(page.getByTestId("live-effect")).toHaveText("Breathing");
   await page.getByRole("button", { name: "Light", exact: true }).click();
   await expect(page.getByTestId("power-button")).toHaveAttribute("aria-pressed", "false");

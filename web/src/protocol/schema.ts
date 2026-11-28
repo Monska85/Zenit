@@ -108,6 +108,8 @@ const SETTINGS = shape(
     timer_minutes: intIn(0, 360),
   },
   {
+    // A firmware from before guided_breathing has no breath_pattern
+    breath_pattern: isText,
     // Words a newer firmware may extend are any text: the app names the ones it knows (docs/protocol/protocol-v1.md#versions)
     wifi_power: isText,
     update_mode: isText,
@@ -234,7 +236,7 @@ export const REPLIES: Record<string, Check> = {
       nvs: shape({ used: isInt, free: isInt }),
       limits: shape({ line: isInt }),
     },
-    { effect_settings: settingsByEffect },
+    { effect_settings: settingsByEffect, breath_patterns: arrayOf(isText) },
   ),
   status: shape({ light: LIGHT }, { wifi: WIFI, time: TIME, update: UPDATE }),
   light: shape({ light: LIGHT }),

@@ -273,6 +273,7 @@ void confirm_trial(uint64_t now)
     return;
   }
   boot.trial = false;
+  settings::keep_old_layout(false);
   platform::log("firmware confirmed");
   if (settings::update_record_readable())
   {
@@ -295,6 +296,7 @@ void begin(uint64_t now)
   schedule = Schedule();
   boot = Boot();
   boot.trial = firmware::on_trial();
+  settings::keep_old_layout(boot.trial);
   boot.unsettled = !settings::update_record_readable();
   if (!boot.trial && !boot.unsettled)
     settle_boot(now);

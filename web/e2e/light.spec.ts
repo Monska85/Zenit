@@ -87,11 +87,15 @@ test("sends a slider moved with the keyboard after a pause", async ({ page }) =>
 
 const EFFECT_SETTINGS: Array<[string, string[]]> = [
   ["Steady", ["Color"]],
-  ["Color change", ["Colors", "Time on each color", "Dimmest level"]],
+  ["Color change", ["Colors", "Time on each color"]],
   ["Breathing", ["Color", "Length of a breath", "Dimmest level"]],
   ["Twinkle", ["Color", "Twinkle strength"]],
   ["Fall asleep", ["Color", "Dimmest level"]],
-  ["Christmas", ["Palette", "Time on each color", "Dimmest level"]],
+  ["Christmas", ["Palette", "Time on each color"]],
+  ["Shooting star", ["Color"]],
+  ["Guided breathing", ["Color", "Breathing pattern", "Dimmest level"]],
+  ["Jingle", ["Palette"]],
+  ["Hop", ["Palette"]],
 ];
 const ALL_SETTINGS = [
   "Color",
@@ -99,6 +103,7 @@ const ALL_SETTINGS = [
   "Palette",
   "Time on each color",
   "Length of a breath",
+  "Breathing pattern",
   "Dimmest level",
   "Twinkle strength",
 ];
@@ -162,6 +167,26 @@ test("sets the time on each color from its slider", async ({ page }) => {
   await expect(page.getByRole("slider", { name: "Time on each color" })).not.toHaveAttribute("aria-valuenow", "30");
   const text = await page.getByRole("slider", { name: "Time on each color" }).getAttribute("aria-valuetext");
   expect(text).toMatch(/^(\d+ s|\d+ min( \d+ s)?)$/);
+});
+
+test("chooses the breathing pattern of Guided breathing", async ({ page }) => {
+  await page.getByRole("radio", { name: "Guided breathing" }).check({ force: true });
+  await expect(page.getByTestId("live-effect")).toHaveText("Guided breathing");
+  const pattern = page.getByRole("group", { name: "Breathing pattern" });
+  await expect(pattern.getByRole("radio", { name: /^4-7-8/ })).toBeChecked();
+  await expect(pattern.getByText("In 4 s, hold 7 s, out 8 s.")).toBeVisible();
+  await pattern.getByRole("radio", { name: /^Box/ }).check({ force: true });
+  await expect(pattern.getByRole("radio", { name: /^Box/ })).toBeChecked();
+  await expect.poll(() => saves.some((line) => line.includes('"breath_pattern":"box"'))).toBe(true);
+});
+
+test("offers every palette the board lists", async ({ page }) => {
+  await page.getByRole("radio", { name: "Hop" }).check({ force: true });
+  const palette = page.getByRole("group", { name: "Palette" });
+  for (const name of ["Christmas", "Ice", "Aurora", "Sunset", "All colors"])
+    await expect(palette.getByRole("radio", { name: new RegExp("^" + name) })).toHaveCount(1);
+  await palette.getByRole("radio", { name: /^All colors/ }).check({ force: true });
+  await expect(palette.getByText("Red, Green, Blue, Warm white")).toBeVisible();
 });
 
 test("shows a hint on Fall asleep while there is no timer", async ({ page }) => {

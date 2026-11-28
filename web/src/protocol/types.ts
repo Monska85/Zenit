@@ -14,6 +14,8 @@ export interface BoardInfo {
   /** The settings each effect reads, in the order the app shows them; missing on a board from before it. */
   effect_settings?: Record<string, string[]>;
   color_sets: string[];
+  /** The patterns of `guided_breathing`; missing on a board from before that effect. */
+  breath_patterns?: string[];
   power_limit_mw: number;
   memory: { free: number; largest: number };
   nvs: { used: number; free: number };
@@ -28,6 +30,8 @@ export interface Settings extends BoardSettings {
   color_set: string;
   hold_seconds: number;
   period_seconds: number;
+  /** Missing on a board from before `guided_breathing`. */
+  breath_pattern?: string;
   floor: number;
   twinkle_strength: number;
   timer_minutes: number;

@@ -9,9 +9,25 @@ namespace zenit
 
 namespace
 {
-const char *const EFFECT_NAMES[EFFECT_COUNT] = {"static",  "color_change", "breathing",
-                                                "twinkle", "fall_asleep",  "christmas"};
-const char *const COLOR_SET_NAMES[COLOR_SET_COUNT] = {"christmas", "ice"};
+const char *const EFFECT_NAMES[EFFECT_COUNT] = {"static",      "color_change", "breathing",     "twinkle",
+                                                "fall_asleep", "christmas",    "shooting_star", "guided_breathing",
+                                                "jingle",      "hop"};
+const char *const COLOR_SET_NAMES[COLOR_SET_COUNT] = {"christmas", "ice", "aurora", "sunset", "all"};
+const char *const BREATH_PATTERN_NAMES[BREATH_PATTERN_COUNT] = {"4-7-8", "box"};
+
+// The index of `name` in `names`, or false.
+bool index_of(const char *const *names, size_t count, const char *name, size_t &index)
+{
+  if (!name)
+    return false;
+  for (size_t i = 0; i < count; i++)
+    if (std::strcmp(name, names[i]) == 0)
+    {
+      index = i;
+      return true;
+    }
+  return false;
+}
 
 const LightField LIGHT_FIELDS[] = {
     {"brightness", FieldKind::Number, MIN_BRIGHTNESS, MAX_BRIGHTNESS, nullptr,
@@ -47,6 +63,11 @@ const LightField LIGHT_FIELDS[] = {
      {
        s.period_seconds = static_cast<uint8_t>(n);
        return true;
+     }},
+    {"breath_pattern", FieldKind::Name, 0, 0, "not a breathing pattern of the board",
+     [](LightSettings &s, uint32_t, const char *text)
+     {
+       return breath_pattern_from_name(text, s.breath_pattern);
      }},
     {"floor", FieldKind::Number, MIN_FLOOR, MAX_FLOOR, nullptr,
      [](LightSettings &s, uint32_t n, const char *)
@@ -91,7 +112,8 @@ bool LightSettings::operator==(const LightSettings &other) const
 {
   return brightness == other.brightness && effect == other.effect && color == other.color && colors == other.colors &&
          color_set == other.color_set && hold_seconds == other.hold_seconds && period_seconds == other.period_seconds &&
-         floor == other.floor && twinkle_strength == other.twinkle_strength && timer_minutes == other.timer_minutes;
+         breath_pattern == other.breath_pattern && floor == other.floor && twinkle_strength == other.twinkle_strength &&
+         timer_minutes == other.timer_minutes;
 }
 
 bool valid_brightness(uint32_t value) { return value >= MIN_BRIGHTNESS && value <= MAX_BRIGHTNESS; }
@@ -122,8 +144,8 @@ bool valid(const LightSettings &s)
   return valid_brightness(s.brightness) && static_cast<size_t>(s.effect) < EFFECT_COUNT &&
          static_cast<size_t>(s.color) < COLOR_COUNT && valid_colors(s.colors) &&
          static_cast<size_t>(s.color_set) < COLOR_SET_COUNT && valid_hold_seconds(s.hold_seconds) &&
-         valid_period_seconds(s.period_seconds) && valid_floor(s.floor) && valid_twinkle_strength(s.twinkle_strength) &&
-         valid_timer_minutes(s.timer_minutes);
+         valid_period_seconds(s.period_seconds) && static_cast<size_t>(s.breath_pattern) < BREATH_PATTERN_COUNT &&
+         valid_floor(s.floor) && valid_twinkle_strength(s.twinkle_strength) && valid_timer_minutes(s.timer_minutes);
 }
 
 const char *effect_name(Effect effect)
@@ -134,15 +156,11 @@ const char *effect_name(Effect effect)
 
 bool effect_from_name(const char *name, Effect &effect)
 {
-  if (!name)
+  size_t index = 0;
+  if (!index_of(EFFECT_NAMES, EFFECT_COUNT, name, index))
     return false;
-  for (size_t i = 0; i < EFFECT_COUNT; i++)
-    if (std::strcmp(name, EFFECT_NAMES[i]) == 0)
-    {
-      effect = static_cast<Effect>(i);
-      return true;
-    }
-  return false;
+  effect = static_cast<Effect>(index);
+  return true;
 }
 
 const char *color_set_name(ColorSet set)
@@ -153,34 +171,40 @@ const char *color_set_name(ColorSet set)
 
 bool color_set_from_name(const char *name, ColorSet &set)
 {
-  if (!name)
+  size_t index = 0;
+  if (!index_of(COLOR_SET_NAMES, COLOR_SET_COUNT, name, index))
     return false;
-  for (size_t i = 0; i < COLOR_SET_COUNT; i++)
-    if (std::strcmp(name, COLOR_SET_NAMES[i]) == 0)
-    {
-      set = static_cast<ColorSet>(i);
-      return true;
-    }
-  return false;
+  set = static_cast<ColorSet>(index);
+  return true;
 }
 
 ColorList color_set_colors(ColorSet set)
 {
-  ColorList list;
-  if (set == ColorSet::Ice)
-  {
-    list.color[0] = Color::Blue;
-    list.color[1] = Color::White;
-    list.count = 2;
-  }
-  else
-  {
-    list.color[0] = Color::Red;
-    list.color[1] = Color::Green;
-    list.color[2] = Color::White;
-    list.count = 3;
-  }
-  return list;
+  // In the order of ColorSet (docs/board/light-v1.md#palettes); every palette has MIN_COLORS or more.
+  static const ColorList PALETTES[COLOR_SET_COUNT] = {
+      {{Color::Red, Color::Green, Color::White, Color::White}, 3},
+      {{Color::Blue, Color::White, Color::White, Color::White}, 2},
+      {{Color::Green, Color::Blue, Color::White, Color::White}, 2},
+      {{Color::Red, Color::White, Color::White, Color::White}, 2},
+      {{Color::Red, Color::Green, Color::Blue, Color::White}, 4},
+  };
+  const size_t index = static_cast<size_t>(set);
+  return PALETTES[index < COLOR_SET_COUNT ? index : 0];
+}
+
+const char *breath_pattern_name(BreathPattern pattern)
+{
+  size_t index = static_cast<size_t>(pattern);
+  return index < BREATH_PATTERN_COUNT ? BREATH_PATTERN_NAMES[index] : BREATH_PATTERN_NAMES[0];
+}
+
+bool breath_pattern_from_name(const char *name, BreathPattern &pattern)
+{
+  size_t index = 0;
+  if (!index_of(BREATH_PATTERN_NAMES, BREATH_PATTERN_COUNT, name, index))
+    return false;
+  pattern = static_cast<BreathPattern>(index);
+  return true;
 }
 
 } // namespace zenit

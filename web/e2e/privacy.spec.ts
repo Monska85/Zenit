@@ -53,7 +53,7 @@ test("makes no request outside its own site and the board, over a whole visit", 
     if (new URL(socket.url()).href !== new URL(simulator.url).href) outside.push(socket.url());
   });
   await connectByAddress(page, simulator.url);
-  await page.getByRole("radio", { name: "Breathing" }).check({ force: true });
+  await page.getByRole("radio", { name: "Breathing", exact: true }).check({ force: true });
   await page.getByRole("link", { name: "Device" }).click();
   await page.getByRole("button", { name: "Install or update firmware" }).click();
   await page.getByRole("alertdialog").getByLabel("The panel power socket is unplugged").check();

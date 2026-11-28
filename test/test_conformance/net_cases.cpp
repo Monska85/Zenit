@@ -763,6 +763,12 @@ void test_stored_settings_cases()
     TEST_ASSERT_EQUAL_STRING_MESSAGE(expect["effect"].as<const char *>(),
                                      zenit::effect_name(settings::current().effect), name.c_str());
     TEST_ASSERT_EQUAL_UINT8_MESSAGE(expect["check_hours"].as<uint8_t>(), settings::board().check_hours, name.c_str());
+    if (expect["color_set"].is<const char *>())
+      TEST_ASSERT_EQUAL_STRING_MESSAGE(expect["color_set"].as<const char *>(),
+                                       zenit::color_set_name(settings::current().color_set), name.c_str());
+    if (expect["breath_pattern"].is<const char *>())
+      TEST_ASSERT_EQUAL_STRING_MESSAGE(expect["breath_pattern"].as<const char *>(),
+                                       zenit::breath_pattern_name(settings::current().breath_pattern), name.c_str());
     if (expect["token"].isNull())
       TEST_ASSERT_TRUE_MESSAGE(net::valid_token(settings::board().token), name.c_str());
     else

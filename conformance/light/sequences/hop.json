@@ -1,0 +1,14 @@
+{
+  "description": "Hop with the christmas palette (red, green, white), seed 1, brightness 100. The first color is draw 1 mod 3 = 0 (red); each hop draws j = x mod 2 and takes j, or j + 1 from the current index up: white, green, white, green. Each hop dips: from 550 ms of a step down to 400 at the step's end (850 at 600 ms), up again in 150 ms (731.36 at 80 ms).",
+  "settings": { "effect": "hop", "brightness": 100 },
+  "seed": 1,
+  "expect": [
+    { "at": 1000, "duties": [0, 0, 0, 16383] },
+    { "at": 1260, "duties": [0, 0, 0, 16107] },
+    { "at": 1400, "duties": [0, 1843, 0, 0] },
+    { "at": 1480, "duties": [0, 7433, 0, 0] },
+    { "at": 1550, "duties": [0, 16383, 0, 0] },
+    { "at": 2000, "duties": [0, 10814, 0, 0] },
+    { "at": 2100, "duties": [0, 0, 0, 1843] }
+  ]
+}

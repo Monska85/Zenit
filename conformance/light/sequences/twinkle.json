@@ -1,10 +1,12 @@
 {
-  "description": "Twinkle, strength 20, seed 1, brightness 60: targets 824, 999, 941, 949, 856, 972 from the xorshift sequence.",
+  "description": "Twinkle, strength 20, seed 1, brightness 60. Knots (start, length, target) from the xorshift sequence: 0, 729, 894.37; 729, 438, 872.70; 1167, 787, 895.12; 1954, 657, 955.48; 2611, 512, 890.31; 3123, 379, 989.98; 3502, 687, 998.79; each eased with (1 - cos(pi p)) / 2. Factors 879.59, 881.23, 895.85, 899.16, 997.25 at 1, 1.5, 2, 3, 4 s.",
   "settings": { "effect": "twinkle" },
   "seed": 1,
   "expect": [
-    { "at": 1000, "duties": [0, 0, 0, 3208] },
-    { "at": 1100, "duties": [0, 0, 0, 3731] },
-    { "at": 1300, "duties": [0, 0, 0, 3642] }
+    { "at": 1000, "duties": [0, 0, 0, 3414] },
+    { "at": 1500, "duties": [0, 0, 0, 3429] },
+    { "at": 2000, "duties": [0, 0, 0, 3562] },
+    { "at": 3000, "duties": [0, 0, 0, 3592] },
+    { "at": 4000, "duties": [0, 0, 0, 4577] }
   ]
 }

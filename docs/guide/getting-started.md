@@ -66,7 +66,7 @@ The **Light** page is where you spend your time. From top to bottom:
 
 - **The power button**, the large round button, turns the light on and off. It glows in the color the light shows. The line beside it says what the light does now.
 - **Brightness**, a slider from 1 to 100 %. Zenit changes when you let go of the slider.
-- **Effect**: Steady (one color, always the same), Color change, Breathing, Twinkle (a gentle shimmer, like a star), Fall asleep (dims slowly while the sleep timer runs) and Christmas (red, green and white, or icy blue). Under the effects you find only the settings the chosen one uses, such as its color.
+- **Effect**: Steady (one color, always the same), Color change, Breathing, Twinkle (a gentle shimmer, like a star), Fall asleep (dims slowly while the sleep timer runs), Christmas (slowly moves through a palette of colors), Shooting star (a calm sky with a bright flash now and then), Guided breathing (breathe in as it brightens and out as it dims, with the 4-7-8 or Box pattern), Jingle (pulses to the beat of Jingle Bells) and Hop (hops from color to color). The palettes are Christmas, Ice, Aurora, Sunset and All colors. Under the effects you find only the settings the chosen one uses, such as its color.
 - **Sleep timer**: Off, 15 min, 30 min, 1 h, 2 h, or Custom (1 to 360 minutes, then **Set**). When the time is up, the light fades out over 30 seconds and stays off until you turn it on.
 
 Zenit keeps your choices of brightness, effect, colors and timer. Turning the light off is not kept: after a power cut or when you plug it in again, the light comes back on.

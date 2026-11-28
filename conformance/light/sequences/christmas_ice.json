@@ -1,8 +1,10 @@
 {
-  "description": "Christmas with the ice set (blue, white), hold 5 s, brightness 100.",
+  "description": "Christmas with the ice palette (blue, white), hold 5 s, brightness 100: blue fades to dark by 7 s, white rises from dark (factor 500 at 7.5 s).",
   "settings": { "effect": "christmas", "color_set": "ice", "hold_seconds": 5, "brightness": 100 },
   "expect": [
     { "at": 3000, "duties": [0, 0, 16383, 0] },
-    { "at": 7500, "duties": [0, 0, 0, 4607] }
+    { "at": 6990, "duties": [0, 0, 18, 0] },
+    { "at": 7000, "duties": [0, 0, 0, 0] },
+    { "at": 7500, "duties": [0, 0, 0, 3018] }
   ]
 }

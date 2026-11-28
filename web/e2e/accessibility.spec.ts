@@ -42,7 +42,7 @@ test("every control has an accessible name and a focus ring", async ({ page, sim
 test("sliders announce their value as text", async ({ page, simulator }) => {
   await connectByAddress(page, simulator.url);
   await expect(page.getByRole("slider", { name: "Brightness" })).toHaveAttribute("aria-valuetext", "60 %");
-  await page.getByRole("radio", { name: "Breathing" }).check({ force: true });
+  await page.getByRole("radio", { name: "Breathing", exact: true }).check({ force: true });
   await expect(page.getByRole("slider", { name: "Length of a breath" })).toHaveAttribute("aria-valuetext", "8 s");
   await expect(page.getByRole("slider", { name: "Dimmest level" })).toHaveAttribute("aria-valuetext", "20 %");
 });
@@ -135,7 +135,10 @@ test("with reduced motion nothing moves; without it the previews and the lit but
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await connectByAddress(page, simulator.url);
-  const breathing = page.getByRole("radio", { name: "Breathing" }).locator("..").getByTestId("effect-preview");
+  const breathing = page
+    .getByRole("radio", { name: "Breathing", exact: true })
+    .locator("..")
+    .getByTestId("effect-preview");
   for (const element of [breathing, page.getByTestId("power-button")]) {
     const style = await element.evaluate((node) => getComputedStyle(node).animationName);
     expect(style).toBe("none");

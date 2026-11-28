@@ -11,7 +11,7 @@ Expected values are worked out by hand from the specification, with a calculator
 - `light/record.json`: the stored record of the light settings, encoded and decoded.
 - `light/sequences/*.json`: a start, events and expected outputs:
   - `settings`: the stored light settings at the start, as in the protocol (missing ones take their defaults).
-  - `seed`: the seed of `twinkle`, 1 when missing.
+  - `seed`: the seed of the random sequence of the effects, 1 when missing.
   - `limit_mw`: a power limit other than the firmware's.
   - `events`: in time order, each with `at` (milliseconds since the start) and either `set` (settings changed as by `settings_set`) or `light` (`true` or `false`).
   - `expect`: each with `at`, `duties` (red, green, blue, white) and optionally `on`, `power_scale` and `timer_remaining_s`.

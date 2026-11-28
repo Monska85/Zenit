@@ -29,6 +29,7 @@
           "color_set": "christmas",
           "hold_seconds": 30,
           "period_seconds": 8,
+          "breath_pattern": "4-7-8",
           "floor": 20,
           "twinkle_strength": 20,
           "timer_minutes": 0,
@@ -129,7 +130,11 @@
           "breathing",
           "twinkle",
           "fall_asleep",
-          "christmas"
+          "christmas",
+          "shooting_star",
+          "guided_breathing",
+          "jingle",
+          "hop"
         ],
         "effect_settings": {
           "static": [
@@ -137,8 +142,7 @@
           ],
           "color_change": [
             "colors",
-            "hold_seconds",
-            "floor"
+            "hold_seconds"
           ],
           "breathing": [
             "color",
@@ -155,13 +159,33 @@
           ],
           "christmas": [
             "color_set",
-            "hold_seconds",
+            "hold_seconds"
+          ],
+          "shooting_star": [
+            "color"
+          ],
+          "guided_breathing": [
+            "color",
+            "breath_pattern",
             "floor"
+          ],
+          "jingle": [
+            "color_set"
+          ],
+          "hop": [
+            "color_set"
           ]
         },
         "color_sets": [
           "christmas",
-          "ice"
+          "ice",
+          "aurora",
+          "sunset",
+          "all"
+        ],
+        "breath_patterns": [
+          "4-7-8",
+          "box"
         ],
         "power_limit_mw": 1000,
         "memory": {
