@@ -2,6 +2,7 @@
 
 import { Power } from "lucide-react";
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 import { own } from "../../lib/own";
 import { COLOR_SWATCHES } from "../../light/model";
 import { cn } from "../../lib/utils";
@@ -29,11 +30,12 @@ export function PowerButton({
   onToggle: (on: boolean) => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation("light");
   return (
     <button
       type="button"
       aria-pressed={on}
-      aria-label="Light"
+      aria-label={t("power.label")}
       disabled={disabled}
       onClick={() => onToggle(!on)}
       style={on ? glowStyle(color) : undefined}

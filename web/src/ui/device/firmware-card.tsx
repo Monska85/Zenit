@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../i18n";
 import {
   boardVerdict,
   canCheck,
@@ -48,13 +50,6 @@ export function publishedState(running: string | undefined, published: Published
     : null;
 }
 
-const STATE_SENTENCES: Record<FirmwareState, string> = {
-  up_to_date: "Your Zenit is up to date.",
-  update_available: "An update is available.",
-  newer: "Your Zenit runs a newer build than the published one.",
-  unknown: "The versions cannot be compared.",
-};
-
 function InstallDialog({
   version,
   force,
@@ -66,32 +61,26 @@ function InstallDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useTranslation("device");
   const session = useSession();
   return (
     <ConfirmDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={force ? `Install version ${version} anyway?` : `Install version ${version}?`}
-      confirm={force ? "Install anyway" : "Install"}
+      title={force ? t("firmware.install.titleAnyway", { version }) : t("firmware.install.title", { version })}
+      confirm={force ? t("firmware.install.confirmAnyway") : t("firmware.install.confirm")}
       tone={force ? "danger" : "default"}
       onConfirm={() => void session.installUpdate(force)}
     >
-      {force && (
-        <Banner tone="warning">
-          This version did not work on this Zenit before, and Zenit went back to the earlier one. It may fail the same
-          way. If it does, Zenit goes back again by itself.
-        </Banner>
-      )}
-      <p>
-        Zenit downloads the new firmware and then restarts. The light goes dark for a moment and fades in again. Keep
-        Zenit powered until it is back, which takes a minute or so.
-      </p>
+      {force && <Banner tone="warning">{t("firmware.install.warning")}</Banner>}
+      <p>{t("firmware.install.text")}</p>
     </ConfirmDialog>
   );
 }
 
 /** What the board reports about firmware updates, and the two things to ask of it: look now, and install. */
 function BoardUpdates({ newerSince }: { newerSince: boolean }) {
+  const { t } = useTranslation("device");
   const { board, session } = useBoard();
   const [asking, setAsking] = useState(false);
   const { update, wifi } = board;
@@ -100,30 +89,30 @@ function BoardUpdates({ newerSince }: { newerSince: boolean }) {
   const progressText = describeUpdateState(update);
   // The progress line is read out when the state changes, not at every percent: the bar carries the number
   const progressWords = describeUpdateState({ ...update, progress: null });
-  const checked = formatCheckTime(update.last_check);
+  const checked = formatCheckTime(update.last_check, dateLocale(navigator.languages));
   const found = update.available;
   return (
     <>
       {!updatesOn(update) ? (
         <p className="mt-3 text-base" data-testid="update-off">
-          Updates are turned off. Zenit does not look for new firmware. You can turn them on in Advanced settings.
+          {t("firmware.updatesOff")}
         </p>
       ) : !firmwareUpdatesOn(update, board.settings) ? (
         <p className="mt-3 text-base" data-testid="update-off">
-          Firmware updates are turned off in Advanced settings, so Zenit does not look for new firmware.
+          {t("firmware.firmwareUpdatesOff")}
         </p>
       ) : (
         <>
           <p className="mt-3 text-base font-medium" data-testid="update-result">
             {newerSince
-              ? "This site has a newer version than the one Zenit found when it last looked."
+              ? t("firmware.newerSince")
               : found !== null && update.last_result === "available"
-                ? `Version ${found} is available.`
+                ? t("firmware.versionAvailable", { version: found })
                 : describeResult(update.last_result)}
           </p>
           {checked && (
             <p className="mt-1 text-sm text-muted-foreground" data-testid="update-checked">
-              Last checked {checked}.
+              {t("firmware.lastChecked", { time: checked })}
             </p>
           )}
         </>
@@ -137,7 +126,7 @@ function BoardUpdates({ newerSince }: { newerSince: boolean }) {
           {update.state === "downloading" && (
             <div
               role="progressbar"
-              aria-label="Download progress"
+              aria-label={t("firmware.downloadProgress")}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={update.progress ?? undefined}
@@ -148,23 +137,17 @@ function BoardUpdates({ newerSince }: { newerSince: boolean }) {
           )}
         </div>
       )}
-      {update.trial && (
-        <p className="mt-3 text-base text-muted-foreground">
-          This firmware is on trial. It confirms itself in a moment, and until then Zenit does not install another one.
-        </p>
-      )}
+      {update.trial && <p className="mt-3 text-base text-muted-foreground">{t("firmware.trial")}</p>}
       {update.rolled_back !== null && (
         <Banner tone="warning" className="mt-3">
-          Version {update.rolled_back} did not work on this Zenit, so Zenit went back to the version it had before.
+          {t("firmware.rolledBack", { version: update.rolled_back })}
         </Banner>
       )}
       {update.skipped !== null && (
-        <p className="mt-3 text-base text-muted-foreground">
-          Version {update.skipped} is set aside and is not installed by itself.
-        </p>
+        <p className="mt-3 text-base text-muted-foreground">{t("firmware.skipped", { version: update.skipped })}</p>
       )}
       {firmwareUpdatesOn(update, board.settings) && wifi !== null && wifi.state !== "connected" && (
-        <p className="mt-3 text-base text-muted-foreground">Zenit needs WiFi to look for and install updates.</p>
+        <p className="mt-3 text-base text-muted-foreground">{t("firmware.needsWifi")}</p>
       )}
       <div className="mt-4 flex flex-wrap gap-2">
         <Button
@@ -172,7 +155,7 @@ function BoardUpdates({ newerSince }: { newerSince: boolean }) {
           disabled={!canCheck(update, wifi, webUpdatesOn(board.settings), board.settings)}
           onClick={() => void session.checkUpdate()}
         >
-          Check now
+          {t("firmware.checkNow")}
         </Button>
         {action !== "none" && found !== null && (
           <Button
@@ -180,7 +163,9 @@ function BoardUpdates({ newerSince }: { newerSince: boolean }) {
             disabled={updateBusy(update)}
             onClick={() => setAsking(true)}
           >
-            {action === "force" ? `Install ${found} anyway` : `Install ${found}`}
+            {action === "force"
+              ? t("firmware.installAnywayButton", { version: found })
+              : t("firmware.installButton", { version: found })}
           </Button>
         )}
       </div>
@@ -198,6 +183,7 @@ function BoardUpdates({ newerSince }: { newerSince: boolean }) {
  * version is newer, one sentence says so in place of both. An available update is said once.
  */
 export function FirmwareCard({ published }: { published: Published }) {
+  const { t } = useTranslation("device");
   const { board } = useBoard();
   const running = board.info?.firmware;
   const ownCheck = board.update !== null && board.phase === "connected";
@@ -215,32 +201,34 @@ export function FirmwareCard({ published }: { published: Published }) {
   const state = source?.from === "published" && !newerSince ? source.state : null;
   return (
     <Card aria-labelledby="firmware-title">
-      <CardTitle id="firmware-title">Firmware</CardTitle>
+      <CardTitle id="firmware-title">{t("firmware.title")}</CardTitle>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-base">
         {running !== undefined && (
           <>
-            <dt className="text-muted-foreground">On your Zenit</dt>
+            <dt className="text-muted-foreground">{t("firmware.running")}</dt>
             <dd data-testid="firmware-running">{running}</dd>
           </>
         )}
         {!board.served && (
           <>
-            <dt className="text-muted-foreground">Latest published</dt>
+            <dt className="text-muted-foreground">{t("firmware.latestPublished")}</dt>
             <dd data-testid="firmware-published">
-              {published === null ? "Checking..." : published === "missing" ? "Not available" : published.version}
+              {published === null
+                ? t("firmware.checking")
+                : published === "missing"
+                  ? t("firmware.notAvailable")
+                  : published.version}
             </dd>
           </>
         )}
       </dl>
       {state && (
         <p role="status" className="mt-3 text-base font-medium" data-testid="firmware-state">
-          {STATE_SENTENCES[state]}
+          {t(`firmware.state.${state}`)}
         </p>
       )}
       {published === "missing" && !board.served && (
-        <p className="mt-3 text-base text-muted-foreground">
-          The published firmware could not be read. This happens when the app runs on your own computer, or offline.
-        </p>
+        <p className="mt-3 text-base text-muted-foreground">{t("firmware.publishedMissing")}</p>
       )}
       {ownCheck && <BoardUpdates newerSince={newerSince} />}
     </Card>

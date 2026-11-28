@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { translate } from "../../i18n";
 import { useBoard } from "../board-context";
 import { Button } from "../components/button";
 
@@ -9,6 +11,7 @@ import { Button } from "../components/button";
  * Reconnect. While the connection is opened again by itself it says so instead, with no button.
  */
 export function LostBanner() {
+  const { t } = useTranslation();
   const { board, session } = useBoard();
   if (board.phase !== "lost") return null;
   if (board.auto !== null) {
@@ -19,11 +22,7 @@ export function LostBanner() {
         className="flex items-start gap-3 rounded-xl border border-border bg-muted p-3 text-base"
       >
         <RefreshCw aria-hidden className="mt-0.5 size-5 shrink-0 motion-safe:animate-spin" />
-        <p>
-          {board.auto === "restarting"
-            ? "Zenit is restarting. It connects again by itself in a few seconds."
-            : "Connecting to Zenit again..."}
-        </p>
+        <p>{board.auto === "restarting" ? t("lost.restarting") : t("lost.reconnecting")}</p>
       </div>
     );
   }
@@ -36,8 +35,8 @@ export function LostBanner() {
       <div className="flex min-w-0 grow items-start gap-3">
         <AlertTriangle aria-hidden className="mt-0.5 size-5 shrink-0" />
         <p>
-          <strong className="font-semibold">Connection lost.</strong> {board.error ?? "Zenit did not answer."} These are
-          the last values Zenit reported.
+          <strong className="font-semibold">{t("lost.title")}</strong>{" "}
+          {board.error === null ? t("lost.noAnswer") : translate(board.error)} {t("lost.lastValues")}
         </p>
       </div>
       <Button
@@ -46,7 +45,7 @@ export function LostBanner() {
         disabled={board.opening}
         onClick={() => void session.reconnect()}
       >
-        Reconnect
+        {t("lost.reconnect")}
       </Button>
     </div>
   );

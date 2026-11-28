@@ -3,6 +3,7 @@
 import { own } from "../../lib/own";
 import { Copy, Eye, EyeOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   describeWindow,
   formatMinute,
@@ -15,6 +16,7 @@ import {
   choiceOptions,
   UPDATE_MODES,
 } from "../../device/settings";
+import { message, translate, type Message } from "../../i18n";
 import type { Settings } from "../../protocol/types";
 import { useBoard, useSession } from "../board-context";
 import { Banner } from "../components/banner";
@@ -50,9 +52,10 @@ function InstallWindow({
   /** The card's commit, so a choice in flight stays shown until the board answers the latest one. */
   commit: (patch: Partial<Settings>) => Promise<void>;
 }) {
+  const { t } = useTranslation("device");
   const [from, setFrom] = useState(formatMinute(start));
   const [to, setTo] = useState(formatMinute(end));
-  const [problem, setProblem] = useState<string | null>(null);
+  const [problem, setProblem] = useState<Message | null>(null);
   const [seen, setSeen] = useState({ start, end });
   // A time changed and not sent yet: the board's answer to an earlier part of the same edit must not replace it
   const [editing, setEditing] = useState(false);
@@ -74,7 +77,7 @@ function InstallWindow({
     window.clearTimeout(timer.current);
     const patch = windowToSend(nextFrom, nextTo, start, end);
     if (patch === "invalid") {
-      if (leaving) setProblem("Choose a time of day for both, like 03:00.");
+      if (leaving) setProblem(message("device:settings.window.problem"));
       return;
     }
     setProblem(null);
@@ -92,10 +95,10 @@ function InstallWindow({
     "block min-h-11 w-full rounded-xl border border-border bg-background px-3 text-base disabled:opacity-50";
   return (
     <fieldset className="flex min-w-0 flex-col gap-3" disabled={disabled}>
-      <legend className="mb-3 text-base font-medium">Install window</legend>
+      <legend className="mb-3 text-base font-medium">{t("settings.window.legend")}</legend>
       <div className="grid grid-cols-2 gap-3">
         <label className="block text-base">
-          <span className="mb-1 block">From</span>
+          <span className="mb-1 block">{t("settings.window.from")}</span>
           <input
             type="time"
             value={from}
@@ -105,7 +108,7 @@ function InstallWindow({
           />
         </label>
         <label className="block text-base">
-          <span className="mb-1 block">Until</span>
+          <span className="mb-1 block">{t("settings.window.until")}</span>
           <input
             type="time"
             value={to}
@@ -116,12 +119,11 @@ function InstallWindow({
         </label>
       </div>
       <p className="text-sm text-muted-foreground" data-testid="window-summary">
-        {describeWindow(start, end)} Zenit installs new firmware by itself only inside this window. If both times are
-        the same, it may install at any time of day.
+        {t("settings.window.summary", { window: describeWindow(start, end) })}
       </p>
       {problem && (
         <p role="alert" className="text-base text-danger">
-          {problem}
+          {translate(problem)}
         </p>
       )}
     </fieldset>
@@ -134,19 +136,21 @@ export const hasAdvancedSettings = (settings: Settings | null): boolean =>
 
 /** How Zenit looks for firmware updates: the mode, the firmware switch, how often, and the install window. */
 export function UpdateSettingsCard() {
+  const { t } = useTranslation("device");
   const { board } = useBoard();
   const { pending, commit } = useCommit();
   const settings = board.settings && { ...board.settings, ...pending };
   if (!settings || settings.update_mode === undefined || board.phase !== "connected") return null;
   const mode = settings.update_mode;
   const off = mode === "off";
+  const modeHint = own(UPDATE_MODE_HINTS, mode);
   return (
     <Card aria-labelledby="update-settings-title">
-      <CardTitle id="update-settings-title">Update settings</CardTitle>
+      <CardTitle id="update-settings-title">{t("settings.title")}</CardTitle>
       <div className="flex flex-col gap-5">
         <div>
           <ChoiceGroup
-            legend="When a new version is published"
+            legend={t("settings.modeLegend")}
             groupName="update-mode"
             layout="grid-cols-1 sm:grid-cols-3"
             value={mode}
@@ -154,28 +158,28 @@ export function UpdateSettingsCard() {
             options={choiceOptions(UPDATE_MODES, UPDATE_MODE_LABELS, mode)}
           />
           <p className="mt-2 text-sm text-muted-foreground" data-testid="update-mode-hint">
-            {own(UPDATE_MODE_HINTS, mode) ?? ""}
+            {modeHint === undefined ? "" : translate(modeHint)}
           </p>
         </div>
         {settings.update_firmware !== undefined && (
           <SwitchField
-            label="Update the firmware"
-            hint="Turn this off to keep the firmware as it is, whatever the choice above."
+            label={t("settings.updateFirmware")}
+            hint={t("settings.updateFirmwareHint")}
             checked={settings.update_firmware}
             onChange={(update_firmware) => void commit({ update_firmware })}
           />
         )}
         {settings.update_web !== undefined && (
           <SwitchField
-            label="Update the app on Zenit"
-            hint="Turn this off to keep the app on Zenit as it is, whatever the choice above."
+            label={t("settings.updateWeb")}
+            hint={t("settings.updateWebHint")}
             checked={settings.update_web}
             onChange={(update_web) => void commit({ update_web })}
           />
         )}
         {settings.check_hours !== undefined && (
           <SelectField
-            label="Look for updates"
+            label={t("settings.checkHours")}
             value={String(settings.check_hours)}
             options={hourOptions(board.settings?.check_hours)}
             onChange={(value) => void commit({ check_hours: Number(value) })}
@@ -200,6 +204,7 @@ export function UpdateSettingsCard() {
  * chosen on this page, which names the board's string while it is still its string.
  */
 export function TimeCard({ chosen, onChoose }: { chosen: string | null; onChoose: (name: string) => void }) {
+  const { t } = useTranslation("device");
   const { board } = useBoard();
   const { pending, commit } = useCommit();
   const settings = board.settings && { ...board.settings, ...pending };
@@ -212,10 +217,10 @@ export function TimeCard({ chosen, onChoose }: { chosen: string | null; onChoose
   if (!settings || zone === undefined || board.phase !== "connected") return null;
   return (
     <Card aria-labelledby="time-title">
-      <CardTitle id="time-title">Time</CardTitle>
+      <CardTitle id="time-title">{t("time.title")}</CardTitle>
       <div className="flex flex-col gap-5">
         <p className="text-base">
-          <span className="text-muted-foreground">Time zone: </span>
+          <span className="text-muted-foreground">{t("time.zone")}</span>
           <span className={cn("font-medium break-words", !named && "font-mono")} data-testid="time-zone-current">
             {zoneText(zone, chosen)}
           </span>
@@ -236,12 +241,12 @@ export function TimeCard({ chosen, onChoose }: { chosen: string | null; onChoose
           data-testid="time-zone-raw"
         >
           <summary className="flex min-h-11 cursor-pointer items-center text-base font-medium">
-            Type a POSIX time zone
+            {t("time.rawSummary")}
           </summary>
           <div className="mt-2">
             <ValueForm
-              label="Time zone text"
-              hint="For experts: a POSIX time zone such as CET-1CEST,M3.5.0,M10.5.0/3."
+              label={t("time.rawLabel")}
+              hint={t("time.rawHint")}
               value={zone}
               validate={timezoneProblem}
               onSubmit={(timezone) => void commit({ timezone })}
@@ -250,8 +255,8 @@ export function TimeCard({ chosen, onChoose }: { chosen: string | null; onChoose
         </details>
         {settings.ntp_server !== undefined && (
           <ValueForm
-            label="Time server"
-            hint="Where Zenit asks for the time. The default is fine for almost everyone."
+            label={t("time.server")}
+            hint={t("time.serverHint")}
             value={settings.ntp_server}
             validate={ntpServerProblem}
             onSubmit={(ntp_server) => void commit({ ntp_server })}
@@ -259,7 +264,7 @@ export function TimeCard({ chosen, onChoose }: { chosen: string | null; onChoose
         )}
         {settings.time_sync_hours !== undefined && (
           <SelectField
-            label="Check the time"
+            label={t("time.syncHours")}
             value={String(settings.time_sync_hours)}
             options={hourOptions(board.settings?.time_sync_hours)}
             onChange={(value) => void commit({ time_sync_hours: Number(value) })}
@@ -271,29 +276,30 @@ export function TimeCard({ chosen, onChoose }: { chosen: string | null; onChoose
 }
 
 function RegenerateToken() {
+  const { t } = useTranslation("device");
   const session = useSession();
   const [open, setOpen] = useState(false);
   return (
     <>
       <Button variant="outline" onClick={() => setOpen(true)}>
-        Make a new token
+        {t("access.newToken.button")}
       </Button>
       <ConfirmDialog
         open={open}
         onOpenChange={setOpen}
-        title="Make a new token?"
-        confirm="Make a new token"
+        title={t("access.newToken.title")}
+        confirm={t("access.newToken.confirm")}
         tone="danger"
         onConfirm={() => void session.regenerateToken()}
       >
-        The old token stops working. Every phone and computer that uses Zenit over WiFi has to log in again with the new
-        one.
+        {t("access.newToken.text")}
       </ConfirmDialog>
     </>
   );
 }
 
 function TokenRow({ token }: { token: string }) {
+  const { t } = useTranslation("device");
   const [reveal, setReveal] = useState(false);
   const [copied, setCopied] = useState(false);
   async function copy(): Promise<void> {
@@ -306,7 +312,7 @@ function TokenRow({ token }: { token: string }) {
   }
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-base font-medium">Token</span>
+      <span className="text-base font-medium">{t("access.token")}</span>
       <div className="flex flex-wrap items-center gap-2">
         <code
           className="min-h-11 grow rounded-xl border border-border bg-background px-3 py-2 font-mono text-base"
@@ -324,15 +330,15 @@ function TokenRow({ token }: { token: string }) {
           }}
         >
           {reveal ? <EyeOff aria-hidden className="size-5" /> : <Eye aria-hidden className="size-5" />}
-          {reveal ? "Hide token" : "Show token"}
+          {reveal ? t("access.hideToken") : t("access.showToken")}
         </Button>
         <Button type="button" variant="outline" onClick={() => void copy()}>
           <Copy aria-hidden className="size-5" />
-          Copy token
+          {t("access.copyToken")}
         </Button>
       </div>
       <p role="status" className="min-h-6 text-sm text-muted-foreground">
-        {copied ? "Copied." : ""}
+        {copied ? t("access.copied") : ""}
       </p>
     </div>
   );
@@ -340,6 +346,7 @@ function TokenRow({ token }: { token: string }) {
 
 /** The login for WiFi clients: the switch, and over USB the token with its reveal, copy and new-token actions. */
 export function AccessCard() {
+  const { t } = useTranslation("device");
   const { board } = useBoard();
   const { pending, commit } = useCommit();
   const [asking, setAsking] = useState(false);
@@ -349,40 +356,32 @@ export function AccessCard() {
   const on = settings.network_login;
   return (
     <Card aria-labelledby="access-title">
-      <CardTitle id="access-title">Access over WiFi</CardTitle>
+      <CardTitle id="access-title">{t("access.title")}</CardTitle>
       <div className="flex flex-col gap-4">
         <SwitchField
-          label="Ask for a token to log in"
-          hint="Anyone on your WiFi can control Zenit unless you turn this on."
+          label={t("access.login")}
+          hint={t("access.loginHint")}
           checked={on}
           onChange={(next) => (next && !usb ? setAsking(true) : void commit({ network_login: next }))}
         />
-        {on && (
-          <p className="text-base text-muted-foreground">
-            Phones and computers on your WiFi type the token once, when they connect. The token is not sent over the
-            network.
-          </p>
-        )}
+        {on && <p className="text-base text-muted-foreground">{t("access.loginOn")}</p>}
         {usb && settings.token !== undefined && <TokenRow token={settings.token} />}
         {usb && settings.token !== undefined && <RegenerateToken />}
         {!usb && (
           <p className="text-base text-muted-foreground" data-testid="token-usb-note">
-            The token is shown only with the USB cable. Making a new one needs the USB cable too.
+            {t("access.usbNote")}
           </p>
         )}
       </div>
       <ConfirmDialog
         open={asking}
         onOpenChange={setAsking}
-        title="Turn on the login?"
-        confirm="Turn on"
+        title={t("access.turnOn.title")}
+        confirm={t("access.turnOn.confirm")}
         onConfirm={() => void commit({ network_login: true })}
       >
-        <p>
-          Zenit closes this connection, and then asks for the token. You find the token in the Device page when Zenit is
-          connected with the USB cable, or with the command line tool over USB.
-        </p>
-        <Banner tone="warning">Make sure you have the token before you continue.</Banner>
+        <p>{t("access.turnOn.text")}</p>
+        <Banner tone="warning">{t("access.turnOn.warning")}</Banner>
       </ConfirmDialog>
     </Card>
   );

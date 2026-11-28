@@ -2,6 +2,7 @@
 
 import { AlertTriangle, CheckCircle2, X } from "lucide-react";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 
 /**
@@ -19,6 +20,7 @@ export function BottomMessage({
   children: ReactNode;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const Icon = tone === "error" ? AlertTriangle : CheckCircle2;
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 flex justify-center px-4 sm:bottom-4">
@@ -35,7 +37,7 @@ export function BottomMessage({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close this message"
+          aria-label={t("buttons.closeMessage")}
           className="-m-2 flex size-11 shrink-0 items-center justify-center rounded-lg hover:bg-muted"
         >
           <X aria-hidden className="size-5" />

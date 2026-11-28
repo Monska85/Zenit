@@ -2,7 +2,9 @@
 
 import { ChevronDown, Monitor, Moon, Sun, Unplug } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { boardName, type BoardState } from "../../board/session";
+import { i18n } from "../../i18n";
 import { chooseTheme, currentTheme } from "../../lib/theme";
 import type { ThemeChoice } from "../../lib/storage";
 import { cn } from "../../lib/utils";
@@ -10,11 +12,11 @@ import { useBoard } from "../board-context";
 import { Button } from "../components/button";
 import type { Route } from "../route";
 
-const THEMES: Array<{ choice: ThemeChoice; label: string; Icon: typeof Sun }> = [
-  { choice: "system", label: "Match my device", Icon: Monitor },
-  { choice: "light", label: "Light", Icon: Sun },
-  { choice: "dark", label: "Dark", Icon: Moon },
-];
+const THEMES = [
+  { choice: "system", label: "theme.system", Icon: Monitor },
+  { choice: "light", label: "theme.light", Icon: Sun },
+  { choice: "dark", label: "theme.dark", Icon: Moon },
+] as const satisfies ReadonlyArray<{ choice: ThemeChoice; label: string; Icon: typeof Sun }>;
 
 type Dot = "ok" | "wait" | "off";
 
@@ -24,21 +26,21 @@ const DOTS: Record<Dot, string> = {
   off: "bg-muted-foreground",
 };
 
-/** The pill's words and dot for each phase. The dot only repeats what the words say. */
+/** The pill's words, in the active language, and dot for each phase. The dot only repeats what the words say. */
 export function pillState(board: BoardState): { text: string; dot: Dot } {
   switch (board.phase) {
     case "connecting":
-      return { text: "Connecting...", dot: "wait" };
+      return { text: i18n.t("status.connecting"), dot: "wait" };
     case "login":
-      return { text: "Log in needed", dot: "wait" };
+      return { text: i18n.t("status.login"), dot: "wait" };
     case "connected":
-      return { text: board.kind === "usb" ? "USB" : "WiFi", dot: "ok" };
+      return { text: i18n.t(board.kind === "usb" ? "status.usb" : "status.wifi"), dot: "ok" };
     case "lost":
-      if (board.auto === "restarting") return { text: "Restarting...", dot: "wait" };
-      if (board.auto === "reconnecting") return { text: "Reconnecting...", dot: "wait" };
-      return { text: "Not connected", dot: "off" };
+      if (board.auto === "restarting") return { text: i18n.t("status.restarting"), dot: "wait" };
+      if (board.auto === "reconnecting") return { text: i18n.t("status.reconnecting"), dot: "wait" };
+      return { text: i18n.t("status.notConnected"), dot: "off" };
     default:
-      return { text: "Not connected", dot: "off" };
+      return { text: i18n.t("status.notConnected"), dot: "off" };
   }
 }
 
@@ -47,6 +49,8 @@ export function pillState(board: BoardState): { text: string; dot: Dot } {
  * It is a disclosure (a button that shows a panel), not an ARIA menu: the panel holds a group of radio buttons.
  */
 export function StatusMenu({ go }: { go: (route: Route) => void }) {
+  // Renders again when the language changes, so the pill's words below follow it
+  const { t } = useTranslation();
   const { board, session } = useBoard();
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>(currentTheme);
@@ -94,7 +98,7 @@ export function StatusMenu({ go }: { go: (route: Route) => void }) {
         aria-expanded={open}
         aria-controls={panelId}
         title={board.phase === "connected" ? board.label : undefined}
-        aria-label={`Connection: ${text}${name === null ? "" : ` · ${name}`}`}
+        aria-label={name === null ? t("status.label", { text }) : t("status.labelWithName", { text, name })}
         onClick={() => setOpen((value) => !value)}
         className="flex min-h-11 max-w-[14rem] items-center gap-2 rounded-full border border-border bg-card px-3 text-sm font-medium hover:bg-muted sm:max-w-xs"
       >
@@ -117,18 +121,18 @@ export function StatusMenu({ go }: { go: (route: Route) => void }) {
       >
         {board.phase === "connected" && (
           <p className="mb-3 text-base">
-            {board.kind === "usb" ? "Connected by USB" : "Connected over WiFi"}
+            {t(board.kind === "usb" ? "status.connectedUsb" : "status.connectedWifi")}
             {name !== null && (
               <>
-                {" to "}
+                {` ${t("status.to")} `}
                 <span className="font-medium whitespace-nowrap">{name}</span>
               </>
             )}
-            .
+            {t("status.end")}
           </p>
         )}
         <fieldset>
-          <legend className="mb-1 text-sm font-medium text-muted-foreground">Theme</legend>
+          <legend className="mb-1 text-sm font-medium text-muted-foreground">{t("theme.legend")}</legend>
           {THEMES.map(({ choice, label, Icon }) => (
             <label
               key={choice}
@@ -146,7 +150,7 @@ export function StatusMenu({ go }: { go: (route: Route) => void }) {
                 className="size-4 accent-[var(--primary)]"
               />
               <Icon aria-hidden className="size-5" />
-              {label}
+              {t(label)}
             </label>
           ))}
         </fieldset>
@@ -163,7 +167,7 @@ export function StatusMenu({ go }: { go: (route: Route) => void }) {
             }}
           >
             <Unplug aria-hidden className="size-5" />
-            Disconnect
+            {t("status.disconnect")}
           </Button>
         )}
       </div>

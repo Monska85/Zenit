@@ -2,10 +2,14 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POLL_MS, BoardSession, OpenFailed, type Visibility } from "../src/board/session";
+import { message, translate, type Message } from "../src/i18n";
 import { FakeBoard, INFO, ScriptedTransport, TIME_STATUS, lineOf } from "./helpers";
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
+
+/** The sentence of a message kept in the state, in English. */
+const said = (text: Message | null | undefined): string | null => (text ? translate(text) : null);
 
 async function connected(
   board = new FakeBoard(),
@@ -58,7 +62,7 @@ describe("BoardSession.connect", () => {
     await vi.advanceTimersByTimeAsync(2000 * 5 + 100);
     await done;
     expect(session.getState().phase).toBe("disconnected");
-    expect(session.getState().error).toContain("did not answer");
+    expect(said(session.getState().error)).toContain("did not answer");
     expect(transport.closed).toBe(true);
   });
 
@@ -68,7 +72,7 @@ describe("BoardSession.connect", () => {
     transport.respond = (request) => [{ seq: request["seq"], ok: true, ...INFO, protocol: 2 }];
     await session.connect(transport, "x");
     expect(session.getState().phase).toBe("disconnected");
-    expect(session.getState().error).toContain("newer protocol");
+    expect(said(session.getState().error)).toContain("newer protocol");
   });
 
   it("refuses settings that name an effect the board does not list", async () => {
@@ -107,7 +111,7 @@ describe("BoardSession.setSettings", () => {
     const { session, board } = await connected();
     board.errors.set("settings_set", "bad_request");
     await session.setSettings({ brightness: 5 });
-    expect(session.getState().error).toBe("Zenit did not accept that value.");
+    expect(said(session.getState().error)).toBe("Zenit did not accept that value.");
     expect(session.getState().settings?.brightness).toBe(60);
     expect(commands(board).slice(-2)).toEqual(["settings_set", "settings_get"]);
     session.dismissError();
@@ -118,8 +122,8 @@ describe("BoardSession.setSettings", () => {
     const { session, board } = await connected();
     board.errors.set("settings_set", "storage_error");
     await session.setSettings({ brightness: 5 });
-    expect(session.getState().error).toContain("could not save");
-    expect(session.getState().error).not.toContain("for logs");
+    expect(said(session.getState().error)).toContain("could not save");
+    expect(said(session.getState().error)).not.toContain("for logs");
   });
 
   it("refuses to show settings that name a color the board does not list", async () => {
@@ -140,7 +144,7 @@ describe("BoardSession.setSettings", () => {
     await vi.advanceTimersByTimeAsync(2000 * 5 + 100);
     await done;
     expect(session.getState().phase).toBe("lost");
-    expect(session.getState().error).toContain("did not answer");
+    expect(said(session.getState().error)).toContain("did not answer");
   });
 
   it("does nothing when there is no connection", async () => {
@@ -192,14 +196,14 @@ describe("BoardSession.setPower and resetSettings", () => {
     const state = session.getState();
     expect(state.settings?.brightness).toBe(60);
     expect(state.favorites?.map((f) => f.name)).toEqual(["Starry night", "Christmas"]);
-    expect(state.error).toContain("could not save");
+    expect(said(state.error)).toContain("could not save");
   });
 
   it("says a reset needs USB when the board says so", async () => {
     const { session, board } = await connected();
     board.errors.set("settings_reset", "usb_only");
     await session.resetSettings();
-    expect(session.getState().error).toBe("This works only with a USB cable.");
+    expect(said(session.getState().error)).toBe("This works only with a USB cable.");
     expect(session.getState().phase).toBe("connected");
   });
 });
@@ -307,7 +311,7 @@ describe("polling", () => {
     transport.drop(new Error("unplugged"));
     await vi.advanceTimersByTimeAsync(POLL_MS + 100);
     expect(session.getState().phase).toBe("lost");
-    expect(session.getState().error).toContain("did not answer");
+    expect(said(session.getState().error)).toContain("did not answer");
     // the last values stay on screen, greyed out by the view
     expect(session.getState().settings).not.toBeNull();
   });
@@ -367,11 +371,11 @@ describe("BoardSession.open", () => {
   it("leaves a live connection alone when the new one cannot be opened", async () => {
     const { session, board, transport } = await connected();
     const before = board.requests.length;
-    await session.open(() => Promise.reject(new OpenFailed("The USB port could not be opened.")), "usb");
+    await session.open(() => Promise.reject(new OpenFailed(message("errors:open.portNotChosen"))), "usb");
     expect(session.getState()).toMatchObject({
       phase: "connected",
       opening: false,
-      error: "The USB port could not be opened.",
+      error: message("errors:open.portNotChosen"),
     });
     expect(session.getState().settings).not.toBeNull();
     expect(transport.closed).toBe(false);
@@ -391,8 +395,12 @@ describe("BoardSession.open", () => {
 
   it("allows a new attempt after a failed one", async () => {
     const session = new BoardSession();
-    await session.open(() => Promise.reject(new OpenFailed("no")), "x");
-    expect(session.getState()).toMatchObject({ phase: "disconnected", error: "no", opening: false });
+    await session.open(() => Promise.reject(new OpenFailed(message("errors:unknown"))), "x");
+    expect(session.getState()).toMatchObject({
+      phase: "disconnected",
+      error: message("errors:unknown"),
+      opening: false,
+    });
     const done = session.open(async () => new FakeBoard().transport(), "x");
     await vi.advanceTimersByTimeAsync(0);
     await done;
@@ -411,9 +419,9 @@ describe("BoardSession.open", () => {
     expect(session.getState().phase).toBe("lost");
     expect(session.getState().settings).not.toBeNull();
     // the open fails: the last values stay
-    opener.mockRejectedValueOnce(new OpenFailed("Could not reach Zenit."));
+    opener.mockRejectedValueOnce(new OpenFailed(message("errors:open.unreachable")));
     await session.reconnect();
-    expect(session.getState()).toMatchObject({ phase: "lost", error: "Could not reach Zenit." });
+    expect(session.getState()).toMatchObject({ phase: "lost", error: message("errors:open.unreachable") });
     expect(session.getState().settings).not.toBeNull();
     board.silent = false;
     const again = session.reconnect();
@@ -534,7 +542,7 @@ describe("the connection Reconnect opens", () => {
     // another method is tried and cancelled, another address cannot be reached
     const usb = vi.fn(async () => null);
     await session.open(usb, "USB");
-    const other = vi.fn(() => Promise.reject(new OpenFailed("Could not reach Zenit.")));
+    const other = vi.fn(() => Promise.reject(new OpenFailed(message("errors:open.unreachable"))));
     await session.open(other, "ws://other.test/ws");
     board.silent = false;
     const again = session.reconnect();
@@ -642,7 +650,7 @@ describe("favorites", () => {
     expect(await session.applyFavorite(1)).toMatchObject({ ok: false, code: "unknown_favorite" });
     expect(commands(board).slice(-2)).toEqual(["favorite_apply", "favorites"]);
     expect(session.getState().favorites?.map((item) => item.name)).toEqual(["Christmas"]);
-    expect(session.getState().error).toBe("That favorite is no longer on Zenit.");
+    expect(said(session.getState().error)).toBe("That favorite is no longer on Zenit.");
   });
 
   it("returns a name error for the dialog and shows no bottom message", async () => {
@@ -660,18 +668,18 @@ describe("favorites", () => {
       ok: false,
       code: "favorites_full",
       nameProblem: false,
-      message: "Your favorites are full. Delete one first.",
+      message: message("errors:board.favorites_full"),
     });
     board.errors.set("favorite_rename", "bad_name");
     expect(await session.renameFavorite(1, "x")).toMatchObject({
       code: "bad_name",
       nameProblem: true,
-      message: "Zenit did not accept that name.",
+      message: message("errors:board.bad_name"),
     });
     board.errors.set("favorite_delete", "storage_error");
     const refused = await session.deleteFavorite(1);
     expect(refused).toMatchObject({ ok: false, code: "storage_error", nameProblem: false });
-    expect(refused.message).toContain("could not save");
+    expect(said(refused.message)).toContain("could not save");
     expect(session.getState().error).toBeNull();
   });
 
@@ -679,7 +687,7 @@ describe("favorites", () => {
     const { session, board } = await connected(withFavorites());
     board.errors.set("favorite_apply", "storage_error");
     expect(await session.applyFavorite(1)).toMatchObject({ ok: false, code: "storage_error", message: null });
-    expect(session.getState().error).toContain("could not save");
+    expect(said(session.getState().error)).toContain("could not save");
   });
 
   it("does nothing, and says it did not work, when the connection is not there", async () => {

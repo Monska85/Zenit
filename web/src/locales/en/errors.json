@@ -1,0 +1,49 @@
+{
+  "board": {
+    "bad_request": "Zenit did not accept that value.",
+    "unknown_command": "This Zenit firmware is too old for that. Update the firmware on the Device page.",
+    "storage_error": "Zenit could not save that. Nothing was changed.",
+    "usb_only": "This works only with a USB cable.",
+    "busy": "Zenit is busy. Try again in a moment.",
+    "unauthorized": "Zenit needs the access token first.",
+    "no_network": "Zenit is not connected to WiFi.",
+    "updates_off": "Updates are turned off. Turn them on in the Device page.",
+    "nothing_to_install": "There is no update to install. Check for updates first.",
+    "favorites_full": "Your favorites are full. Delete one first.",
+    "unknown_favorite": "That favorite is no longer on Zenit.",
+    "bad_name": "Zenit did not accept that name.",
+    "name_taken": "You already have a favorite with that name."
+  },
+  "refused": "Zenit refused the request ({{code}}).",
+  "closed": {
+    "1008": "Zenit closed the connection: the access token was wrong three times, or this page is not allowed to connect.",
+    "1013": "Another page or phone is already connected to this Zenit. Close it, then connect again."
+  },
+  "noAnswer": "Zenit did not answer. Check the cable or the address.",
+  "newerProtocol": "This Zenit speaks a newer protocol than this app. Reload the app, or update it.",
+  "invalidReply": "Zenit sent something this app cannot show. Update the firmware on the Device page.",
+  "unknown": "Something went wrong.",
+  "didNotComeBack": "Zenit did not come back. Check that it is on, then press Reconnect.",
+  "login": {
+    "tokenShape": "The token has 16 characters, letters from a to z and digits from 0 to 9.",
+    "tokenWrong": "That token is not right. After three wrong tries Zenit closes the connection.",
+    "noAnswer": "Zenit did not answer. Check that it is on and try again."
+  },
+  "open": {
+    "noSerial": "This browser cannot use a USB cable. Use Chrome or Edge.",
+    "portNotThere": "The USB port is not there yet.",
+    "portNotChosen": "The USB port could not be chosen.",
+    "portBusy": "The USB port could not be opened. Another program or browser tab may be using it.",
+    "mixedContent": "This browser does not let this page reach a Zenit over WiFi. Open the Zenit's own address in the browser, or use an up-to-date Chrome or Edge.",
+    "unreachable": "Could not reach Zenit at that address. Check that it is on, and on the same network.",
+    "unreachableFromSite": "Could not reach Zenit at that address. Check that it is on, and on the same network. If Chrome asked to let this page find devices on your local network, allow it and connect again.",
+    "servedUnreachable": "Could not reach this Zenit. Check that it is on, and on the same network."
+  },
+  "address": {
+    "empty": "Type the address of your Zenit.",
+    "invalid": "That is not a valid address.",
+    "notWs": "The address must start with ws://.",
+    "notAnAddress": "That does not look like an address. Try zenit-1a2b.local or 192.168.1.20.",
+    "privateOnly": "This app connects only to a Zenit on your own network: a name that ends in .local, like zenit-1a2b.local, or a local address, like 192.168.1.20 or 10.0.0.5. For the simulator on this computer, use ws://127.0.0.1:8765."
+  }
+}

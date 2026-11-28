@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Info, X } from "lucide-react";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "../../lib/utils";
 
 type Tone = "error" | "warning" | "info";
@@ -24,6 +25,7 @@ export function Banner({
   onClose?: () => void;
   className?: string;
 }) {
+  const { t } = useTranslation();
   const Icon = tone === "info" ? Info : AlertTriangle;
   return (
     <div
@@ -36,7 +38,7 @@ export function Banner({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close this message"
+          aria-label={t("buttons.closeMessage")}
           className="-m-2 flex size-11 shrink-0 items-center justify-center rounded-lg hover:bg-muted"
         >
           <X aria-hidden className="size-5" />

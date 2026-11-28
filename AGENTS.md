@@ -17,8 +17,9 @@ Zenit is ESP32 firmware that drives LEDs through MOSFET outputs, with WiFi contr
 
 ## Language
 
-- Everything in the repository is in English: code, comments, documentation, commit messages, pull requests, file and folder names. No Italian word may appear.
+- Everything in the repository is in English: code, comments, documentation, commit messages, pull requests, file and folder names. No Italian word may appear, except under the one exception below.
 - Source material may arrive in Italian (the project plan, the wiring guide, messages). When the repository needs it as reference, translate it into an English document under `docs/reference/`; never copy Italian text or file names into the repository.
+- One exception: the translated text of the web app lives in `web/src/locales/<language>/` and in the tests that check those catalogs, and nowhere else ([ADR 0007](docs/adr/0007-translations.md)). Everything else stays English: code, comments, documentation, commit messages, file and folder names.
 
 When this file and the repository disagree, the repository wins: fix this file in the same change.
 
@@ -57,7 +58,7 @@ These apply to everything in `web/`. The reasons are in [ADR 0003](docs/adr/0003
 - **The UI shows only what the board reports** (effects, colors, color sets from `info`) and, for an effect, only the settings it reads.
 - **Text from the board is rendered as React text,** never as HTML, and the board's own error messages are never shown: each error code has a sentence.
 - **No outside request,** no analytics, fonts or scripts from other sites; the content security policy and an end-to-end test enforce it. A change that breaks this is called out for approval and updates the privacy page and `docs/web/web-app-v1.md`.
-- **Wording is plain and warm,** with no protocol terms on the Light view; the UI is English.
+- **Wording is plain and warm,** with no protocol terms on the Light view. The UI's source language is English: every user-visible string is in the English catalogs of `web/src/locales/en/`, with typed keys, and translations follow those catalogs ([ADR 0007](docs/adr/0007-translations.md)). No HTML in a translation and no `Trans` component; a sentence kept in state is kept as its key.
 - **A new dependency of the web app** follows the dependency rules below, gets its license notice (the build fails on a bundled package that has no license text or a license GPL-3.0-or-later cannot include) and keeps the initial JavaScript under its size budget.
 - **Reference screenshots are drawn inside the Playwright container** (`just web-screenshots-update`); look at the new images before committing them.
 

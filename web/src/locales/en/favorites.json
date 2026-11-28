@@ -1,0 +1,61 @@
+{
+  "card": {
+    "title": "Favorites",
+    "empty": "Save the light you like, then bring it back with one tap.",
+    "save": "Save this light",
+    "edit": "Edit"
+  },
+  "tile": {
+    "onNow": "On now",
+    "turnsOn": "Turns on with this",
+    "onNowName": "on now",
+    "turnsOnName": "turns on with this",
+    "separator": ", "
+  },
+  "done": {
+    "applied": "{{name}} is on.",
+    "saved": "Saved {{name}}.",
+    "updated": "Updated {{name}}.",
+    "renamed": "Renamed to {{name}}.",
+    "startOn": "Zenit turns on with {{name}}.",
+    "startOff": "Zenit turns on with the last light.",
+    "deleted": "Deleted {{name}}."
+  },
+  "buttons": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "replace": "Replace",
+    "rename": "Rename",
+    "delete": "Delete",
+    "done": "Done"
+  },
+  "name": {
+    "label": "Name",
+    "default": "My light",
+    "hint": "Up to {{max}} characters.",
+    "empty": "Give your favorite a name.",
+    "badCharacter": "That name has a character Zenit cannot keep. Try letters, numbers and spaces.",
+    "tooLong": "Keep the name to {{max}} characters or fewer.",
+    "taken": "You already have a favorite called {{name}}. Choose another name."
+  },
+  "save": {
+    "title": "Save this light"
+  },
+  "full": {
+    "title": "Your favorites are full",
+    "body": "Zenit keeps up to {{max}} favorites. Choose one to replace with this light, or delete one first in Edit.",
+    "legend": "Favorite to replace"
+  },
+  "edit": {
+    "title": "Edit favorites"
+  },
+  "sheet": {
+    "useNow": "Use the light as it is now",
+    "useNowHint": "{{name}} will show the light you see now.",
+    "start": "Turn on with this",
+    "startHint": "Zenit shows {{name}} when it gets power and when you turn the light on.",
+    "startHolder": "Now {{name}} has it; this moves it here.",
+    "deleteTitle": "Delete {{name}}?",
+    "deleteQuestion": "You can save a new favorite any time."
+  }
+}

@@ -2,7 +2,7 @@
 
 Date: 2026-11-22
 
-Status: accepted; the consequence on mixed content amended 2026-11-26 (Chrome's Local Network Access)
+Status: accepted; the consequence on mixed content amended 2026-11-26 (Chrome's Local Network Access); the language of the UI amended 2026-11-28 ([ADR 0007](0007-translations.md))
 
 ## Context
 
@@ -22,7 +22,7 @@ The constraints that shape this decision:
 2. **Protocol client in plain TypeScript, no framework.** `web/src/protocol/` holds the CRC-32, a strict JSON reader of our own, framing, the reply schema, the client and two transports behind one line-oriented interface. The strict reader exists because `JSON.parse` cannot reject a repeated key or tell `1.0` from `1`; floats are a distinct type in its output, so integer fields stay strict as in Python.
 3. **The client mirrors `tools/zenit.py` rule by rule** (documented in [the specification](../web/web-app-v1.md#client-rules)), and the protocol conformance cases run in Vitest through the client's framing and parsing, so the two clients and the firmware agree on the same hand-worked cases.
 4. **Web Serial leaves the control lines alone.** The transport opens the port at 115,200 baud with an 8,192-byte buffer, never calls `setSignals`, and is tested with a fake port that fails the test if it does.
-5. **One screen for the light.** Power, brightness, effect cards, only the settings the selected effect reads, and the sleep timer, in a single column that works from 360 px wide. A Device view holds firmware and device facts; a Connect screen and a Privacy page complete it. Views are hash routes, with no router library.
+5. **One screen for the light.** (Amended 2026-11-28: the UI's text is in translation catalogs with English as the source language, [ADR 0007](0007-translations.md).) Power, brightness, effect cards, only the settings the selected effect reads, and the sleep timer, in a single column that works from 360 px wide. A Device view holds firmware and device facts; a Connect screen and a Privacy page complete it. Views are hash routes, with no router library.
 6. **Settings are sent on commit,** never while dragging, matching the protocol's rule that the board saves at once. Status is polled once per second while the page is visible.
 7. **Only what the board reports is shown.** Effects, colors and color sets come from `info`, so later firmware adds them without an app change; an unknown effect gets a plain card. WiFi, update and token parts appear when the board reports them, which in this milestone it does not.
 8. **Firmware install with ESP Web Tools, loaded on demand,** from a manifest on the same site, after a dialog that makes the user confirm the panel power socket is unplugged. The app closes its own serial connection first. The installer writes the bootloader, partition table, boot_app0 and firmware at their own offsets (the manifest offers a full erase for a clean install), so an update keeps the settings, which a factory image written at address 0 would erase with its 0xFF padding. The installation closes the app's USB connection first, within bounded waits; a port that cannot be released stops it with a message to unplug and replug the cable.

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useId, useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
+import { translate } from "../../i18n";
 import { useBoard } from "../board-context";
 import { Banner } from "../components/banner";
 import { Button } from "../components/button";
@@ -9,6 +11,7 @@ import type { Route } from "../route";
 
 /** The token this Zenit asks for before it answers over WiFi. It stays in the page's memory and is never saved. */
 export function LoginView({ go }: { go: (route: Route) => void }) {
+  const { t } = useTranslation("connect");
   const { board, session } = useBoard();
   const [token, setToken] = useState("");
   const [working, setWorking] = useState(false);
@@ -28,17 +31,14 @@ export function LoginView({ go }: { go: (route: Route) => void }) {
 
   return (
     <>
-      <h1 className="text-2xl font-semibold">Log in to your Zenit</h1>
+      <h1 className="text-2xl font-semibold">{t("login.title")}</h1>
       <Card aria-labelledby="login-title">
-        <CardTitle id="login-title">Access to this Zenit</CardTitle>
-        <p className="mb-3 text-base">
-          This Zenit asks for a token before it lets you control it over WiFi. The token has 16 letters and digits. You
-          find it in the Device page when Zenit is connected with the USB cable, or with the command line tool over USB.
-        </p>
+        <CardTitle id="login-title">{t("login.cardTitle")}</CardTitle>
+        <p className="mb-3 text-base">{t("login.text")}</p>
         <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3">
           <div>
             <label htmlFor={id} className="mb-1 block text-base font-medium">
-              Token
+              {t("login.token")}
             </label>
             <input
               id={id}
@@ -55,18 +55,13 @@ export function LoginView({ go }: { go: (route: Route) => void }) {
               className="block min-h-11 w-full rounded-xl border border-border bg-background px-3 font-mono text-base disabled:opacity-50"
             />
             <p id={hintId} className="mt-1 text-sm text-muted-foreground">
-              Zenit never sends the token over WiFi. This page keeps it only until you close it.
+              {t("login.tokenHint")}
             </p>
           </div>
-          {board.loginIdle && !board.loginProblem && (
-            <Banner tone="info">
-              Zenit closed the idle connection after 10 seconds. Type the token and press Log in: this page connects
-              again by itself.
-            </Banner>
-          )}
-          {board.loginProblem && <Banner tone="error">{board.loginProblem}</Banner>}
+          {board.loginIdle && !board.loginProblem && <Banner tone="info">{t("login.idle")}</Banner>}
+          {board.loginProblem && <Banner tone="error">{translate(board.loginProblem)}</Banner>}
           <Button type="submit" disabled={working}>
-            Log in
+            {t("login.submit")}
           </Button>
         </form>
         {/* A page a Zenit served has only that Zenit to talk to */}
@@ -79,7 +74,7 @@ export function LoginView({ go }: { go: (route: Route) => void }) {
               go("connect");
             }}
           >
-            Use another Zenit
+            {t("login.another")}
           </Button>
         )}
       </Card>

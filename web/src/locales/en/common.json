@@ -1,0 +1,55 @@
+{
+  "tabs": {
+    "label": "Pages",
+    "light": "Light",
+    "device": "Device"
+  },
+  "footer": {
+    "privacy": "Privacy"
+  },
+  "connectedAgain": "Connected again.",
+  "status": {
+    "label": "Connection: {{text}}",
+    "labelWithName": "Connection: {{text}} · {{name}}",
+    "connecting": "Connecting...",
+    "login": "Log in needed",
+    "usb": "USB",
+    "wifi": "WiFi",
+    "restarting": "Restarting...",
+    "reconnecting": "Reconnecting...",
+    "notConnected": "Not connected",
+    "connectedUsb": "Connected by USB",
+    "connectedWifi": "Connected over WiFi",
+    "to": "to",
+    "end": ".",
+    "disconnect": "Disconnect"
+  },
+  "theme": {
+    "legend": "Theme",
+    "system": "Match my device",
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "lost": {
+    "restarting": "Zenit is restarting. It connects again by itself in a few seconds.",
+    "reconnecting": "Connecting to Zenit again...",
+    "title": "Connection lost.",
+    "noAnswer": "Zenit did not answer.",
+    "lastValues": "These are the last values Zenit reported.",
+    "reconnect": "Reconnect"
+  },
+  "buttons": {
+    "cancel": "Cancel",
+    "set": "Set",
+    "closeMessage": "Close this message"
+  },
+  "failure": {
+    "title": "Something went wrong",
+    "text": "This page could not show what Zenit sent. Reload it to start again.",
+    "reload": "Reload"
+  },
+  "framed": {
+    "text": "The Zenit app works only in its own browser tab, not inside another page.",
+    "open": "Open the Zenit app in its own tab"
+  }
+}

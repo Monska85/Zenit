@@ -6,6 +6,7 @@
 
 import { parseStrictObject } from "../protocol/strict-json";
 import { openWebSocket } from "../protocol/websocket";
+import { message } from "../i18n";
 import { OpenFailed, type BoardSession, type Opener } from "./session";
 
 export interface ServedBoard {
@@ -101,7 +102,7 @@ export function servedOpener(host: string): Opener {
     try {
       return await openWebSocket(`ws://${host}/ws`);
     } catch {
-      throw new OpenFailed("Could not reach this Zenit. Check that it is on, and on the same network.");
+      throw new OpenFailed(message("errors:open.servedUnreachable"));
     }
   };
 }

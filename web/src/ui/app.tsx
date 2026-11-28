@@ -2,6 +2,8 @@
 
 import { Lightbulb, SlidersHorizontal, Sparkles } from "lucide-react";
 import { lazy, Suspense, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { translate } from "../i18n";
 import { cn } from "../lib/utils";
 import { BoardProvider, useBoard } from "./board-context";
 import { BottomMessage } from "./components/bottom-message";
@@ -19,12 +21,13 @@ import { DevicePlaceholder } from "./views/device-placeholder";
 const DeviceView = lazy(() => import("./views/device-view").then((module) => ({ default: module.DeviceView })));
 const PrivacyView = lazy(() => import("./views/privacy-view").then((module) => ({ default: module.PrivacyView })));
 
-const TABS: Array<{ route: Route; label: string; Icon: typeof Lightbulb }> = [
-  { route: "light", label: "Light", Icon: Lightbulb },
-  { route: "device", label: "Device", Icon: SlidersHorizontal },
-];
+const TABS = [
+  { route: "light", label: "tabs.light", Icon: Lightbulb },
+  { route: "device", label: "tabs.device", Icon: SlidersHorizontal },
+] as const satisfies ReadonlyArray<{ route: Route; label: string; Icon: typeof Lightbulb }>;
 
 function Shell() {
+  const { t } = useTranslation();
   const { board, session } = useBoard();
   const [current, go] = useRoute();
   const [backAgain, hideBackAgain] = useBackAgain(board.phase, board.opening);
@@ -47,7 +50,7 @@ function Shell() {
         <StatusMenu go={go} />
       </header>
       <nav
-        aria-label="Pages"
+        aria-label={t("tabs.label")}
         className="fixed inset-x-0 bottom-0 z-20 flex border-t border-border bg-card pb-[env(safe-area-inset-bottom)] sm:static sm:gap-1 sm:rounded-2xl sm:border sm:p-1"
       >
         {TABS.map(({ route, label, Icon }) => {
@@ -65,7 +68,7 @@ function Shell() {
               )}
             >
               <Icon aria-hidden className="size-6 sm:size-5" />
-              {label}
+              {t(label)}
             </a>
           );
         })}
@@ -90,25 +93,25 @@ function Shell() {
           aria-current={current === "privacy" ? "page" : undefined}
           className="inline-flex min-h-11 items-center px-3 text-muted-foreground underline hover:text-foreground"
         >
-          Privacy
+          {t("footer.privacy")}
         </a>
       </footer>
       {/* Kept in the page, so a screen reader hears the confirmation when it appears */}
       <p role="status" className="sr-only">
-        {error === null ? (notice ?? (backAgain ? "Connected again." : "")) : ""}
+        {error === null ? (notice !== null ? translate(notice) : backAgain ? t("connectedAgain") : "") : ""}
       </p>
       {error !== null ? (
         <BottomMessage tone="error" onClose={() => session.dismissError()}>
-          {error}
+          {translate(error)}
         </BottomMessage>
       ) : notice !== null ? (
         <BottomMessage tone="done" onClose={clearNotice}>
-          {notice}
+          {translate(notice)}
         </BottomMessage>
       ) : (
         backAgain && (
           <BottomMessage tone="done" onClose={hideBackAgain}>
-            Connected again.
+            {t("connectedAgain")}
           </BottomMessage>
         )
       )}

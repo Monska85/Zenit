@@ -10,7 +10,7 @@ The user is a family member with no technical background, holding a phone or sit
 
 - **Browsers.** Chrome and Edge on desktop, and Chrome on Android, for USB (Web Serial), which also sets up the WiFi. Any current browser for a WebSocket connection, and so for the page a Zenit serves itself. A browser without Web Serial shows the USB option disabled, with the reason in one sentence.
 - **Screens.** From 360 px wide to desktop, one-handed on a phone, light and dark theme from the system, with a choice in the header menu.
-- **Language.** English. Localization is an open question for the owner.
+- **Language.** English is the source language and the default. Every user-visible string is in the catalogs of `web/src/locales/`, and other languages follow them ([Languages](#languages), [ADR 0007](../adr/0007-translations.md)).
 - **Offline.** The app is a static site and needs no server of its own; once loaded it needs only the board. The board serves the same app on its own address, so a phone on the home network needs nothing from the internet.
 
 ## Views
@@ -383,7 +383,17 @@ The board takes a POSIX TZ string; the app offers the IANA zones. `web/src/devic
 
 ## Wording
 
-Plain, short and warm. "Zenit" for the projector, "light" for what it shines, "device" only in the name of the Device page, and "board" only on that page. No jargon on the Light view: no protocol, firmware, serial or PWM. Sentences end with a period, buttons are verbs ("Connect", "Turn on"), and the user is addressed as "you".
+Plain, short and warm. "Zenit" for the projector, "light" for what it shines, "device" only in the name of the Device page, and "board" only on that page. No jargon on the Light view: no protocol, firmware, serial or PWM. Sentences end with a period, buttons are verbs ("Connect", "Turn on"), and the user is addressed as "you". These rules are written for the English source; a translation keeps their spirit in its own language.
+
+## Languages
+
+- **Catalogs.** The app's text is in `web/src/locales/<language>/<namespace>.json`, one file per namespace (`common`, `connect`, `light`, `favorites`, `device`, `errors`, `privacy`), English in `en/`. Keys are typed: the build fails on a key the English catalogs do not have. A sentence is one key with `{{placeholder}}` values and plural keys where it counts something; no translation holds markup, and a sentence around a link is split around the link's text.
+- **Loading.** English is part of the first JavaScript the page loads. Another language is its own file of the same site, loaded only when that language is chosen; nothing comes from another site.
+- **Order.** The browser's languages in order by their primary subtag (`it-CH` is Italian), then English; while English is the only catalog, the app is always in English. A language the person chooses in the app, saved in the browser, comes first once there is a second language to choose (ADR 0007 decision 5). A missing key shows its English text.
+- **Dates** use the browser's own variant of the active language when it has one (`en-GB` keeps its day-first dates), else the active language.
+- **Not translated.** Names the board reports, protocol identifiers, the raw POSIX time zone string, the city names of the time zone table and log output. An effect, palette, color or pattern with no catalog entry shows the board's id in words.
+- **Numbers and times.** Numbers with a fraction or grouping use the active language's separators; times of day stay `HH:MM` on a 24-hour clock.
+- **Checks.** A test compares every language folder with English: the same files and keys, every plural form of the language, the same placeholders per key, no empty text and no markup.
 
 ## Publishing
 

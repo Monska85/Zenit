@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +41,7 @@ export function ConfirmDialog({
   keepOpen?: boolean;
   onConfirm: () => void;
 }) {
+  const { t } = useTranslation();
   const button = (
     <Button variant={tone} disabled={disabled} onClick={onConfirm}>
       {confirm}
@@ -55,7 +57,7 @@ export function ConfirmDialog({
         {extra}
         <div className="flex justify-end gap-2">
           <AlertDialogCancel asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button variant="outline">{t("buttons.cancel")}</Button>
           </AlertDialogCancel>
           {keepOpen ? button : <AlertDialogAction asChild>{button}</AlertDialogAction>}
         </div>

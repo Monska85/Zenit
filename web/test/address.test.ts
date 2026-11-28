@@ -13,6 +13,7 @@ import {
   PRIVATE_ONLY_MESSAGE,
 } from "../src/protocol/address";
 import { CONNECT_TIMEOUT_MS } from "../src/protocol/websocket";
+import { translate, type Message } from "../src/i18n";
 
 describe("boardUrl", () => {
   it.each([
@@ -54,11 +55,12 @@ describe("boardUrl", () => {
   ])("refuses %j with a sentence", (typed) => {
     const result = boardUrl(typed);
     expect(result).toHaveProperty("error");
-    expect((result as { error: string }).error).toMatch(/\.$/);
+    expect(translate((result as { error: Message }).error)).toMatch(/\.$/);
   });
 
   it("refuses an encrypted address: a Zenit has none", () => {
-    expect(boardUrl("wss://zenit-1a2b.local/ws")).toEqual({ error: "The address must start with ws://." });
+    const result = boardUrl("wss://zenit-1a2b.local/ws");
+    expect(translate((result as { error: Message }).error)).toBe("The address must start with ws://.");
   });
 
   it.each([
@@ -95,9 +97,9 @@ describe("boardUrl", () => {
   });
 
   it("names the forms it accepts in its sentence", () => {
-    expect(PRIVATE_ONLY_MESSAGE).toContain(".local");
-    expect(PRIVATE_ONLY_MESSAGE).toContain("192.168.1.20");
-    expect(PRIVATE_ONLY_MESSAGE).toContain("ws://127.0.0.1:8765");
+    expect(translate(PRIVATE_ONLY_MESSAGE)).toContain(".local");
+    expect(translate(PRIVATE_ONLY_MESSAGE)).toContain("192.168.1.20");
+    expect(translate(PRIVATE_ONLY_MESSAGE)).toContain("ws://127.0.0.1:8765");
   });
 });
 

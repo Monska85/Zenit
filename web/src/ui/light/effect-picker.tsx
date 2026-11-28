@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { useTranslation } from "react-i18next";
 import { own } from "../../lib/own";
 import { COLOR_SWATCHES, effectInfo } from "../../light/model";
 import { cn } from "../../lib/utils";
@@ -70,9 +71,10 @@ export function EffectPicker({
   value: string;
   onChange: (effect: string) => void;
 }) {
+  const { t } = useTranslation("light");
   return (
     <ChoiceGroup
-      legend="Effect"
+      legend={t("picker.legend")}
       hideLegend
       groupName="effect"
       value={value}

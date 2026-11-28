@@ -2,7 +2,9 @@
 
 import { Check, Pencil, Plus, Power } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { FavoriteOutcome } from "../../board/session";
+import { i18n, message, type Message } from "../../i18n";
 import { cn } from "../../lib/utils";
 import {
   defaultFavoriteName,
@@ -24,7 +26,13 @@ import { EditDialog, FavoriteSheet, FullDialog, SaveDialog, type Note, type Shee
 
 /** The words of a tile for assistive technology: its name, then what is true of it. */
 export function tileName(favorite: Favorite, onNow: boolean, turnsOn: boolean): string {
-  return [favorite.name, onNow ? "on now" : null, turnsOn ? "turns on with this" : null].filter(Boolean).join(", ");
+  return [
+    favorite.name,
+    onNow ? i18n.t("favorites:tile.onNowName") : null,
+    turnsOn ? i18n.t("favorites:tile.turnsOnName") : null,
+  ]
+    .filter(Boolean)
+    .join(i18n.t("favorites:tile.separator"));
 }
 
 function Tile({
@@ -38,6 +46,7 @@ function Tile({
   turnsOn: boolean;
   onApply: () => void;
 }) {
+  const { t } = useTranslation("favorites");
   // An effect this app does not know gets a still, neutral dot
   const known = own(EFFECTS, favorite.effect) !== undefined;
   return (
@@ -63,13 +72,13 @@ function Tile({
         {onNow && (
           <span className="flex items-start gap-1 text-sm font-medium">
             <Check aria-hidden className="mt-0.5 size-4 shrink-0" />
-            On now
+            {t("tile.onNow")}
           </span>
         )}
         {turnsOn && (
           <span className={cn("flex items-start gap-1 text-sm", !onNow && "text-muted-foreground")}>
             <Power aria-hidden className="mt-0.5 size-4 shrink-0" />
-            Turns on with this
+            {t("tile.turnsOn")}
           </span>
         )}
       </span>
@@ -108,6 +117,7 @@ export function FavoritesCard({
   start: number | null;
   disabled: boolean;
 }) {
+  const { t } = useTranslation("favorites");
   const session = useSession();
   const [dialog, setDialog] = useState<Dialog>(null);
   const [sheetId, setSheetId] = useState<number | null>(null);
@@ -163,7 +173,8 @@ export function FavoritesCard({
   async function apply(favorite: Favorite): Promise<void> {
     setApplying(favorite.id);
     try {
-      if ((await session.applyFavorite(favorite.id)).ok) showNotice(`${favorite.name} is on.`);
+      if ((await session.applyFavorite(favorite.id)).ok)
+        showNotice(message("favorites:done.applied", { name: favorite.name }));
     } finally {
       setApplying(null);
     }
@@ -193,7 +204,7 @@ export function FavoritesCard({
   }
 
   /** Shows a sentence on the surface on top: a line in its dialog, or the bottom message when no dialog is open. */
-  function show(tone: Note["tone"], text: string): void {
+  function show(tone: Note["tone"], text: Message): void {
     const surface = top();
     if (surface !== "page") setNote({ surface, tone, text });
     else if (tone === "error") session.showError(text);
@@ -208,7 +219,7 @@ export function FavoritesCard({
   async function request(
     kind: Origin["kind"],
     outcome: Promise<FavoriteOutcome>,
-    confirmation: string,
+    confirmation: Message,
     closes: boolean,
   ): Promise<FavoriteOutcome> {
     const origin = originNow(kind);
@@ -227,27 +238,39 @@ export function FavoritesCard({
 
   const actions: SheetActions = {
     rename: (favorite, name) =>
-      request("sheet", session.renameFavorite(favorite.id, name), `Renamed to ${name}.`, false),
-    useNow: (favorite) => request("sheet", session.replaceFavorite(favorite.id), `Updated ${favorite.name}.`, false),
+      request("sheet", session.renameFavorite(favorite.id, name), message("favorites:done.renamed", { name }), false),
+    useNow: (favorite) =>
+      request(
+        "sheet",
+        session.replaceFavorite(favorite.id),
+        message("favorites:done.updated", { name: favorite.name }),
+        false,
+      ),
     setStart: (favorite, on) =>
       request(
         "sheet",
         session.setStartFavorite(on ? favorite.id : null),
-        on ? `Zenit turns on with ${favorite.name}.` : "Zenit turns on with the last light.",
+        on ? message("favorites:done.startOn", { name: favorite.name }) : message("favorites:done.startOff"),
         false,
       ),
-    remove: (favorite) => request("sheet", session.deleteFavorite(favorite.id), `Deleted ${favorite.name}.`, true),
+    remove: (favorite) =>
+      request(
+        "sheet",
+        session.deleteFavorite(favorite.id),
+        message("favorites:done.deleted", { name: favorite.name }),
+        true,
+      ),
   };
   const noteFor = (surface: Surface): Note | null => (note?.surface === surface ? note : null);
 
   return (
     <Card aria-labelledby="favorites-title" className="relative">
       <CardTitle id="favorites-title" className="sm:mb-3 sm:flex sm:min-h-11 sm:items-center">
-        Favorites
+        {t("card.title")}
       </CardTitle>
       {favorites.length === 0 ? (
         <p className="text-base text-muted-foreground" data-testid="favorites-empty">
-          Save the light you like, then bring it back with one tap.
+          {t("card.empty")}
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -265,12 +288,12 @@ export function FavoritesCard({
       <div className="mt-3 flex gap-2 sm:absolute sm:top-5 sm:right-5 sm:mt-0">
         <Button type="button" variant="outline" className="flex-1 sm:flex-none" onClick={() => openDialog("save")}>
           <Plus aria-hidden className="size-5" />
-          Save this light
+          {t("card.save")}
         </Button>
         {favorites.length > 0 && (
           <Button type="button" variant="outline" className="flex-1 sm:flex-none" onClick={() => openDialog("edit")}>
             <Pencil aria-hidden className="size-5" />
-            Edit
+            {t("card.edit")}
           </Button>
         )}
       </div>
@@ -285,7 +308,7 @@ export function FavoritesCard({
           limits.name,
         )}
         note={noteFor("save")}
-        onSave={(name) => request("save", session.saveFavorite(name), `Saved ${name}.`, true)}
+        onSave={(name) => request("save", session.saveFavorite(name), message("favorites:done.saved", { name }), true)}
       />
       <FullDialog
         open={dialog === "save" && full}
@@ -294,7 +317,12 @@ export function FavoritesCard({
         favorites={favorites}
         note={noteFor("save")}
         onReplace={(favorite) =>
-          request("save", session.replaceFavorite(favorite.id), `Updated ${favorite.name}.`, true)
+          request(
+            "save",
+            session.replaceFavorite(favorite.id),
+            message("favorites:done.updated", { name: favorite.name }),
+            true,
+          )
         }
       />
       <EditDialog

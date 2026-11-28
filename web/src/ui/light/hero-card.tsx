@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { LIMITS, liveLine } from "../../light/model";
+import { useTranslation } from "react-i18next";
+import { formatPercent, LIMITS, liveLine } from "../../light/model";
 import type { LightStatus } from "../../protocol/types";
 import { Banner } from "../components/banner";
 import { Card } from "../components/card";
@@ -26,27 +27,28 @@ export function HeroCard({
   onPower: (on: boolean) => void;
   onBrightness: (brightness: number) => Promise<void>;
 }) {
+  const { t } = useTranslation("light");
   const line = liveLine(light);
   const reduced = light.power_scale < 100;
   return (
     <Card aria-labelledby="hero-title" className="flex flex-col gap-4">
       <h2 id="hero-title" className="sr-only">
-        Light now
+        {t("hero.title")}
       </h2>
       <div className="flex items-center gap-4">
         <PowerButton on={light.on} color={light.color} disabled={disabled} onToggle={onPower} />
         <div className="min-w-0 grow">
           <p className="text-lg font-medium" data-testid="live-state">
             {line === null ? (
-              "Off"
+              t("hero.off")
             ) : (
               <>
                 <span data-testid="live-color">{line.color}</span>
-                {" · "}
+                {t("hero.separator")}
                 <span data-testid="live-effect">{line.effect}</span>
                 {line.timer !== null && (
                   <>
-                    {" · "}
+                    {t("hero.separator")}
                     <span className="font-normal text-muted-foreground">{line.timer}</span>
                   </>
                 )}
@@ -55,24 +57,20 @@ export function HeroCard({
           </p>
           {reduced && (
             <p role="status" className="mt-1 text-base text-muted-foreground">
-              Light reduced to {light.power_scale} % to stay cool.
+              {t("hero.reduced", { value: light.power_scale })}
             </p>
           )}
         </div>
       </div>
       <SettingSlider
-        label="Brightness"
+        label={t("hero.brightness")}
         value={brightness}
         {...LIMITS.brightness}
-        format={(value) => `${value} %`}
+        format={formatPercent}
         disabled={disabled}
         onCommit={onBrightness}
       />
-      {usb && (
-        <Banner tone="info">
-          Connected by USB. The light gets no power from USB: plug in the panel power socket and use WiFi to see it.
-        </Banner>
-      )}
+      {usb && <Banner tone="info">{t("hero.usb")}</Banner>}
     </Card>
   );
 }

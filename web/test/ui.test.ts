@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { describe, expect, it } from "vitest";
-import { describeError, INVALID_REPLY, NEWER_PROTOCOL } from "../src/board/messages";
+import { errorMessage, INVALID_REPLY, NEWER_PROTOCOL } from "../src/board/messages";
+import { translate } from "../src/i18n";
 import { BoardError, ClientError } from "../src/protocol/client";
 import { routeOf } from "../src/ui/route";
 import { colorsLimit } from "../src/ui/light/effect-settings";
@@ -20,7 +21,10 @@ describe("routeOf", () => {
   });
 });
 
-describe("describeError", () => {
+// The sentence a person reads for a failed request
+const describeError = (error: unknown): string => translate(errorMessage(error));
+
+describe("errorMessage", () => {
   it("has a sentence for each error code of the specification the app can meet", () => {
     for (const code of [
       "bad_request",
@@ -51,9 +55,9 @@ describe("describeError", () => {
   });
 
   it("tells a newer protocol apart from a reply the app cannot show", () => {
-    expect(describeError(new ClientError("protocol", "x"))).toBe(NEWER_PROTOCOL);
-    expect(describeError(new ClientError("invalid_reply", "x"))).toBe(INVALID_REPLY);
-    expect(INVALID_REPLY).not.toContain("newer protocol");
+    expect(describeError(new ClientError("protocol", "x"))).toBe(translate(NEWER_PROTOCOL));
+    expect(describeError(new ClientError("invalid_reply", "x"))).toBe(translate(INVALID_REPLY));
+    expect(translate(INVALID_REPLY)).not.toContain("newer protocol");
   });
 
   it("explains the status a board closes a connection with", () => {
@@ -104,11 +108,17 @@ describe("timerLine", () => {
 });
 
 describe("colorsLimit", () => {
+  /** The sentence, in English, or null. */
+  const limit = (colors: string[], color: string): string | null => {
+    const text = colorsLimit(colors, color);
+    return text === null ? null : translate(text);
+  };
+
   it("says why a color box cannot change, and nothing when it can", () => {
-    expect(colorsLimit(["red", "blue"], "red")).toBe("Keep at least 2 colors.");
-    expect(colorsLimit(["red", "blue"], "green")).toBeNull();
-    expect(colorsLimit(["red", "blue", "green"], "red")).toBeNull();
-    expect(colorsLimit(["red", "blue", "green", "white"], "amber")).toBe("Pick at most 4 colors.");
-    expect(colorsLimit(["red", "blue", "green", "white"], "red")).toBeNull();
+    expect(limit(["red", "blue"], "red")).toBe("Keep at least 2 colors.");
+    expect(limit(["red", "blue"], "green")).toBeNull();
+    expect(limit(["red", "blue", "green"], "red")).toBeNull();
+    expect(limit(["red", "blue", "green", "white"], "amber")).toBe("Pick at most 4 colors.");
+    expect(limit(["red", "blue", "green", "white"], "red")).toBeNull();
   });
 });

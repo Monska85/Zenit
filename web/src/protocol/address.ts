@@ -2,9 +2,11 @@
 
 // The address a person types to reach a board or the simulator over WebSocket (docs/web/web-app-v1.md#websocket).
 
+import type { Message } from "../i18n";
 import { CONNECT_TIMEOUT_MS } from "./websocket";
 
-export type AddressResult = { url: string } | { error: string };
+/** A URL, or the sentence that says why the text is not an address (a message of the `errors` catalog). */
+export type AddressResult = { url: string } | { error: Message };
 
 const HOST = /^(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*$/;
 const IPV6 = /^\[[0-9A-Fa-f:.]+\]$/;
@@ -14,8 +16,9 @@ function validPort(port: string): boolean {
 }
 
 /** The sentence for an address outside the person's own network: the app talks to nothing on the internet. */
-export const PRIVATE_ONLY_MESSAGE =
-  "This app connects only to a Zenit on your own network: a name that ends in .local, like zenit-1a2b.local, or a local address, like 192.168.1.20 or 10.0.0.5. For the simulator on this computer, use ws://127.0.0.1:8765.";
+export const PRIVATE_ONLY_MESSAGE: Message = { key: "errors:address.privateOnly" };
+
+const INVALID: Message = { key: "errors:address.invalid" };
 
 /**
  * The WebSocket URL for what was typed. A full `ws://` URL is used as typed; a host name or address, with an optional
@@ -24,24 +27,24 @@ export const PRIVATE_ONLY_MESSAGE =
  */
 export function boardUrl(typed: string): AddressResult {
   const text = typed.trim();
-  if (text === "") return { error: "Type the address of your Zenit." };
+  if (text === "") return { error: { key: "errors:address.empty" } };
   let address: string;
   if (/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(text)) {
     let url: URL;
     try {
       url = new URL(text);
     } catch {
-      return { error: "That is not a valid address." };
+      return { error: INVALID };
     }
-    if (url.protocol !== "ws:") return { error: "The address must start with ws://." };
-    if (url.username || url.password || url.hostname === "") return { error: "That is not a valid address." };
+    if (url.protocol !== "ws:") return { error: { key: "errors:address.notWs" } };
+    if (url.username || url.password || url.hostname === "") return { error: INVALID };
     address = text;
   } else {
     const split = /^(\[[^\]]*\]|[^:]*)(?::(.*))?$/.exec(text);
     const host = split?.[1] ?? "";
     const port = split?.[2];
     if (!(HOST.test(host) || IPV6.test(host)) || (port !== undefined && !validPort(port))) {
-      return { error: "That does not look like an address. Try zenit-1a2b.local or 192.168.1.20." };
+      return { error: { key: "errors:address.notAnAddress" } };
     }
     address = `ws://${host}${port === undefined ? "" : `:${port}`}/ws`;
   }
@@ -50,7 +53,7 @@ export function boardUrl(typed: string): AddressResult {
   try {
     hostname = new URL(address).hostname;
   } catch {
-    return { error: "That is not a valid address." };
+    return { error: INVALID };
   }
   if (!localHost(hostname)) return { error: PRIVATE_ONLY_MESSAGE };
   return { url: address };

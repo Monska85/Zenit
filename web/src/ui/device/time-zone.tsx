@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useId, useMemo, useState, type KeyboardEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { ZONE_TABLE, type Zone } from "../../device/zones";
 import { zoneSearchKey, type ListState } from "./zone-search-keys";
 import { cn } from "../../lib/utils";
@@ -28,6 +29,7 @@ export function zoneText(posix: string, chosen: string | null): string {
  * browser's zone. `onChoose` remembers the zone chosen on this page, so the board's string is named by it.
  */
 export function TimeZoneOffer({ chosen, onChoose }: { chosen: string | null; onChoose: (name: string) => void }) {
+  const { t } = useTranslation("device");
   const { board } = useBoard();
   const { pending, commit } = useCommit();
   const settings = board.settings && { ...board.settings, ...pending };
@@ -38,9 +40,9 @@ export function TimeZoneOffer({ chosen, onChoose }: { chosen: string | null; onC
   const now = ZONE_TABLE.boardZone(posix, chosen, null);
   return (
     <Card aria-labelledby="time-offer-title" data-testid="time-zone-offer">
-      <CardTitle id="time-offer-title">Time zone</CardTitle>
+      <CardTitle id="time-offer-title">{t("time.offer.title")}</CardTitle>
       <p className="mb-3 text-base">
-        {now === null ? `Zenit uses the time zone ${posix}.` : `Zenit uses ${now.label} time.`}
+        {now === null ? t("time.offer.posix", { posix }) : t("time.offer.named", { zone: now.label })}
       </p>
       <Button
         variant="outline"
@@ -49,7 +51,7 @@ export function TimeZoneOffer({ chosen, onChoose }: { chosen: string | null; onC
           void commit({ timezone: mine.posix });
         }}
       >
-        Use this device's time zone ({mine.city})
+        {t("time.offer.useMine", { city: mine.city })}
       </Button>
     </Card>
   );
@@ -60,6 +62,7 @@ export function TimeZoneOffer({ chosen, onChoose }: { chosen: string | null; onC
  * one calls `onChoose` at once and empties the field.
  */
 export function ZoneSearch({ onChoose }: { onChoose: (zone: Zone) => void }) {
+  const { t } = useTranslation("device");
   const [text, setText] = useState("");
   const [list, setList] = useState<ListState>({ open: false, active: -1 });
   const found = useMemo(() => ZONE_TABLE.searchZones(text), [text]);
@@ -88,7 +91,7 @@ export function ZoneSearch({ onChoose }: { onChoose: (zone: Zone) => void }) {
   return (
     <div>
       <label htmlFor={id} className="mb-1 block text-base font-medium">
-        Find a time zone
+        {t("time.search.label")}
       </label>
       <input
         id={id}
@@ -113,12 +116,12 @@ export function ZoneSearch({ onChoose }: { onChoose: (zone: Zone) => void }) {
         className="block min-h-11 w-full rounded-xl border border-border bg-background px-3 text-base"
       />
       <p id={hintId} className="mt-1 text-sm text-muted-foreground">
-        Type a city or a country, then choose. Zenit changes at once.
+        {t("time.search.hint")}
       </p>
       <ul
         id={listId}
         role="listbox"
-        aria-label="Time zones"
+        aria-label={t("time.search.list")}
         hidden={!shown}
         className="mt-2 flex flex-col overflow-hidden rounded-xl border border-border bg-background"
       >
@@ -143,8 +146,8 @@ export function ZoneSearch({ onChoose }: { onChoose: (zone: Zone) => void }) {
           ))}
       </ul>
       <p role="status" className="mt-1 text-sm text-muted-foreground empty:hidden">
-        {typed && list.open && found.length === 0 ? "No time zone matches. Try a nearby city or the country." : ""}
-        {shown ? <span className="sr-only">{`${found.length} time zones found.`}</span> : ""}
+        {typed && list.open && found.length === 0 ? t("time.search.none") : ""}
+        {shown ? <span className="sr-only">{t("time.search.found", { count: found.length })}</span> : ""}
       </p>
     </div>
   );

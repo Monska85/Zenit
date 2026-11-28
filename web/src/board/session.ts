@@ -3,7 +3,8 @@
 // One connection to a board, and what the app knows of it (docs/web/web-app-v1.md#connection). Plain TypeScript with a
 // subscribe function, so the React code only reads it and the tests run it with a scripted board.
 
-import { describeError, NO_ANSWER } from "./messages";
+import { message, type Message } from "../i18n";
+import { errorMessage, NO_ANSWER } from "./messages";
 import type { ServedBoard } from "./served";
 import { settingsProblem } from "../light/model";
 import { isToken, login } from "../protocol/auth";
@@ -47,11 +48,11 @@ export interface BoardState {
   time: TimeStatus | null;
   update: UpdateStatus | null;
   /** A sentence for the banner, until it is closed or the next request succeeds. */
-  error: string | null;
+  error: Message | null;
   /** A connection is being opened (a port chosen, a socket connecting): no other one may start. */
   opening: boolean;
   /** Why the token was not accepted, while the phase is `login`. */
-  loginProblem: string | null;
+  loginProblem: Message | null;
   /** While the phase is `login`: the board closed the connection for waiting too long, and the next try opens it again. */
   loginIdle: boolean;
   /** The board that served this page, when there is one. */
@@ -68,8 +69,12 @@ export interface BoardState {
 /** The board's name as it reports it: the board that served the page, or the name it has on the network. */
 export const boardName = (board: BoardState): string | null => board.served?.hostname ?? board.wifi?.hostname ?? null;
 
-/** A connection that could not be opened; the message is the sentence for the banner. */
-export class OpenFailed extends Error {}
+/** A connection that could not be opened; `reason` is the sentence for the banner. */
+export class OpenFailed extends Error {
+  constructor(readonly reason: Message) {
+    super(reason.key);
+  }
+}
 
 /**
  * What opens a connection: a transport, null when the person gave up (a closed chooser), or an OpenFailed.
@@ -86,7 +91,7 @@ export interface FavoriteOutcome {
   ok: boolean;
   code: string | null;
   nameProblem: boolean;
-  message: string | null;
+  message: Message | null;
 }
 
 const NAME_ERRORS: readonly string[] = ["bad_name", "name_taken"];
@@ -257,7 +262,7 @@ export class BoardSession {
       if (generation !== this.generation) return;
       this.client = null;
       await client.close().catch(() => undefined);
-      if (!silent) this.update(this.blank({ opening: this.openRunning, error: describeError(error) }));
+      if (!silent) this.update(this.blank({ opening: this.openRunning, error: errorMessage(error) }));
     }
   }
 
@@ -327,8 +332,8 @@ export class BoardSession {
       try {
         transport = await opener(!silent);
       } catch (error) {
-        const message = error instanceof OpenFailed ? error.message : describeError(error);
-        if (!silent) this.update({ error: message });
+        const reason = error instanceof OpenFailed ? error.reason : errorMessage(error);
+        if (!silent) this.update({ error: reason });
         return;
       }
       if (transport !== null) await this.connect(transport, label, { opener, label }, silent);
@@ -367,8 +372,8 @@ export class BoardSession {
   }
 
   /** A sentence for the bottom message, for a caller that has a refusal to show and no dialog left to show it in. */
-  showError(message: string): void {
-    this.update({ error: message });
+  showError(text: Message): void {
+    this.update({ error: text });
   }
 
   dismissError(): void {
@@ -453,7 +458,7 @@ export class BoardSession {
     request: (client: Client, info: BoardInfo) => Promise<void>,
   ): Promise<FavoriteOutcome> {
     let code: string | null = null;
-    let message: string | null = null;
+    let message: Message | null = null;
     let attempts = 0;
     const ran = await this.run(async (client, info) => {
       // A run after a login is the retry `run` makes once the outcome was already returned, and the login screen has
@@ -467,7 +472,7 @@ export class BoardSession {
           code = error.code;
           await this.refreshFavorites(client);
           if (where === "dialog") {
-            message = describeError(error);
+            message = errorMessage(error);
             return;
           }
         }
@@ -572,7 +577,7 @@ export class BoardSession {
     if (this.state.phase !== "login") return;
     const text = token.trim();
     if (!isToken(text)) {
-      this.update({ loginProblem: "The token has 16 characters, letters from a to z and digits from 0 to 9." });
+      this.update({ loginProblem: message("errors:login.tokenShape") });
       return;
     }
     if (this.state.loginIdle) {
@@ -584,8 +589,7 @@ export class BoardSession {
     if (!client || !info) return;
     const generation = this.generation;
     await this.loginWith(client, info, text, () => {
-      if (generation === this.generation)
-        this.update({ loginProblem: "That token is not right. After three wrong tries Zenit closes the connection." });
+      if (generation === this.generation) this.update({ loginProblem: message("errors:login.tokenWrong") });
     });
   }
 
@@ -597,10 +601,10 @@ export class BoardSession {
     if (this.phase() !== "login") return;
     if (this.client === null) {
       this.token = null;
-      this.update({ loginIdle: true, loginProblem: "Zenit did not answer. Check that it is on and try again." });
+      this.update({ loginIdle: true, loginProblem: message("errors:login.noAnswer") });
     } else {
       this.token = null;
-      this.update({ loginProblem: "That token is not right. After three wrong tries Zenit closes the connection." });
+      this.update({ loginProblem: message("errors:login.tokenWrong") });
     }
   }
 
@@ -678,7 +682,7 @@ export class BoardSession {
     if (error instanceof ClientError && (error.failure === "no_reply" || error.failure === "closed")) {
       this.lose(error);
     } else {
-      this.update({ error: describeError(error) });
+      this.update({ error: errorMessage(error) });
     }
   }
 
@@ -698,7 +702,7 @@ export class BoardSession {
     this.lose(error);
   }
 
-  private lose(error?: unknown, message?: string): void {
+  private lose(error?: unknown, reason?: Message): void {
     const client = this.client;
     if (client === null) return;
     // The board installed a new web app. A page it served loads again to get it; any other page connects again.
@@ -723,7 +727,7 @@ export class BoardSession {
     this.update({
       phase: "lost",
       auto,
-      error: auto ? null : (message ?? (error === undefined ? NO_ANSWER : describeError(error))),
+      error: auto ? null : (reason ?? (error === undefined ? NO_ANSWER : errorMessage(error))),
     });
     if (auto) void this.reconnectByItself(auto);
   }
@@ -745,7 +749,7 @@ export class BoardSession {
       if (this.phase() === "connected" || this.phase() === "login") return;
     }
     if (run === this.retryRun && this.state.phase === "lost") {
-      this.update({ auto: null, error: "Zenit did not come back. Check that it is on, then press Reconnect." });
+      this.update({ auto: null, error: message("errors:didNotComeBack") });
     }
   }
 

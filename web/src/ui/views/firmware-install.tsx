@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { lazy, Suspense, useId, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { FirmwareManifest } from "../../release/manifest";
 import { useBoard } from "../board-context";
 import { Banner } from "../components/banner";
@@ -17,6 +18,7 @@ const MANIFEST_PATH = "firmware/manifest.json";
 /** The install over a USB cable, as a part of the Maintenance card: its root stays a <section>, which the card's
  * divider between parts relies on. */
 export function FirmwareInstall({ published, go }: { published: FirmwareManifest | null; go: (route: Route) => void }) {
+  const { t } = useTranslation("device");
   const { board, session } = useBoard();
   const [asking, setAsking] = useState(false);
   const [unplugged, setUnplugged] = useState(false);
@@ -38,12 +40,12 @@ export function FirmwareInstall({ published, go }: { published: FirmwareManifest
   return (
     <section aria-labelledby="install-title">
       <h3 id="install-title" className="mb-2 text-base font-semibold">
-        Install or update the firmware
+        {t("install.title")}
       </h3>
       {installing ? (
         <div className="flex flex-col gap-3">
-          <Banner tone="warning">Keep the USB cable plugged in until the installer says it is done.</Banner>
-          <Suspense fallback={<p role="status">Loading the installer...</p>}>
+          <Banner tone="warning">{t("install.keepPlugged")}</Banner>
+          <Suspense fallback={<p role="status">{t("install.loading")}</p>}>
             <Installer manifest={MANIFEST_PATH} />
           </Suspense>
           <Button
@@ -53,16 +55,14 @@ export function FirmwareInstall({ published, go }: { published: FirmwareManifest
               go("connect");
             }}
           >
-            Done
+            {t("install.done")}
           </Button>
         </div>
       ) : (
         <>
           <p className="mb-3 text-base">
-            {published
-              ? `Installs version ${published.version} over a USB cable.`
-              : "Installs the latest firmware over a USB cable."}{" "}
-            Your settings are kept, unless you choose to erase everything.
+            {published ? t("install.version", { version: published.version }) : t("install.latest")}{" "}
+            {t("install.settingsKept")}
           </p>
           <Button
             onClick={() => {
@@ -71,15 +71,15 @@ export function FirmwareInstall({ published, go }: { published: FirmwareManifest
               setAsking(true);
             }}
           >
-            Install or update firmware
+            {t("install.button")}
           </Button>
         </>
       )}
       <ConfirmDialog
         open={asking}
         onOpenChange={setAsking}
-        title="Before you connect the cable"
-        confirm="Continue"
+        title={t("install.dialog.title")}
+        confirm={t("install.dialog.confirm")}
         disabled={!unplugged}
         keepOpen
         onConfirm={() => void start()}
@@ -92,23 +92,13 @@ export function FirmwareInstall({ published, go }: { published: FirmwareManifest
               onChange={(event) => setUnplugged(event.target.checked)}
               className="size-6 accent-primary"
             />
-            The panel power socket is unplugged
+            {t("install.dialog.unplugged")}
           </label>
         }
       >
-        <Banner tone="warning">
-          Unplug the panel power socket from the wall before you connect the USB cable. Never connect USB and the panel
-          power together.
-        </Banner>
-        <p>
-          Your settings are kept. The installer offers to erase everything for a clean install: choose that only if the
-          Zenit misbehaves.
-        </p>
-        {stuck && (
-          <Banner tone="error">
-            The USB port is still in use. Unplug the USB cable, plug it in again, then reload this page.
-          </Banner>
-        )}
+        <Banner tone="warning">{t("install.dialog.warning")}</Banner>
+        <p>{t("install.dialog.text")}</p>
+        {stuck && <Banner tone="error">{t("install.dialog.stuck")}</Banner>}
       </ConfirmDialog>
     </section>
   );

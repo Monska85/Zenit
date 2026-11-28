@@ -3,6 +3,7 @@
 // The board settings as the app shows and checks them (docs/protocol/protocol-v1.md#settings_get-settings_set). The
 // limits equal the protocol's; a change to one changes both.
 
+import { i18n, message, translate, type Message } from "../i18n";
 import { own } from "../lib/own";
 import type { BoardSettings } from "../protocol/types";
 
@@ -18,33 +19,34 @@ export const BOARD_LIMITS = {
 export const WIFI_POWERS = ["auto", "8.5", "11", "13", "15", "17", "18.5", "19.5"] as const;
 export const UPDATE_MODES = ["off", "notify", "automatic"] as const;
 
-export const WIFI_POWER_LABELS: Record<string, string> = {
-  auto: "Automatic",
-  "8.5": "8.5 dBm (lowest)",
-  "11": "11 dBm",
-  "13": "13 dBm",
-  "15": "15 dBm",
-  "17": "17 dBm",
-  "18.5": "18.5 dBm",
-  "19.5": "19.5 dBm (highest)",
+// The labels and hints are messages, translated when a choice is drawn
+export const WIFI_POWER_LABELS: Record<string, Message> = {
+  auto: message("device:wifi.power.auto"),
+  "8.5": message("device:wifi.power.lowest", { value: "8.5" }),
+  "11": message("device:wifi.power.dbm", { value: "11" }),
+  "13": message("device:wifi.power.dbm", { value: "13" }),
+  "15": message("device:wifi.power.dbm", { value: "15" }),
+  "17": message("device:wifi.power.dbm", { value: "17" }),
+  "18.5": message("device:wifi.power.dbm", { value: "18.5" }),
+  "19.5": message("device:wifi.power.highest", { value: "19.5" }),
 };
 
-export const UPDATE_MODE_LABELS: Record<string, string> = {
-  off: "Off",
-  notify: "Tell me",
-  automatic: "Install automatically",
+export const UPDATE_MODE_LABELS: Record<string, Message> = {
+  off: message("device:settings.modes.off"),
+  notify: message("device:settings.modes.notify"),
+  automatic: message("device:settings.modes.automatic"),
 };
 
-export const UPDATE_MODE_HINTS: Record<string, string> = {
-  off: "Zenit never looks for new firmware.",
-  notify: "Zenit looks for new firmware and tells you. You choose when to install it.",
-  automatic: "Zenit installs new firmware by itself, inside the time window below.",
+export const UPDATE_MODE_HINTS: Record<string, Message> = {
+  off: message("device:settings.modeHints.off"),
+  notify: message("device:settings.modeHints.notify"),
+  automatic: message("device:settings.modeHints.automatic"),
 };
 
 /** Why a POSIX TZ string is not acceptable, or null: 1 to 64 printable ASCII characters other than space. */
 export function timezoneProblem(text: string): string | null {
   if (!/^[\x21-\x7e]+$/.test(text) || text.length > BOARD_LIMITS.timezone.max) {
-    return `Use 1 to ${BOARD_LIMITS.timezone.max} letters, digits or symbols, with no spaces.`;
+    return i18n.t("device:time.timezoneProblem", { max: BOARD_LIMITS.timezone.max });
   }
   return null;
 }
@@ -52,7 +54,7 @@ export function timezoneProblem(text: string): string | null {
 /** Why an NTP server is not acceptable, or null: a host name or IPv4 address of 1 to 64 letters, digits, dots and dashes. */
 export function ntpServerProblem(text: string): string | null {
   if (!/^[A-Za-z0-9.-]+$/.test(text) || text.length > BOARD_LIMITS.ntp_server.max) {
-    return `Use 1 to ${BOARD_LIMITS.ntp_server.max} letters, digits, dots or dashes, for example pool.ntp.org.`;
+    return i18n.t("device:time.ntpServerProblem", { max: BOARD_LIMITS.ntp_server.max });
   }
   return null;
 }
@@ -66,7 +68,7 @@ export function hourOptions(current: number | undefined): Array<{ value: string;
   if (current !== undefined && !values.includes(current)) values.push(current);
   return values
     .sort((a, b) => a - b)
-    .map((hours) => ({ value: String(hours), label: hours === 1 ? "Every hour" : `Every ${hours} hours` }));
+    .map((hours) => ({ value: String(hours), label: i18n.t("device:settings.every", { count: hours }) }));
 }
 
 /**
@@ -98,8 +100,11 @@ export function parseMinute(text: string): number | null {
 
 /** The install window in words. Equal start and end mean the whole day. */
 export function describeWindow(start: number, end: number): string {
-  if (start === end) return "Any time of day.";
-  return `From ${formatMinute(start)} to ${formatMinute(end)}${end < start ? " (past midnight)" : ""}.`;
+  if (start === end) return i18n.t("device:settings.window.anyTime");
+  const times = { from: formatMinute(start), to: formatMinute(end) };
+  return end < start
+    ? i18n.t("device:settings.window.pastMidnight", times)
+    : i18n.t("device:settings.window.range", times);
 }
 
 /** The first setting of the board that is out of its limits, or null. Settings the board does not report are skipped. */
@@ -127,11 +132,14 @@ export function boardSettingsProblem(settings: BoardSettings): string | null {
  * choice shows what the board has and a newer firmware's word is never hidden. */
 export function choiceOptions(
   values: readonly string[],
-  labels: Record<string, string>,
+  labels: Record<string, Message>,
   current: string | undefined,
 ): Array<{ value: string; label: string }> {
-  const options = values.map((value) => ({ value, label: own(labels, value) ?? value }));
+  const options = values.map((value) => {
+    const label = own(labels, value);
+    return { value, label: label === undefined ? value : translate(label) };
+  });
   if (current !== undefined && !values.includes(current))
-    options.push({ value: current, label: `${current} (new in this Zenit)` });
+    options.push({ value: current, label: i18n.t("device:settings.newChoice", { value: current }) });
   return options;
 }

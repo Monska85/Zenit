@@ -2,32 +2,29 @@
 
 import { Eye, EyeOff, RefreshCw } from "lucide-react";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
+import { message, translate, type Message } from "../../i18n";
 import { ImprovClient, ImprovError, type ImprovNetwork } from "../../protocol/improv-client";
-import { boardAddress, describeSignal, passwordProblem, PHONE_ACCESS_HINT, ssidProblem } from "../../wifi/model";
+import { boardAddress, describeSignal, passwordProblem, phoneAccessHint, ssidProblem } from "../../wifi/model";
 import { useSession } from "../board-context";
 import { Banner } from "../components/banner";
 import { Button } from "../components/button";
 
-/** The sentence for a failed WiFi request over USB. A password is never in it. */
-function describeImprovError(error: unknown, request: "scan" | "provision" = "provision"): string {
+/** The message for a failed WiFi request over USB. A password is never in it. */
+function describeImprovError(error: unknown, request: "scan" | "provision" = "provision"): Message {
   if (error instanceof ImprovError) {
-    if (request === "scan" && error.failure === "invalid_rpc") return "Zenit could not look for networks. Try again.";
+    if (request === "scan" && error.failure === "invalid_rpc") return message("device:improv.errors.scanFailed");
     switch (error.failure) {
       case "unable_to_connect":
-        return "Zenit could not join that network. Check the name and the password, then try again.";
       case "invalid_rpc":
-        return "Zenit did not accept that name or password.";
       case "unknown_rpc":
-        return "This Zenit firmware cannot do that. Update the firmware.";
       case "timeout":
-        return "Zenit did not answer. Try again.";
       case "busy":
-        return "Zenit is still working on the last request. Wait a moment.";
       case "link":
-        return "The USB connection failed. Check the cable.";
+        return message(`device:improv.errors.${error.failure}`);
     }
   }
-  return "Something went wrong.";
+  return message("errors:unknown");
 }
 
 type Progress =
@@ -35,10 +32,11 @@ type Progress =
   | { kind: "scanning" }
   | { kind: "connecting" }
   | { kind: "done"; hostname: string | null }
-  | { kind: "failed"; message: string };
+  | { kind: "failed"; message: Message };
 
 /** Setting up the WiFi of a board connected by USB, with Improv Wi-Fi Serial: scan, choose, type the password, connect. */
 export function ImprovPanel() {
+  const { t } = useTranslation("device");
   const session = useSession();
   const client = useRef<ImprovClient | null>(null);
   const [networks, setNetworks] = useState<ImprovNetwork[] | null>(null);
@@ -46,11 +44,13 @@ export function ImprovPanel() {
   const [password, setPassword] = useState("");
   const [reveal, setReveal] = useState(false);
   const [progress, setProgress] = useState<Progress>({ kind: "idle" });
-  const [problem, setProblem] = useState<string | null>(null);
+  const [problem, setProblem] = useState<Message | null>(null);
   const ssidId = useId();
   const passwordId = useId();
   const listId = useId();
   const working = progress.kind === "scanning" || progress.kind === "connecting";
+  const connectedAs = (hostname: string): string =>
+    t("improv.connectedAs", { hostname, address: boardAddress(hostname) });
 
   useEffect(
     () => () => {
@@ -105,18 +105,18 @@ export function ImprovPanel() {
       <div>
         <Button variant="outline" disabled={working} onClick={() => void scan()}>
           <RefreshCw aria-hidden className="size-5" />
-          Scan for networks
+          {t("improv.scan")}
         </Button>
         {progress.kind === "scanning" && (
           <p role="status" className="mt-2 text-base text-muted-foreground">
-            Looking for WiFi networks, up to 15 seconds...
+            {t("improv.scanning")}
           </p>
         )}
         {networks !== null && networks.length === 0 && progress.kind !== "scanning" && (
-          <p className="mt-2 text-base text-muted-foreground">Zenit sees no networks. Type the name of yours below.</p>
+          <p className="mt-2 text-base text-muted-foreground">{t("improv.noNetworks")}</p>
         )}
         {networks !== null && networks.length > 0 && (
-          <ul aria-label="Networks Zenit sees" className="mt-3 flex flex-col gap-2" id={listId}>
+          <ul aria-label={t("improv.networks")} className="mt-3 flex flex-col gap-2" id={listId}>
             {networks.map((network) => (
               <li key={network.ssid}>
                 <button
@@ -127,7 +127,9 @@ export function ImprovPanel() {
                 >
                   <span className="min-w-0 break-words">{network.ssid}</span>
                   <span className="shrink-0 text-sm text-muted-foreground">
-                    {describeSignal(network.rssi)} signal, {network.secure ? "password" : "open"}
+                    {network.secure
+                      ? t("improv.networkSecure", { signal: describeSignal(network.rssi) })
+                      : t("improv.networkOpen", { signal: describeSignal(network.rssi) })}
                   </span>
                 </button>
               </li>
@@ -138,7 +140,7 @@ export function ImprovPanel() {
       <form onSubmit={(event) => void connect(event)} className="flex flex-col gap-3">
         <div>
           <label htmlFor={ssidId} className="mb-1 block text-base font-medium">
-            Network name
+            {t("improv.networkName")}
           </label>
           <input
             id={ssidId}
@@ -154,7 +156,7 @@ export function ImprovPanel() {
         </div>
         <div>
           <label htmlFor={passwordId} className="mb-1 block text-base font-medium">
-            Password
+            {t("improv.password")}
           </label>
           <div className="flex gap-2">
             <input
@@ -174,31 +176,29 @@ export function ImprovPanel() {
               variant="outline"
               size="icon"
               aria-pressed={reveal}
-              aria-label={reveal ? "Hide password" : "Show password"}
+              aria-label={reveal ? t("improv.hidePassword") : t("improv.showPassword")}
               onClick={() => setReveal((shown) => !shown)}
             >
               {reveal ? <EyeOff aria-hidden className="size-5" /> : <Eye aria-hidden className="size-5" />}
             </Button>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">Leave it empty for a network with no password.</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t("improv.passwordHint")}</p>
         </div>
-        {problem && <Banner tone="error">{problem}</Banner>}
+        {problem && <Banner tone="error">{translate(problem)}</Banner>}
         <Button type="submit" disabled={working}>
-          Connect Zenit to this network
+          {t("improv.connect")}
         </Button>
       </form>
       {progress.kind === "connecting" && (
         <p role="status" className="text-base">
-          Connecting, up to 30 seconds. Keep the USB cable plugged in.
+          {t("improv.connecting")}
         </p>
       )}
-      {progress.kind === "failed" && <Banner tone="error">{progress.message}</Banner>}
+      {progress.kind === "failed" && <Banner tone="error">{translate(progress.message)}</Banner>}
       {progress.kind === "done" && (
         <Banner tone="info">
           <p role="status" data-testid="wifi-done">
-            {progress.hostname
-              ? `Connected as ${progress.hostname}.local. Open ${boardAddress(progress.hostname)} on your phone or computer to control Zenit over WiFi. ${PHONE_ACCESS_HINT}`
-              : "Connected. Zenit is on your WiFi."}
+            {progress.hostname ? `${connectedAs(progress.hostname)} ${phoneAccessHint()}` : t("improv.connected")}
           </p>
         </Banner>
       )}
