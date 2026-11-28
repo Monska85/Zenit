@@ -30,18 +30,32 @@ const PREVIEW_COLORS: Record<string, string> = {
   hop: COLOR_SWATCHES["red"] ?? "",
 };
 
-function Preview({ effect }: { effect: string }) {
+/**
+ * The small dot that shows how an effect moves. `color` is the name of the color it starts with (a favorite's own); an
+ * effect card shows the effect's usual one.
+ */
+export function EffectPreview({
+  effect,
+  color,
+  testId = "effect-preview",
+}: {
+  effect: string;
+  color?: string | null;
+  testId?: string;
+}) {
   const motion = own(PREVIEWS, effect);
+  const swatch =
+    color === undefined ? own(PREVIEW_COLORS, effect) : color === null ? undefined : own(COLOR_SWATCHES, color);
   return (
     <span
       aria-hidden
-      data-testid="effect-preview"
+      data-testid={testId}
       className={cn(
         "inline-block size-5 shrink-0 rounded-full border border-black/20",
         motion === undefined && "bg-muted",
         motion,
       )}
-      style={motion === undefined ? undefined : { background: own(PREVIEW_COLORS, effect) ?? COLOR_SWATCHES["white"] }}
+      style={motion === undefined ? undefined : { background: swatch ?? COLOR_SWATCHES["white"] }}
     />
   );
 }
@@ -70,7 +84,7 @@ export function EffectPicker({
           value: name,
           label: (
             <span className="flex items-center gap-2 font-semibold">
-              <Preview effect={name} />
+              <EffectPreview effect={name} />
               {info.label}
             </span>
           ),

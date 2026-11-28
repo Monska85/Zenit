@@ -7,7 +7,12 @@ import {
   EFFECTS,
   LIMITS,
   effectControls,
+  defaultFavoriteName,
   effectInfo,
+  favoriteLimits,
+  favoriteMatches,
+  favoriteNameProblem,
+  favoritePreviewColor,
   formatHold,
   formatSeconds,
   formatTimer,
@@ -267,4 +272,157 @@ describe("formats", () => {
     [120, "2 h"],
     [360, "6 h"],
   ])("formatTimer(%d) is %s", (value, text) => expect(formatTimer(value)).toBe(text));
+});
+
+describe("favoriteMatches", () => {
+  const christmas = {
+    id: 2,
+    name: "Christmas",
+    effect: "christmas",
+    brightness: 60,
+    color_set: "christmas",
+    hold_seconds: 30,
+  };
+
+  it("matches the effect, the brightness and every setting the effect reads", () => {
+    const now = settings({ effect: "christmas", color_set: "christmas", hold_seconds: 30 });
+    expect(favoriteMatches(christmas, now, info)).toBe(true);
+    expect(favoriteMatches(christmas, settings({ ...now, brightness: 61 }), info)).toBe(false);
+    expect(favoriteMatches(christmas, settings({ ...now, effect: "hop" }), info)).toBe(false);
+    expect(favoriteMatches(christmas, settings({ ...now, hold_seconds: 31 }), info)).toBe(false);
+    expect(favoriteMatches(christmas, settings({ ...now, color_set: "ice" }), info)).toBe(false);
+  });
+
+  it("ignores the settings the effect does not read and the timer", () => {
+    const now = settings({ effect: "christmas", color: "red", floor: 70, timer_minutes: 30 });
+    expect(favoriteMatches(christmas, now, info)).toBe(true);
+  });
+
+  it("compares the colors in order", () => {
+    const saved = {
+      id: 3,
+      name: "Rainbow",
+      effect: "color_change",
+      brightness: 60,
+      colors: ["red", "green"],
+      hold_seconds: 30,
+    };
+    const now = settings({ effect: "color_change", colors: ["red", "green"] });
+    expect(favoriteMatches(saved, now, info)).toBe(true);
+    expect(favoriteMatches(saved, settings({ ...now, colors: ["green", "red"] }), info)).toBe(false);
+  });
+
+  it("uses the list the board reports, else the app's own", () => {
+    const own = {
+      id: 4,
+      name: "Breath",
+      effect: "breathing",
+      brightness: 60,
+      color: "white",
+      period_seconds: 8,
+      floor: 20,
+    };
+    const now = settings({ effect: "breathing", floor: 21 });
+    expect(favoriteMatches(own, now, info)).toBe(false);
+    // The board says Breathing reads no floor: it does not count
+    const narrow = toInfo({
+      ...INFO,
+      effect_settings: { ...INFO.effect_settings, breathing: ["color", "period_seconds"] },
+    } as unknown as JsonObject);
+    expect(favoriteMatches(own, now, narrow)).toBe(true);
+    // A board with no lists: the app's table, where Breathing reads the floor
+    const { effect_settings: _lists, ...without } = INFO;
+    void _lists;
+    const old = toInfo(without as unknown as JsonObject);
+    expect(favoriteMatches(own, now, old)).toBe(false);
+  });
+
+  it("compares an effect nobody lists by effect and brightness only", () => {
+    const newer = { id: 5, name: "Aurora", effect: "northern_lights", brightness: 60, color: "red" };
+    expect(favoriteMatches(newer, settings({ effect: "northern_lights", color: "blue" }), info)).toBe(true);
+    expect(favoriteMatches(newer, settings({ effect: "northern_lights", brightness: 50 }), info)).toBe(false);
+  });
+});
+
+const ZERO_WIDTH = String.fromCodePoint(0x200b);
+
+describe("defaultFavoriteName", () => {
+  it("is the effect's name, then the name with 2, 3 and so on", () => {
+    expect(defaultFavoriteName("Shooting star", [])).toBe("Shooting star");
+    expect(defaultFavoriteName("Shooting star", ["Shooting star"])).toBe("Shooting star 2");
+    expect(defaultFavoriteName("Shooting star", ["Shooting star", "Shooting star 2"])).toBe("Shooting star 3");
+    expect(defaultFavoriteName("Shooting star", ["shooting STAR"])).toBe("Shooting star 2");
+  });
+
+  it("never goes over 20 characters, and the name stays a name the board takes", () => {
+    const long = "A".repeat(20);
+    expect(defaultFavoriteName(long, [])).toBe(long);
+    expect(defaultFavoriteName(long, [long])).toBe(`${"A".repeat(18)} 2`);
+    expect(defaultFavoriteName("Guided breathing now", ["Guided breathing now"])).toBe("Guided breathing n 2");
+    expect(defaultFavoriteName("B".repeat(30), [])).toBe("B".repeat(20));
+    const names = [long];
+    for (let number = 2; number <= 12; number++) names.push(defaultFavoriteName(long, names));
+    expect(names.every((name) => [...name].length <= 20)).toBe(true);
+    expect(new Set(names).size).toBe(names.length);
+    expect(defaultFavoriteName("", [])).toBe("My light");
+    expect(defaultFavoriteName(`a${ZERO_WIDTH}b`, [])).toBe("My light");
+  });
+});
+
+describe("favoriteNameProblem", () => {
+  const list = [
+    { id: 1, name: "Starry night", effect: "static", brightness: 60 },
+    { id: 2, name: "Christmas", effect: "static", brightness: 60 },
+  ];
+  const check = (name: string, exceptId: number | null = null) => favoriteNameProblem(name, list, exceptId);
+
+  it("takes a name, trims its ends and writes it in NFC", () => {
+    expect(check("  Bedtime  ")).toEqual({ name: "Bedtime", problem: null });
+    expect(check("Café")).toEqual({ name: "Café", problem: null });
+    expect(check("Bath \u{1f6c1} time").problem).toBeNull();
+  });
+
+  it("says what is wrong, in the sentences of the design", () => {
+    expect(check("").problem).toBe("Give your favorite a name.");
+    expect(check("   ").problem).toBe("Give your favorite a name.");
+    expect(check("x".repeat(21)).problem).toBe("Keep the name to 20 characters or fewer.");
+    expect(check("a\tb").problem).toBe("That name has a character Zenit cannot keep. Try letters, numbers and spaces.");
+    expect(check(`a${ZERO_WIDTH}b`).problem).toBe(
+      "That name has a character Zenit cannot keep. Try letters, numbers and spaces.",
+    );
+    expect(check("christmas").problem).toBe("You already have a favorite called Christmas. Choose another name.");
+  });
+
+  it("counts characters, not UTF-16 units", () => {
+    expect(check("\u{1f31f}".repeat(20)).problem).toBeNull();
+    expect(check("\u{1f31f}".repeat(21)).problem).toBe("Keep the name to 20 characters or fewer.");
+  });
+
+  it("compares only ASCII letters without case, and lets a favorite keep its own name", () => {
+    expect(favoriteNameProblem("École", [{ ...list[0]!, name: "école" }]).problem).toBeNull();
+    expect(check("STARRY NIGHT", 1).problem).toBeNull();
+    expect(check("STARRY NIGHT", 2).problem).toContain("Starry night");
+  });
+});
+
+describe("favoritePreviewColor", () => {
+  it("is the color, the first of the colors, or the first color of the palette", () => {
+    const base = { id: 1, name: "A", effect: "static", brightness: 60 };
+    expect(favoritePreviewColor({ ...base, color: "blue" })).toBe("blue");
+    expect(favoritePreviewColor({ ...base, colors: ["green", "red"] })).toBe("green");
+    expect(favoritePreviewColor({ ...base, color_set: "ice" })).toBe("blue");
+    expect(favoritePreviewColor({ ...base, color_set: "christmas" })).toBe("red");
+    expect(favoritePreviewColor(base)).toBeNull();
+    expect(favoritePreviewColor({ ...base, color_set: "newer" })).toBeNull();
+  });
+});
+
+describe("favoriteLimits", () => {
+  it("are the board's, else the protocol's", () => {
+    expect(favoriteLimits(info)).toEqual({ count: 6, name: 20 });
+    expect(favoriteLimits({ ...info, limits: { line: 1024, favorites: 4, favorite_name: 12 } })).toEqual({
+      count: 4,
+      name: 12,
+    });
+  });
 });

@@ -158,6 +158,25 @@ export class ScriptedTransport implements LineTransport {
   }
 }
 
+/** The two ready-made favorites of a new board. */
+export const READY_MADE_FAVORITES = [
+  { id: 1, name: "Starry night", effect: "shooting_star", brightness: 60, color: "white" },
+  { id: 2, name: "Christmas", effect: "christmas", brightness: 60, color_set: "christmas", hold_seconds: 30 },
+];
+
+const FAVORITE_SETTINGS: Record<string, string[]> = {
+  static: ["color"],
+  color_change: ["colors", "hold_seconds"],
+  breathing: ["color", "period_seconds", "floor"],
+  twinkle: ["color", "twinkle_strength"],
+  fall_asleep: ["color", "floor"],
+  christmas: ["color_set", "hold_seconds"],
+  shooting_star: ["color"],
+  guided_breathing: ["color", "breath_pattern", "floor"],
+  jingle: ["color_set"],
+  hop: ["color_set"],
+};
+
 /** A board that answers like the simulator: settings that change, a light that turns on and off. */
 export class FakeBoard {
   info: Record<string, unknown> = structuredClone(INFO);
@@ -172,6 +191,12 @@ export class FakeBoard {
   time: Record<string, unknown> | null = null;
   update: Record<string, unknown> | null = null;
   token = TOKEN;
+  /** `settings_reset` resets everything, then answers `storage_error`: the favorites write failed after the settings'. */
+  resetFailsAfter = false;
+  /** The favorites and the one marked, once `withFavorites` has been called; null is a board from before them. */
+  favorites: Array<Record<string, unknown>> | null = null;
+  start: number | null = null;
+  private nextId = 3;
   /** The WebSocket close code the board closes the connection with after the reply it just gave, or null. */
   closeCode: number | null = null;
   private authenticated = false;
@@ -185,6 +210,84 @@ export class FakeBoard {
     this.time = structuredClone(TIME_STATUS);
     this.update = structuredClone(UPDATE_STATUS);
     return this;
+  }
+
+  /** The board has the favorites of firmware 1.3.0: the limits in `info` and the two ready-made favorites. */
+  withFavorites(): this {
+    this.info["limits"] = { line: 1024, favorites: 6, favorite_name: 20 };
+    this.favorites = structuredClone(READY_MADE_FAVORITES);
+    this.start = null;
+    this.nextId = 3;
+    return this;
+  }
+
+  /** The look of the board's settings now: the effect, the brightness and what the effect reads. */
+  private look(): Record<string, unknown> {
+    const names = FAVORITE_SETTINGS[this.settings["effect"] as string] ?? [];
+    return {
+      effect: this.settings["effect"],
+      brightness: this.settings["brightness"],
+      ...Object.fromEntries(names.map((name) => [name, structuredClone(this.settings[name])])),
+    };
+  }
+
+  private favoritesReply(seq: unknown): Array<Record<string, unknown>> {
+    return [{ seq, ok: true, favorites: this.favorites, start: this.start }];
+  }
+
+  private favoriteCommand(
+    cmd: string,
+    fields: Record<string, unknown>,
+    seq: unknown,
+    fail: (error: string) => Array<Record<string, unknown>>,
+  ): Array<Record<string, unknown>> {
+    const list = this.favorites;
+    if (list === null) return fail("unknown_command");
+    const key = (name: string): string => name.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+    const found = list.find((item) => item["id"] === fields["id"]);
+    const name = fields["name"];
+    if (typeof name === "string") {
+      const clash = list.find((item) => key(item["name"] as string) === key(name) && item["id"] !== fields["id"]);
+      if (name === "" || name !== name.trim() || [...name].length > 20) return fail("bad_name");
+      if (clash) return fail("name_taken");
+    }
+    switch (cmd) {
+      case "favorites":
+        return this.favoritesReply(seq);
+      case "favorite_save":
+        if (fields["id"] !== undefined) {
+          if (!found) return fail("unknown_favorite");
+          Object.keys(found).forEach((key) => !["id", "name"].includes(key) && delete found[key]);
+          Object.assign(found, this.look());
+        } else {
+          if (list.length >= 6) return fail("favorites_full");
+          list.push({ id: this.nextId++, name, ...this.look() });
+        }
+        return this.favoritesReply(seq);
+      case "favorite_rename":
+        if (!found) return fail("unknown_favorite");
+        found["name"] = name;
+        return this.favoritesReply(seq);
+      case "favorite_delete":
+        if (!found) return fail("unknown_favorite");
+        this.favorites = list.filter((item) => item !== found);
+        if (this.start === found["id"]) this.start = null;
+        return this.favoritesReply(seq);
+      case "favorite_start":
+        if (fields["id"] !== null && !found) return fail("unknown_favorite");
+        this.start = fields["id"] as number | null;
+        return this.favoritesReply(seq);
+      default: {
+        // favorite_apply
+        if (!found) return fail("unknown_favorite");
+        const { id: _id, name: _name, ...look } = found;
+        void _id;
+        void _name;
+        this.settings = { ...this.settings, ...look };
+        this.on = true;
+        return [{ seq, ok: true, light: this.light(), settings: this.settings }];
+      }
+    }
   }
 
   /** A new connection: nobody has logged in yet. */
@@ -263,12 +366,34 @@ export class FakeBoard {
         if (kind === "websocket" && fields["network_login"] === true) this.closeCode = 1000;
         return [{ seq, ok: true, settings: this.shownSettings(kind) }];
       }
-      case "light":
+      case "favorites":
+      case "favorite_save":
+      case "favorite_rename":
+      case "favorite_delete":
+      case "favorite_start":
+      case "favorite_apply":
+        return this.favoriteCommand(cmd, fields, seq, fail);
+      case "light": {
+        const turningOn = request["on"] === true && !this.on;
         this.on = request["on"] === true;
+        // A turn-on from off with a favorite marked shows that favorite
+        const marked = this.favorites?.find((item) => item["id"] === this.start);
+        if (turningOn && marked) {
+          const { id: _id, name: _name, ...look } = marked;
+          void _id;
+          void _name;
+          this.settings = { ...this.settings, ...look };
+        }
         return [{ seq, ok: true, light: this.light() }];
+      }
       case "settings_reset":
         this.settings = structuredClone(DEFAULT_SETTINGS);
+        if (this.favorites) {
+          this.favorites = structuredClone(READY_MADE_FAVORITES);
+          this.start = null;
+        }
         if (this.wifi) this.settings = { ...this.settings, ...structuredClone(BOARD_SETTINGS) };
+        if (this.resetFailsAfter) return fail("storage_error");
         return [{ seq, ok: true, settings: this.shownSettings(kind) }];
       case "wifi_forget":
         if (this.wifi === null) return fail("unknown_command");

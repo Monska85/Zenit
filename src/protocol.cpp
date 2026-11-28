@@ -3,6 +3,7 @@
 #include "protocol.h"
 
 #include <ArduinoJson.h>
+#include <favorites_json.h>
 #include <frame.h>
 #include <net_auth.h>
 #include <proto_limits.h>
@@ -160,6 +161,8 @@ Failure cmd_info(const Context &, JsonDocument &reply)
   reply["nvs"]["used"] = nvs.used;
   reply["nvs"]["free"] = nvs.free;
   reply["limits"]["line"] = zenit::proto::MAX_LINE;
+  reply["limits"]["favorites"] = zenit::MAX_FAVORITES;
+  reply["limits"]["favorite_name"] = zenit::MAX_FAVORITE_NAME;
   return {};
 }
 
@@ -175,10 +178,15 @@ Failure cmd_status(const Context &context, JsonDocument &reply)
   return {};
 }
 
-Failure cmd_settings_get(const Context &context, JsonDocument &reply)
+void write_settings_reply(const Context &context, JsonDocument &reply)
 {
   zenit::proto::write_settings(reply["settings"].to<JsonObject>(), settings::current(), settings::board(),
                                context.transport == Transport::Usb);
+}
+
+Failure cmd_settings_get(const Context &context, JsonDocument &reply)
+{
+  write_settings_reply(context, reply);
   return {};
 }
 
@@ -204,10 +212,114 @@ Failure cmd_light(const Context &context, JsonDocument &reply)
   JsonVariantConst on = context.request["on"];
   if (!on.is<bool>())
     return zenit::proto::fail("bad_request", "\"on\" must be true or false");
-  app::set_light(on.as<bool>(), context.now);
+  if (!on.as<bool>())
+    app::set_light(false, context.now);
+  else if (app::turn_on(context.now) != settings::Commit::Ok)
+    return zenit::proto::fail("storage_error", "the start favorite could not be saved; nothing changed");
   // The reply reports the light as this request left it, not as the last 10 ms tick saw it.
   app::tick(context.now);
   write_light(reply["light"].to<JsonObject>());
+  return {};
+}
+
+// ---- Favorites ----
+
+Failure storage_failure()
+{
+  return zenit::proto::fail("storage_error", "the favorites could not be saved; nothing changed");
+}
+
+// Stores `next` and replies with the whole list.
+Failure commit_favorites(const zenit::Favorites &next, JsonDocument &reply)
+{
+  if (settings::commit_favorites(next) != settings::Commit::Ok)
+    return storage_failure();
+  zenit::proto::write_favorites(reply.as<JsonObject>(), settings::favorites());
+  return {};
+}
+
+Failure cmd_favorites(const Context &, JsonDocument &reply)
+{
+  zenit::proto::write_favorites(reply.as<JsonObject>(), settings::favorites());
+  return {};
+}
+
+Failure cmd_favorite_save(const Context &context, JsonDocument &reply)
+{
+  JsonVariantConst name_field = context.request["name"];
+  JsonVariantConst id_field = context.request["id"];
+  if (name_field.isUnbound() == id_field.isUnbound())
+    return zenit::proto::fail("bad_request", "favorite_save takes either \"name\" or \"id\"");
+  zenit::Favorites next = settings::favorites();
+  zenit::FavoriteResult result;
+  if (!name_field.isUnbound())
+  {
+    const char *name = nullptr;
+    if (Failure failure = zenit::proto::read_favorite_name(name_field, name))
+      return failure;
+    result = zenit::add_favorite(next, name, settings::current());
+  }
+  else
+  {
+    uint8_t id = 0;
+    if (Failure failure = zenit::proto::read_favorite_id(id_field, id))
+      return failure;
+    result = zenit::replace_favorite(next, id, settings::current());
+  }
+  if (Failure failure = zenit::proto::favorite_failure(result))
+    return failure;
+  return commit_favorites(next, reply);
+}
+
+Failure cmd_favorite_rename(const Context &context, JsonDocument &reply)
+{
+  uint8_t id = 0;
+  const char *name = nullptr;
+  if (Failure failure = zenit::proto::read_favorite_id(context.request["id"], id))
+    return failure;
+  if (Failure failure = zenit::proto::read_favorite_name(context.request["name"], name))
+    return failure;
+  zenit::Favorites next = settings::favorites();
+  if (Failure failure = zenit::proto::favorite_failure(zenit::rename_favorite(next, id, name)))
+    return failure;
+  return commit_favorites(next, reply);
+}
+
+Failure cmd_favorite_delete(const Context &context, JsonDocument &reply)
+{
+  uint8_t id = 0;
+  if (Failure failure = zenit::proto::read_favorite_id(context.request["id"], id))
+    return failure;
+  zenit::Favorites next = settings::favorites();
+  if (Failure failure = zenit::proto::favorite_failure(zenit::delete_favorite(next, id)))
+    return failure;
+  return commit_favorites(next, reply);
+}
+
+Failure cmd_favorite_start(const Context &context, JsonDocument &reply)
+{
+  uint8_t id = 0;
+  if (Failure failure = zenit::proto::read_favorite_id(context.request["id"], id, true))
+    return failure;
+  zenit::Favorites next = settings::favorites();
+  if (Failure failure = zenit::proto::favorite_failure(zenit::set_start_favorite(next, id)))
+    return failure;
+  return commit_favorites(next, reply);
+}
+
+Failure cmd_favorite_apply(const Context &context, JsonDocument &reply)
+{
+  uint8_t id = 0;
+  if (Failure failure = zenit::proto::read_favorite_id(context.request["id"], id))
+    return failure;
+  const zenit::Favorite *favorite = zenit::find_favorite(settings::favorites(), id);
+  if (!favorite)
+    return zenit::proto::favorite_failure(zenit::FavoriteResult::Unknown);
+  if (app::apply_favorite(*favorite, context.now) != settings::Commit::Ok)
+    return zenit::proto::fail("storage_error", "the settings could not be saved; nothing changed");
+  app::tick(context.now);
+  write_light(reply["light"].to<JsonObject>());
+  write_settings_reply(context, reply);
   return {};
 }
 
@@ -226,6 +338,9 @@ Failure cmd_settings_reset(const Context &context, JsonDocument &reply)
       settings::Commit::Ok)
     return zenit::proto::fail("storage_error", "the settings could not be saved; nothing changed");
   revoke_wifi_login();
+  // The favorites have their own record, written after the settings (which hold the network and the token)
+  if (settings::commit_favorites(zenit::ready_made_favorites()) != settings::Commit::Ok)
+    return zenit::proto::fail("storage_error", "the settings were reset, but the favorites could not be");
   zenit::proto::write_settings(reply["settings"].to<JsonObject>(), settings::current(), settings::board(), true);
   return {};
 }
@@ -366,6 +481,12 @@ const Command COMMANDS[] = {
     {"auth", cmd_auth, Login::NotNeeded, Fields::Listed, {"hmac"}},
     {"update_check", cmd_update_check, Login::Required, Fields::Listed, {}},
     {"update_install", cmd_update_install, Login::Required, Fields::Listed, {"target", "force"}},
+    {"favorites", cmd_favorites, Login::Required, Fields::Listed, {}},
+    {"favorite_save", cmd_favorite_save, Login::Required, Fields::Listed, {"name", "id"}},
+    {"favorite_rename", cmd_favorite_rename, Login::Required, Fields::Listed, {"id", "name"}},
+    {"favorite_delete", cmd_favorite_delete, Login::Required, Fields::Listed, {"id"}},
+    {"favorite_apply", cmd_favorite_apply, Login::Required, Fields::Listed, {"id"}},
+    {"favorite_start", cmd_favorite_start, Login::Required, Fields::Listed, {"id"}},
 };
 
 // A request read from a frame whose checksum matched.

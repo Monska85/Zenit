@@ -293,3 +293,82 @@ describe("the replies of the WiFi and updates milestone", () => {
     for (const command of ["wifi_forget", "auth"]) expect(validBody(command, reply({ seq: 1, ok: true }))).toBe(true);
   });
 });
+
+describe("favorites replies", () => {
+  const starry = { id: 1, name: "Starry night", effect: "shooting_star", brightness: 60, color: "white" };
+  const list = (favorites: unknown[], start: unknown = null) => reply({ seq: 1, ok: true, favorites, start });
+  const accepts = (favorites: unknown[], start: unknown = null) =>
+    ["favorites", "favorite_save", "favorite_rename", "favorite_delete", "favorite_start"].every((command) =>
+      validBody(command, list(favorites, start)),
+    );
+
+  it("accepts a list, an empty one and a mark", () => {
+    expect(accepts([starry])).toBe(true);
+    expect(accepts([])).toBe(true);
+    expect(accepts([starry], 1)).toBe(true);
+  });
+
+  it("counts a name in characters, not UTF-16 units, and refuses a space at an end", () => {
+    expect(accepts([{ ...starry, name: "\u{1f31f}".repeat(20) }])).toBe(true);
+    expect(accepts([{ ...starry, name: "\u{1f31f}".repeat(21) }])).toBe(false);
+    expect(accepts([{ ...starry, name: " Night" }])).toBe(false);
+    expect(accepts([{ ...starry, name: "Night " }])).toBe(false);
+    for (const refused of [0x1f, 0x7f, 0x9f, 0x200b, 0x200f, 0x2028, 0x202e, 0x2060, 0x206f, 0xfeff])
+      expect(accepts([{ ...starry, name: `a${String.fromCodePoint(refused)}b` }]), refused.toString(16)).toBe(false);
+    for (const allowed of [0xa0, 0x2010, 0x2027, 0x202f, 0x205f, 0x2070])
+      expect(accepts([{ ...starry, name: `a${String.fromCodePoint(allowed)}b` }]), allowed.toString(16)).toBe(true);
+  });
+
+  it("refuses ids and names twice (ASCII letters without case), and a mark that names none", () => {
+    expect(accepts([starry, { ...starry, name: "Other" }])).toBe(false);
+    expect(accepts([starry, { ...starry, id: 2, name: "STARRY NIGHT" }])).toBe(false);
+    expect(
+      accepts([
+        { ...starry, name: "é" },
+        { ...starry, id: 2, name: "É" },
+      ]),
+    ).toBe(true);
+    expect(accepts([starry], 2)).toBe(false);
+    expect(accepts([], 1)).toBe(false);
+  });
+
+  it("allows six favorites and refuses seven", () => {
+    const many = (count: number) => Array.from({ length: count }, (_, i) => ({ ...starry, id: i + 1, name: `N${i}` }));
+    expect(accepts(many(6))).toBe(true);
+    expect(accepts(many(7))).toBe(false);
+  });
+
+  it("checks the id, the brightness and the settings the favorite holds, each optional", () => {
+    expect(accepts([{ ...starry, id: 255 }])).toBe(true);
+    expect(accepts([{ ...starry, id: 0 }])).toBe(false);
+    expect(accepts([{ ...starry, id: 256 }])).toBe(false);
+    expect(accepts([{ ...starry, brightness: 0 }])).toBe(false);
+    expect(accepts([{ ...starry, hold_seconds: 4 }])).toBe(false);
+    expect(accepts([{ ...starry, colors: ["red"] }])).toBe(false);
+    expect(accepts([{ ...starry, colors: ["red", "red"] }])).toBe(false);
+    expect(accepts([{ ...starry, colors: ["red", "green"], breath_pattern: "box", future: 1 }])).toBe(true);
+    const { effect: _effect, ...noEffect } = starry;
+    void _effect;
+    expect(accepts([noEffect])).toBe(false);
+  });
+
+  it("needs the mark to be there, and the array to be one", () => {
+    expect(validBody("favorites", reply({ seq: 1, ok: true, favorites: [starry] }))).toBe(false);
+    expect(validBody("favorites", reply({ seq: 1, ok: true, favorites: {}, start: null }))).toBe(false);
+    expect(validBody("favorites", reply({ seq: 1, ok: true, favorites: [], start: "1" }))).toBe(false);
+  });
+
+  it("takes the light and the settings of an apply", () => {
+    expect(validBody("favorite_apply", reply({ seq: 1, ok: true, light, settings: DEFAULT_SETTINGS }))).toBe(true);
+    expect(validBody("favorite_apply", reply({ seq: 1, ok: true, light }))).toBe(false);
+  });
+
+  it("takes the favorites limits together or not at all", () => {
+    const limits = (value: unknown) => validBody("info", reply({ seq: 1, ok: true, ...INFO, limits: value }));
+    expect(limits({ line: 1024 })).toBe(true);
+    expect(limits({ line: 1024, favorites: 6, favorite_name: 20 })).toBe(true);
+    expect(limits({ line: 1024, favorites: 6 })).toBe(false);
+    expect(limits({ line: 1024, favorite_name: 20 })).toBe(false);
+    expect(limits({ line: 1024, favorites: 0, favorite_name: 20 })).toBe(false);
+  });
+});

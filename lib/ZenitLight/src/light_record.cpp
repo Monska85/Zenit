@@ -83,6 +83,11 @@ LightSettings decode_light_record(const uint8_t *in, size_t size)
   return s;
 }
 
+bool light_record_is_current(const uint8_t *in, size_t size)
+{
+  return in && size == LIGHT_RECORD_SIZE && in[0] == LIGHT_RECORD_VERSION && in[2] < EFFECT_COUNT;
+}
+
 size_t light_record_size_in_blob(const uint8_t *blob, size_t size, size_t other_size)
 {
   // The size first: a blob of another size may not have been read into `blob` at all

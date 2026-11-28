@@ -31,6 +31,13 @@ settings::Commit change_settings(const zenit::LightSettings &light, const zenit:
 // Turns the light on or off, without saving.
 void set_light(bool on, uint64_t now);
 
+// Turns the light on as `light` with `on: true` does: from off, with the start favorite when one is marked (its look is
+// saved first; on failure nothing changes and the light stays off), then as set_light(true).
+settings::Commit turn_on(uint64_t now);
+
+// Applies a favorite's look (saved first; on failure nothing changes) and turns the light on.
+settings::Commit apply_favorite(const zenit::Favorite &favorite, uint64_t now);
+
 // The frame written last.
 const zenit::LightFrame &last_frame();
 

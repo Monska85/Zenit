@@ -28,6 +28,7 @@ import random
 import re
 import sys
 import time
+import unicodedata
 import zlib
 
 MARKER = b"@ZN "
@@ -428,6 +429,54 @@ LIGHT = {
     "power_scale": int_in(1, 100),
     "timer": (is_null, TIMER),
 }
+# The favorites of docs/protocol/protocol-v1.md#favorites
+MAX_FAVORITES = 6
+MAX_FAVORITE_NAME = 20
+# Control and invisible formatting characters, which a name may not hold
+REFUSED_IN_NAME = re.compile("[\x00-\x1f\x7f-\x9f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]")
+
+
+def is_favorite_name(value):
+    """1 to 20 characters (code points), none refused, no space at either end."""
+    return (
+        is_text(value)
+        and 1 <= len(value) <= MAX_FAVORITE_NAME
+        and not value.startswith(" ")
+        and not value.endswith(" ")
+        and REFUSED_IN_NAME.search(value) is None
+    )
+
+
+def name_key(name):
+    """Two names are the same when equal with the ASCII letters compared without case."""
+    return name.translate(str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"))
+
+
+# A favorite: its look is the effect, the brightness and the settings that effect reads, with their ranges
+FAVORITE = {
+    "id": int_in(1, 255),
+    "name": is_favorite_name,
+    "effect": is_text,
+    "brightness": SETTINGS["brightness"],
+    **{
+        key: Maybe(SETTINGS[key])
+        for key in ("color", "colors", "color_set", "hold_seconds", "period_seconds", "floor", "twinkle_strength")
+    },
+    "breath_pattern": SETTINGS["breath_pattern"],
+}
+# The list: at most 6, ids and names each once, a mark that names one of them
+FAVORITES = where(
+    {"favorites": [FAVORITE], "start": (int_in(1, 255), is_null)},
+    lambda reply: len(reply["favorites"]) <= MAX_FAVORITES
+    and len({item["id"] for item in reply["favorites"]}) == len(reply["favorites"])
+    and len({name_key(item["name"]) for item in reply["favorites"]}) == len(reply["favorites"])
+    and (reply["start"] is None or reply["start"] in {item["id"] for item in reply["favorites"]}),
+)
+# `info.limits`: the favorites limits come together, from the firmware with favorites
+LIMITS = where(
+    {"line": is_int, "favorites": Maybe(int_in(1, 255)), "favorite_name": Maybe(int_in(1, 255))},
+    lambda limits: ("favorites" in limits) == ("favorite_name" in limits),
+)
 # The known fields of a successful reply, by command
 REPLIES = {
     "info": {
@@ -443,7 +492,7 @@ REPLIES = {
         "power_limit_mw": is_int,
         "memory": {"free": is_int, "largest": is_int},
         "nvs": {"used": is_int, "free": is_int},
-        "limits": {"line": is_int},
+        "limits": LIMITS,
     },
     "status": {"light": LIGHT, "wifi": Maybe(WIFI), "time": Maybe(TIME), "update": Maybe(UPDATE)},
     "light": {"light": LIGHT},
@@ -454,6 +503,12 @@ REPLIES = {
     "auth_challenge": {"nonce": matching(r"[0-9a-f]{32}")},
     "update_check": {"update": UPDATE},
     "update_install": {"update": UPDATE},
+    "favorites": FAVORITES,
+    "favorite_save": FAVORITES,
+    "favorite_rename": FAVORITES,
+    "favorite_delete": FAVORITES,
+    "favorite_start": FAVORITES,
+    "favorite_apply": {"light": LIGHT, "settings": SETTINGS},
 }
 
 
@@ -592,6 +647,18 @@ def build_parser():
     what.add_argument("--web", action="store_true", help="install the web app version the last check found instead")
     light = commands.add_parser("light", help="turn the light on or off, without saving")
     light.add_argument("state", choices=["on", "off"])
+    commands.add_parser("favorites", help="the favorites and the one the light turns on with")
+    save = commands.add_parser("favorite-save", help="save the current look as a new favorite, or over one with --id")
+    target = save.add_mutually_exclusive_group(required=True)
+    target.add_argument("--name", help="the name of a new favorite")
+    target.add_argument("--id", type=int, help="the favorite that takes the current look")
+    rename = commands.add_parser("favorite-rename", help="rename a favorite")
+    rename.add_argument("id", type=int)
+    rename.add_argument("name")
+    for name, text in (("favorite-delete", "delete a favorite"), ("favorite-apply", "apply a favorite and turn on")):
+        commands.add_parser(name, help=text).add_argument("id", type=int)
+    start = commands.add_parser("favorite-start", help="the favorite the light turns on with, or none")
+    start.add_argument("id", help="a favorite's id, or none")
     raw = commands.add_parser("raw", help="send a request object as it is; `seq` is added unless given")
     raw.add_argument("json", help='e.g. \'{"cmd":"settings_get"}\'')
     return parser
@@ -607,6 +674,21 @@ def request_of(args):
         if args.web:
             return "update_install", {"target": "web"}
         return "update_install", {"target": "firmware", **({"force": True} if args.force else {})}
+    if args.command == "favorite-save":
+        # Names travel in normalization form C, as the protocol asks of clients
+        if args.name is not None:
+            return "favorite_save", {"name": unicodedata.normalize("NFC", args.name)}
+        return "favorite_save", {"id": args.id}
+    if args.command == "favorite-rename":
+        return "favorite_rename", {"id": args.id, "name": unicodedata.normalize("NFC", args.name)}
+    if args.command in ("favorite-delete", "favorite-apply"):
+        return args.command.replace("-", "_"), {"id": args.id}
+    if args.command == "favorite-start":
+        if args.id == "none":
+            return "favorite_start", {"id": None}
+        if not args.id.isdigit():
+            raise ValueError("favorite-start expects a favorite's id or none")
+        return "favorite_start", {"id": int(args.id)}
     if args.command == "raw":
         fields = json.loads(args.json)
         if not isinstance(fields, dict) or not isinstance(fields.get("cmd"), str):

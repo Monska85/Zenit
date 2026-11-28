@@ -7,6 +7,8 @@ import { connectByAddress, expect, test } from "./fixtures.ts";
 async function dragTo(page: Page, name: string, fraction: number): Promise<void> {
   const thumb = page.getByRole("slider", { name });
   const root = thumb.locator("xpath=ancestor::span[contains(@class, 'touch-none')]");
+  // The mouse works on what is in the window
+  await root.scrollIntoViewIfNeeded();
   const box = (await root.boundingBox())!;
   const handle = (await thumb.boundingBox())!;
   await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);

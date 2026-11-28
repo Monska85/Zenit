@@ -2,7 +2,7 @@
 
 Status: **accepted**. Why it works this way is recorded in [ADR 0001](../adr/0001-architecture.md). The hardware is described in [`docs/reference/hardware.md`](../reference/hardware.md); the settings named here are read and changed through the [command protocol](../protocol/protocol-v1.md).
 
-This document specifies what the board's LED shows: the channels and their PWM, the brightness curve, the power limit, the effects, the fades, the timer and the behavior at boot. Every rule is a function of the settings and of time, so the simulator and the tests reproduce the board exactly.
+This document specifies what the board's LED shows: the channels and their PWM, the brightness curve, the power limit, the effects, the fades, the timer, the favorites and the behavior at boot. Every rule is a function of the settings and of time, so the simulator and the tests reproduce the board exactly.
 
 ## Channels
 
@@ -195,11 +195,22 @@ Changes never jump:
 - When it ends, the light fades out in 30 seconds, linearly in `L`, and stays off.
 - Off, from the app or from the timer, is not saved: the light stays off until the board restarts or the app turns it on again.
 
+## Favorites
+
+A favorite is a named look the board keeps: an effect, a brightness and the settings that effect reads (its `Parameters` above). The timer and the power state are not part of a look. The board keeps at most 6, in the order they were saved; the names and the commands are in the [protocol](../protocol/protocol-v1.md#favorites).
+
+- **Ready-made.** A board with no stored favorites has two: `Starry night` (id 1), `shooting_star` in `white` at brightness 60 (its sky at 45 %), and `Christmas` (id 2), `christmas` with the `christmas` palette and `hold_seconds` 30 at brightness 60. They are ordinary favorites: they can be renamed, replaced and deleted. Nothing is written for them until the first change of the favorites, so a deleted ready-made favorite stays deleted after a restart. A reset to defaults brings both back, with none marked.
+- **Saving** copies the current light settings but `timer_minutes` into the favorite (all of them, whatever the effect reads).
+- **Applying** sets `effect`, `brightness` and the settings the favorite's effect reads, as one change with the [transitions](#transitions), saves them, and turns the light on (from off it fades in over 1,000 ms and the timer starts; when on, the timer keeps running). The other settings keep their values, so a later change of effect finds the person's own choices.
+- **Turn on with this.** At most one favorite is marked. When one is, it is applied, before the light fades in, at every turn-on from off (`light` with `on: true` while `light.on` is false) and at every [start](#start). On during the timer's fade-out is not a turn-on from off: the light comes back up as it is. The timer is not part of a look, so a turn-on starts it as usual. With no mark, the light turns on with the settings as they are. Deleting the marked favorite clears the mark; saving over it keeps it.
+- **A favorite the board cannot read** (an effect code this firmware does not know, a damaged entry) is left out when the favorites are read, and a mark that names no favorite counts as none.
+
 ## Start
 
 1. Before the pins are attached, every duty is 0. The gate pull-downs keep the channels off while the chip boots.
 2. The board reads the settings. A board that has never been configured uses the defaults: `static`, `white`, brightness 60, no timer.
-3. The light fades in over 1,000 ms to the saved configuration, and the timer starts.
+3. When a favorite is marked to turn on with, its look becomes the light settings and is saved (when it differs). While a new firmware is on trial it is applied but not saved: the previous firmware may boot again, and nothing is saved before the new one confirms; the next save that changes a setting writes it. If the save fails, the light starts with the stored settings.
+4. The light fades in over 1,000 ms to the configuration, and the timer starts.
 
 A new firmware on its trial boot confirms itself once the settings are read and the first output is applied.
 
@@ -235,6 +246,22 @@ Version 1, written by firmware 1.1.0 and earlier, is the first 17 bytes of this 
 
 These codes never change meaning: a new effect, color, color set or pattern takes the next free code. A record of another size or version is ignored and the defaults apply; a field out of its range keeps its default and the others load. Nothing is written when no setting changes. The cases in `conformance/light/record.json` give records and their settings both ways.
 
+## Stored favorites
+
+The favorites are a record of their own, version 1, stored in NVS (namespace `zenit`) under the key `favorites`, apart from the settings blob, so a firmware from before favorites never reads it and a rollback to it is safe. It is 598 bytes, written in one step:
+
+| Byte     | Content                                                                                   |
+| -------- | ----------------------------------------------------------------------------------------- |
+| 0        | Version, `1`                                                                              |
+| 1        | Number of favorites, 0 to 6                                                               |
+| 2        | The id of the favorite marked to turn on with, or 0 for none                              |
+| 3        | Where the search for the next id starts (1 to 255; 0 reads as 1)                          |
+| 4..597   | Six entries of 99 bytes; the entries after the number of favorites are all 0               |
+
+An entry is the favorite's id (1 byte, 1 to 255), its name in UTF-8 padded with 0 (80 bytes) and its look as a light record of version 2 (18 bytes, the table of [Stored settings](#stored-settings), with `timer_minutes` 0). A new favorite takes the first id from byte 3 on that no favorite has, skipping 0 and wrapping after 255, and byte 3 then names the id after it.
+
+A missing record is the two ready-made favorites, with next id 3 and no mark. A record of another size or version, or with more than 6 favorites, is damaged: the ready-made favorites, and the next change writes over it. An entry with id 0 or the id of an earlier entry, a name that breaks the rules or repeats an earlier one, or a light record of another version or with an unknown effect code is left out; a field of the light record out of its range keeps its default. If the record cannot be read (an I/O error) the board shows the ready-made favorites and refuses every change until a restart, as for the settings. The cases in `conformance/light/favorites_record.json` give records and what is read from them.
+
 ## Measurements
 
 On an ESP32-C3 SuperMini with this milestone's firmware (2026-11-21): the firmware takes 315 KB of its 1,984 KiB slot (the layout before [ADR 0005](../adr/0005-web-app-partition.md); the slot is now 1,728 KiB); the loop task's minimum free stack is 6,276 bytes of 8,192 after a minute of running; the heap has 281,796 bytes free, with a largest block of 139,252 bytes. Measured with a temporary task that printed `uxTaskGetStackHighWaterMark` of the loop task once a second; the measuring code is not in the repository.
@@ -255,5 +282,7 @@ The simulator runs the engine with a virtual clock and writes the duty of each c
 | `twinkle_strength`      | 5 to 50                   |
 | `breath_pattern`        | `4-7-8` or `box`          |
 | `timer_minutes`         | 0, or 1 to 360            |
+| Favorites               | 6                         |
+| Favorite name           | 1 to 20 characters        |
 | `LIMIT_MW`              | 1,000 (firmware constant) |
 | Engine tick             | 10 ms                     |

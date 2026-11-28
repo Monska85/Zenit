@@ -871,6 +871,55 @@ void test_core_longest_settings_reply_fits()
   TEST_ASSERT_TRUE(written[0].size() < zenit::proto::MAX_REPLY_LINE);
 }
 
+// The longest favorites reply: six favorites with names of twenty 4-byte characters (80 bytes, the most a name holds),
+// the highest ids, a mark, and the look whose settings write the most (color_change with four colors, the longest
+// hold). It fits the reply buffer, which every reply must.
+void test_core_longest_favorites_reply_fits()
+{
+  start();
+  send(framed("{\"seq\":1,\"cmd\":\"settings_set\",\"brightness\":100,\"effect\":\"color_change\","
+              "\"colors\":[\"white\",\"green\",\"blue\",\"red\"],\"hold_seconds\":600}"));
+  // The ready-made favorites go first, so all six are the long ones
+  send(framed("{\"seq\":2,\"cmd\":\"favorite_delete\",\"id\":1}"));
+  send(framed("{\"seq\":3,\"cmd\":\"favorite_delete\",\"id\":2}"));
+  for (int i = 0; i < 6; i++)
+  {
+    std::string name;
+    for (int k = 0; k < 19; k++)
+      name += "\xF0\x9F\x8C\x99"; // U+1F319
+    name += std::string("\xF0\x9F\x8C") + static_cast<char>(0x80 + i);
+    send(framed("{\"seq\":" + std::to_string(10 + i) + ",\"cmd\":\"favorite_save\",\"name\":\"" + name + "\"}"));
+    TEST_ASSERT_TRUE(reply(written.size() - 1)["ok"].as<bool>());
+  }
+  send(framed("{\"seq\":20,\"cmd\":\"favorite_start\",\"id\":8}"));
+  send(framed("{\"seq\":4294967295,\"cmd\":\"favorites\"}"));
+  JsonDocument doc = reply(written.size() - 1);
+  TEST_ASSERT_TRUE(doc["ok"].as<bool>());
+  TEST_ASSERT_EQUAL(6, doc["favorites"].as<JsonArrayConst>().size());
+  // Ids 3 to 8 here; ids up to 255 take one more digit each
+  TEST_ASSERT_TRUE(written.back().size() + 7 < zenit::proto::MAX_REPLY_LINE);
+}
+
+// favorite_apply replies with the light and every setting: with the longest settings it still fits.
+void test_core_longest_apply_reply_fits()
+{
+  start();
+  const std::string quotes(64, '"');
+  std::string timezone;
+  for (char c : quotes)
+    timezone += std::string("\\") + c;
+  send(framed("{\"seq\":1,\"cmd\":\"settings_set\",\"timer_minutes\":360,\"colors\":[\"green\",\"white\",\"blue\","
+              "\"red\"],\"wifi_power\":\"auto\",\"update_mode\":\"automatic\",\"check_hours\":168,"
+              "\"install_start\":1439,\"install_end\":1438,\"time_sync_hours\":168,\"timezone\":\"" +
+              timezone + "\",\"ntp_server\":\"" + std::string(64, 'n') + "\"}"));
+  TEST_ASSERT_TRUE(reply(0)["ok"].as<bool>());
+  send(framed("{\"seq\":4294967295,\"cmd\":\"favorite_apply\",\"id\":2}"));
+  JsonDocument doc = reply(1);
+  TEST_ASSERT_TRUE(doc["ok"].as<bool>());
+  TEST_ASSERT_EQUAL_STRING("christmas", doc["settings"]["effect"].as<const char *>());
+  TEST_ASSERT_TRUE(written[1].size() < zenit::proto::MAX_REPLY_LINE);
+}
+
 void test_core_longest_status_reply_fits()
 {
   start();
@@ -957,6 +1006,8 @@ int main()
   RUN_TEST(test_core_light_reply_reflects_the_request);
   RUN_TEST(test_core_status_lightness_has_one_decimal);
   RUN_TEST(test_core_longest_reply_fits);
+  RUN_TEST(test_core_longest_favorites_reply_fits);
+  RUN_TEST(test_core_longest_apply_reply_fits);
   RUN_TEST(test_core_longest_info_reply_fits);
   RUN_TEST(test_core_longest_settings_reply_fits);
   RUN_TEST(test_core_longest_status_reply_fits);

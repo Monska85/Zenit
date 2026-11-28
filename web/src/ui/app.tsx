@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { Lightbulb, SlidersHorizontal, Sparkles } from "lucide-react";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { cn } from "../lib/utils";
 import { BoardProvider, useBoard } from "./board-context";
 import { BottomMessage } from "./components/bottom-message";
+import { clearNotice, useNotice } from "./notice";
 import { screenOf, useRoute, type Route } from "./route";
 import { LostBanner } from "./shell/lost-banner";
 import { StatusMenu } from "./shell/status-menu";
@@ -32,6 +33,9 @@ function Shell() {
   // person is already choosing a board); the reason is then not said twice
   const lostBanner = board.phase === "lost" && screen !== "connect";
   const error = lostBanner ? null : board.error;
+  const notice = useNotice();
+  // A confirmation is about the connection it came from
+  useEffect(() => clearNotice, [board.phase]);
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-4 px-4 pt-3 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-8">
@@ -91,11 +95,15 @@ function Shell() {
       </footer>
       {/* Kept in the page, so a screen reader hears the confirmation when it appears */}
       <p role="status" className="sr-only">
-        {error === null && backAgain ? "Connected again." : ""}
+        {error === null ? (notice ?? (backAgain ? "Connected again." : "")) : ""}
       </p>
       {error !== null ? (
         <BottomMessage tone="error" onClose={() => session.dismissError()}>
           {error}
+        </BottomMessage>
+      ) : notice !== null ? (
+        <BottomMessage tone="done" onClose={clearNotice}>
+          {notice}
         </BottomMessage>
       ) : (
         backAgain && (

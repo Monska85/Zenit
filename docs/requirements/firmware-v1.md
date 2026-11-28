@@ -63,3 +63,4 @@ ESP32-C3 SuperMini, one CREE RGBW-1225 LED driven by four low-side MOSFET module
 3. **New palettes:** aurora (green, blue), sunset (red, white) and all (red, green, blue, white).
 4. **At most 3 light changes a second** in every effect, for photosensitive safety. The formulas are in [Light](../board/light-v1.md#effects).
 5. **No dome rotation:** the rotating dome upgrade is dropped, and no motor module is planned.
+6. **Favorites:** up to 6 named looks (an effect, its colors or palette, its settings and the brightness) stored on the board, so every phone sees the same list, with two ready-made ones (Starry night, Christmas) that come back after a reset. Applying one is one tap and turns the light on. One favorite may be marked "Turn on with this": Zenit then shows it at power-on and whenever the light is turned on; without a mark, decision 5 holds. Rules in [Light](../board/light-v1.md#favorites) and the [protocol](../protocol/protocol-v1.md#favorites).

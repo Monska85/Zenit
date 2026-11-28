@@ -5,6 +5,7 @@ import { cn } from "../../lib/utils";
 import { useBoard } from "../board-context";
 import { Card, CardTitle } from "../components/card";
 import { EffectPicker } from "../light/effect-picker";
+import { FavoritesCard } from "../light/favorites-card";
 import { EffectSettings } from "../light/effect-settings";
 import { HeroCard } from "../light/hero-card";
 import { TimerCard } from "../light/timer-card";
@@ -29,6 +30,16 @@ export function LightView() {
         onPower={(on) => void session.setPower(on)}
         onBrightness={(brightness) => commit({ brightness })}
       />
+      {info.limits.favorites !== undefined && board.favorites !== null && (
+        <FavoritesCard
+          info={info}
+          settings={settings}
+          light={light}
+          favorites={board.favorites}
+          start={board.start}
+          disabled={lost}
+        />
+      )}
       <Card aria-labelledby="effect-title">
         <CardTitle id="effect-title">Effect</CardTitle>
         <EffectPicker effects={info.effects} value={settings.effect} onChange={(effect) => void commit({ effect })} />

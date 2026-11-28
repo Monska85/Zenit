@@ -1,0 +1,159 @@
+{
+  "description": "favorite_apply sets the favorite's effect, brightness and the settings its effect reads, keeps the others and the timer, and turns the light on; the reply holds the light and the settings.",
+  "steps": [
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "settings_set",
+        "color": "green",
+        "timer_minutes": 30
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "green",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "breath_pattern": "4-7-8",
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 30,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      }
+    },
+    {
+      "advance_ms": 1100
+    },
+    {
+      "note": "Off: the countdown no longer runs, so nothing remains.",
+      "send": {
+        "seq": 2,
+        "cmd": "light",
+        "on": false
+      },
+      "expect": {
+        "seq": 2,
+        "ok": true,
+        "light": {
+          "on": false,
+          "effect": "static",
+          "color": "green",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": {
+            "minutes": 30,
+            "remaining": 0
+          }
+        }
+      }
+    },
+    {
+      "advance_ms": 1000
+    },
+    {
+      "note": "From off the light fades in from 0 over 1,000 ms: nothing is lit at the moment of the request; the timer starts again.",
+      "send": {
+        "seq": 3,
+        "cmd": "favorite_apply",
+        "id": 2
+      },
+      "expect": {
+        "seq": 3,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "christmas",
+          "color": null,
+          "lightness": 0.0,
+          "power_scale": 100,
+          "timer": {
+            "minutes": 30,
+            "remaining": 1800
+          }
+        },
+        "settings": {
+          "brightness": 60,
+          "effect": "christmas",
+          "color": "green",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "breath_pattern": "4-7-8",
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 30,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      }
+    },
+    {
+      "advance_ms": 1000
+    },
+    {
+      "note": "On while on changes nothing. Christmas started on the palette's first color, red, at full factor, and the fade-in is over; 1,799 whole seconds remain.",
+      "send": {
+        "seq": 4,
+        "cmd": "light",
+        "on": true
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "christmas",
+          "color": "red",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": {
+            "minutes": 30,
+            "remaining": 1799
+          }
+        }
+      }
+    }
+  ]
+}

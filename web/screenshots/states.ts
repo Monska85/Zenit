@@ -22,9 +22,10 @@ export interface State {
   mask?: (page: Page) => import("@playwright/test").Locator[];
 }
 
-/** A board that reports the firmware of an older release and a timer, for the states that show them. */
+/** A board that reports the firmware of an older release and a timer, for the states that show them. It has the two
+ * ready-made favorites, as a new board of the firmware with favorites does. */
 function board(patch: (board: FakeBoard) => void = () => undefined): FakeBoard {
-  const fake = new FakeBoard();
+  const fake = new FakeBoard().withFavorites();
   fake.info["firmware"] = "0.9.0";
   patch(fake);
   return fake;
@@ -95,6 +96,33 @@ async function served(page: Page, fake: FakeBoard): Promise<Mock> {
   return mockBoard(page, fake, [`ws://${base.host}/ws`]);
 }
 
+/** Six favorites, as the design shows them: a long name, one the light shows now (Reading), one Zenit turns on with. */
+const SIX_FAVORITES = [
+  { id: 1, name: "Starry night", effect: "shooting_star", brightness: 60, color: "white" },
+  { id: 2, name: "Christmas", effect: "christmas", brightness: 60, color_set: "christmas", hold_seconds: 30 },
+  {
+    id: 3,
+    name: "Grandma's night glow",
+    effect: "breathing",
+    brightness: 30,
+    color: "red",
+    period_seconds: 8,
+    floor: 20,
+  },
+  { id: 4, name: "Reading", effect: "static", brightness: 80, color: "white" },
+  { id: 5, name: "Bath time", effect: "color_change", brightness: 50, colors: ["blue", "green"], hold_seconds: 30 },
+  { id: 6, name: "Party", effect: "hop", brightness: 70, color_set: "all" },
+];
+
+/** A board with six favorites, the light showing Reading and Zenit turning on with Starry night. */
+const sixFavorites = (fake: FakeBoard): void => {
+  fake.favorites = structuredClone(SIX_FAVORITES);
+  fake.start = 1;
+  fake.settings["effect"] = "static";
+  fake.settings["brightness"] = 80;
+  fake.settings["color"] = "white";
+};
+
 export const STATES: State[] = [
   {
     name: "connect",
@@ -155,6 +183,103 @@ export const STATES: State[] = [
     name: "light",
     dark: true,
     reach: async (page) => void (await connectedLight(page)),
+  },
+  {
+    // The card of a board with no favorite: the hint and one button
+    name: "favorites-none",
+    dark: true,
+    reach: async (page) => {
+      await connectedLight(
+        page,
+        board((fake) => (fake.favorites = [])),
+      );
+      await expect(page.getByTestId("favorites-empty")).toBeVisible();
+    },
+  },
+  {
+    // The two ready-made favorites: the light shows Starry night, and Zenit turns on with Christmas
+    name: "favorites-two",
+    dark: true,
+    reach: async (page) => {
+      await connectedLight(
+        page,
+        board((fake) => {
+          fake.settings["effect"] = "shooting_star";
+          fake.start = 2;
+        }),
+      );
+      await expect(page.getByRole("button", { name: "Starry night, on now" })).toBeVisible();
+    },
+  },
+  {
+    // Six favorites: a name that wraps, the one on now, the one Zenit turns on with
+    name: "favorites-six",
+    dark: true,
+    reach: async (page) => {
+      await connectedLight(page, board(sixFavorites));
+      await expect(page.getByRole("button", { name: "Reading, on now" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Starry night, turns on with this" })).toBeVisible();
+    },
+  },
+  {
+    name: "favorites-save",
+    dark: true,
+    reach: async (page) => {
+      await connectedLight(page);
+      await page.getByRole("button", { name: "Save this light" }).click();
+      await expect(page.getByRole("dialog", { name: "Save this light" })).toBeVisible();
+    },
+  },
+  {
+    // The save dialog with the name checked: the sentence under the field
+    name: "favorites-save-problem",
+    reach: async (page) => {
+      await connectedLight(page);
+      await page.getByRole("button", { name: "Save this light" }).click();
+      const dialog = page.getByRole("dialog", { name: "Save this light" });
+      await dialog.getByLabel("Name").fill("christmas");
+      await dialog.getByRole("button", { name: "Save", exact: true }).click();
+      await expect(dialog.getByRole("alert")).toBeVisible();
+    },
+  },
+  {
+    name: "favorites-full",
+    reach: async (page) => {
+      await connectedLight(page, board(sixFavorites));
+      await page.getByRole("button", { name: "Save this light" }).click();
+      const dialog = page.getByRole("dialog", { name: "Your favorites are full" });
+      await dialog.getByRole("radio", { name: "Bath time" }).check({ force: true });
+      await expect(dialog.getByRole("button", { name: "Replace" })).toBeEnabled();
+    },
+  },
+  {
+    name: "favorites-edit",
+    reach: async (page) => {
+      await connectedLight(page, board(sixFavorites));
+      await page.getByRole("button", { name: "Edit", exact: true }).click();
+      await expect(page.getByRole("dialog", { name: "Edit favorites" })).toBeVisible();
+    },
+  },
+  {
+    // A favorite's sheet, with Zenit turning on with another one
+    name: "favorites-sheet",
+    dark: true,
+    reach: async (page) => {
+      await connectedLight(page, board(sixFavorites));
+      await page.getByRole("button", { name: "Edit", exact: true }).click();
+      await page.getByRole("dialog", { name: "Edit favorites" }).getByRole("button", { name: "Reading" }).click();
+      await expect(page.getByRole("dialog", { name: "Reading", exact: true })).toBeVisible();
+    },
+  },
+  {
+    name: "favorites-delete",
+    reach: async (page) => {
+      await connectedLight(page, board(sixFavorites));
+      await page.getByRole("button", { name: "Edit", exact: true }).click();
+      await page.getByRole("dialog", { name: "Edit favorites" }).getByRole("button", { name: "Party" }).click();
+      await page.getByRole("dialog", { name: "Party", exact: true }).getByRole("button", { name: "Delete" }).click();
+      await expect(page.getByRole("alertdialog")).toBeVisible();
+    },
   },
   {
     // The header menu open: how Zenit is connected, the theme and Disconnect

@@ -1,0 +1,202 @@
+{
+  "description": "When the favorites cannot be saved the reply is storage_error and nothing changes; a start favorite that cannot be saved at a turn-on leaves the light off.",
+  "steps": [
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "favorite_start",
+        "id": 2
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "favorites": [
+          {
+            "id": 1,
+            "name": "Starry night",
+            "effect": "shooting_star",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 2,
+            "name": "Christmas",
+            "effect": "christmas",
+            "brightness": 60,
+            "color_set": "christmas",
+            "hold_seconds": 30
+          }
+        ],
+        "start": 2
+      }
+    },
+    {
+      "advance_ms": 1100
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "light",
+        "on": false
+      },
+      "expect": {
+        "seq": 2,
+        "ok": true,
+        "light": {
+          "on": false,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        }
+      }
+    },
+    {
+      "advance_ms": 1000
+    },
+    {
+      "event": "storage_fail"
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "favorite_save",
+        "name": "New"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": false,
+        "error": "storage_error"
+      }
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "favorite_delete",
+        "id": 1
+      },
+      "expect": {
+        "seq": 4,
+        "ok": false,
+        "error": "storage_error"
+      }
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "light",
+        "on": true
+      },
+      "expect": {
+        "seq": 5,
+        "ok": false,
+        "error": "storage_error"
+      }
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "favorite_apply",
+        "id": 1
+      },
+      "expect": {
+        "seq": 6,
+        "ok": false,
+        "error": "storage_error"
+      }
+    },
+    {
+      "send": {
+        "seq": 7,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 7,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "breath_pattern": "4-7-8",
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      }
+    },
+    {
+      "event": "storage_ok"
+    },
+    {
+      "send": {
+        "seq": 8,
+        "cmd": "favorites"
+      },
+      "expect": {
+        "seq": 8,
+        "ok": true,
+        "favorites": [
+          {
+            "id": 1,
+            "name": "Starry night",
+            "effect": "shooting_star",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 2,
+            "name": "Christmas",
+            "effect": "christmas",
+            "brightness": 60,
+            "color_set": "christmas",
+            "hold_seconds": 30
+          }
+        ],
+        "start": 2
+      }
+    },
+    {
+      "send": {
+        "seq": 9,
+        "cmd": "light",
+        "on": true
+      },
+      "expect": {
+        "seq": 9,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "christmas",
+          "color": null,
+          "lightness": 0.0,
+          "power_scale": 100,
+          "timer": null
+        }
+      }
+    }
+  ]
+}

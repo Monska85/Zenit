@@ -6,6 +6,7 @@
 
 #include "curve.h"
 #include "effects.h"
+#include "favorites.h"
 #include "engine.h"
 #include "light_record.h"
 #include "light_settings.h"

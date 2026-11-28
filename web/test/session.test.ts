@@ -169,6 +169,32 @@ describe("BoardSession.setPower and resetSettings", () => {
     expect(session.getState().settings?.brightness).toBe(60);
   });
 
+  it("reads the ready-made favorites again after a reset", async () => {
+    const board = new FakeBoard();
+    board.withFavorites();
+    const { session } = await connected(board, null, "usb");
+    await session.deleteFavorite(1);
+    await session.setStartFavorite(2);
+    await session.resetSettings();
+    expect(commands(board).slice(-3)).toEqual(["settings_reset", "favorites", "status"]);
+    expect(session.getState().favorites?.map((f) => f.name)).toEqual(["Starry night", "Christmas"]);
+    expect(session.getState().start).toBeNull();
+  });
+
+  it("shows what the board holds when a reset fails after it reset the settings", async () => {
+    const board = new FakeBoard().withFavorites();
+    const { session } = await connected(board, null, "usb");
+    await session.setSettings({ brightness: 5 });
+    await session.deleteFavorite(1);
+    board.resetFailsAfter = true;
+    await session.resetSettings();
+    expect(commands(board).slice(-4)).toEqual(["settings_reset", "settings_get", "favorites", "status"]);
+    const state = session.getState();
+    expect(state.settings?.brightness).toBe(60);
+    expect(state.favorites?.map((f) => f.name)).toEqual(["Starry night", "Christmas"]);
+    expect(state.error).toContain("could not save");
+  });
+
   it("says a reset needs USB when the board says so", async () => {
     const { session, board } = await connected();
     board.errors.set("settings_reset", "usb_only");
@@ -537,5 +563,145 @@ describe("the connection Reconnect opens", () => {
     await vi.advanceTimersByTimeAsync(0);
     await c;
     expect(good).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("favorites", () => {
+  const withFavorites = () => new FakeBoard().withFavorites();
+  const marked = (board: FakeBoard) => board.favorites!.map((item) => item["name"]);
+
+  it("reads the list after the settings, before the Light view shows, and keeps it", async () => {
+    const { session, board } = await connected(withFavorites());
+    expect(commands(board)).toEqual(["info", "settings_get", "favorites", "status"]);
+    expect(session.getState().favorites?.map((item) => item.name)).toEqual(["Starry night", "Christmas"]);
+    expect(session.getState().start).toBeNull();
+  });
+
+  it("does not ask for favorites from a board that reports no limits", async () => {
+    const { session, board } = await connected();
+    expect(commands(board)).toEqual(["info", "settings_get", "status"]);
+    expect(session.getState().favorites).toBeNull();
+  });
+
+  it("applies a favorite: the reply updates the light and the settings", async () => {
+    const board = withFavorites();
+    board.on = false;
+    const { session } = await connected(board);
+    expect(await session.applyFavorite(2)).toMatchObject({ ok: true, code: null });
+    const state = session.getState();
+    expect(state.light?.on).toBe(true);
+    expect(state.settings?.effect).toBe("christmas");
+    expect(state.settings?.hold_seconds).toBe(30);
+  });
+
+  it("saves a new favorite from the light as it is, replaces one, renames, marks and deletes", async () => {
+    const { session, board } = await connected(withFavorites());
+    await session.setSettings({ effect: "breathing", brightness: 40 });
+    expect(await session.saveFavorite("Bedtime")).toMatchObject({ ok: true, code: null });
+    expect(session.getState().favorites?.at(-1)).toMatchObject({
+      name: "Bedtime",
+      effect: "breathing",
+      brightness: 40,
+    });
+    expect(await session.replaceFavorite(1)).toMatchObject({ ok: true, code: null });
+    expect(session.getState().favorites?.[0]).toMatchObject({
+      name: "Starry night",
+      effect: "breathing",
+      brightness: 40,
+    });
+    expect(await session.renameFavorite(1, "Night")).toMatchObject({ ok: true, code: null });
+    expect(await session.setStartFavorite(1)).toMatchObject({ ok: true, code: null });
+    expect(session.getState().start).toBe(1);
+    expect(await session.deleteFavorite(1)).toMatchObject({ ok: true, code: null });
+    expect(session.getState().start).toBeNull();
+    expect(marked(board)).toEqual(["Christmas", "Bedtime"]);
+    expect(session.getState().favorites?.map((item) => item.name)).toEqual(["Christmas", "Bedtime"]);
+    expect(await session.setStartFavorite(null)).toMatchObject({ ok: true, code: null });
+    expect(board.requests.at(-1)).toMatchObject({ cmd: "favorite_start", id: null });
+  });
+
+  it("reads the settings after a turn-on while a favorite is marked, and not otherwise", async () => {
+    const board = withFavorites();
+    const { session } = await connected(board);
+    await session.setPower(false);
+    await session.setPower(true);
+    expect(commands(board).slice(-2)).toEqual(["light", "light"]);
+    await session.setStartFavorite(2);
+    await session.setPower(false);
+    await session.setPower(true);
+    expect(commands(board).slice(-2)).toEqual(["light", "settings_get"]);
+    expect(session.getState().settings?.effect).toBe("christmas");
+    await session.setPower(false);
+    expect(commands(board).at(-1)).toBe("light");
+  });
+
+  it("reads the list again after an error and shows the sentence in the bottom message", async () => {
+    const { session, board } = await connected(withFavorites());
+    // Another phone deleted the favorite
+    board.favorites = board.favorites!.filter((item) => item["id"] !== 1);
+    expect(await session.applyFavorite(1)).toMatchObject({ ok: false, code: "unknown_favorite" });
+    expect(commands(board).slice(-2)).toEqual(["favorite_apply", "favorites"]);
+    expect(session.getState().favorites?.map((item) => item.name)).toEqual(["Christmas"]);
+    expect(session.getState().error).toBe("That favorite is no longer on Zenit.");
+  });
+
+  it("returns a name error for the dialog and shows no bottom message", async () => {
+    const { session } = await connected(withFavorites());
+    expect(await session.saveFavorite("christmas")).toMatchObject({ ok: false, code: "name_taken" });
+    expect(session.getState().error).toBeNull();
+    expect(await session.renameFavorite(1, "christmas")).toMatchObject({ ok: false, code: "name_taken" });
+    expect(session.getState().error).toBeNull();
+  });
+
+  it("gives the sentence of a refusal to the dialog that asked, and keeps it out of the bottom message", async () => {
+    const { session, board } = await connected(withFavorites());
+    for (const name of ["a", "b", "c", "d"]) await session.saveFavorite(name);
+    expect(await session.saveFavorite("e")).toMatchObject({
+      ok: false,
+      code: "favorites_full",
+      nameProblem: false,
+      message: "Your favorites are full. Delete one first.",
+    });
+    board.errors.set("favorite_rename", "bad_name");
+    expect(await session.renameFavorite(1, "x")).toMatchObject({
+      code: "bad_name",
+      nameProblem: true,
+      message: "Zenit did not accept that name.",
+    });
+    board.errors.set("favorite_delete", "storage_error");
+    const refused = await session.deleteFavorite(1);
+    expect(refused).toMatchObject({ ok: false, code: "storage_error", nameProblem: false });
+    expect(refused.message).toContain("could not save");
+    expect(session.getState().error).toBeNull();
+  });
+
+  it("shows a refused tile in the bottom message, as a request of the page", async () => {
+    const { session, board } = await connected(withFavorites());
+    board.errors.set("favorite_apply", "storage_error");
+    expect(await session.applyFavorite(1)).toMatchObject({ ok: false, code: "storage_error", message: null });
+    expect(session.getState().error).toContain("could not save");
+  });
+
+  it("does nothing, and says it did not work, when the connection is not there", async () => {
+    const session = new BoardSession();
+    expect(await session.saveFavorite("Bedtime")).toMatchObject({ ok: false, code: null });
+  });
+
+  it("lets a poll give way to a favorites request", async () => {
+    const board = withFavorites();
+    const { session } = await connected(board);
+    const before = commands(board).length;
+    const request = session.setStartFavorite(2);
+    await vi.advanceTimersByTimeAsync(POLL_MS);
+    await request;
+    expect(commands(board).slice(before)).toContain("favorite_start");
+    expect(session.getState().start).toBe(2);
+  });
+
+  it("forgets the favorites with the connection", async () => {
+    const { session } = await connected(withFavorites());
+    await session.disconnect();
+    expect(session.getState().favorites).toBeNull();
+    expect(session.getState().start).toBeNull();
   });
 });

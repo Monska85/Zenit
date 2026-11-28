@@ -683,6 +683,22 @@ class MainTest(unittest.TestCase):
         self.assertEqual(len(link.sent), 1)
         self.assertTrue(link.closed)
 
+    def test_favorite_commands_build_their_requests(self):
+        cases = [
+            (["favorites"], ("favorites", {})),
+            (["favorite-save", "--name", "Cafe\u0301"], ("favorite_save", {"name": "Caf\u00e9"})),  # sent in NFC
+            (["favorite-save", "--id", "3"], ("favorite_save", {"id": 3})),
+            (["favorite-rename", "3", "Night"], ("favorite_rename", {"id": 3, "name": "Night"})),
+            (["favorite-delete", "3"], ("favorite_delete", {"id": 3})),
+            (["favorite-apply", "2"], ("favorite_apply", {"id": 2})),
+            (["favorite-start", "2"], ("favorite_start", {"id": 2})),
+            (["favorite-start", "none"], ("favorite_start", {"id": None})),
+        ]
+        for argv, expected in cases:
+            self.assertEqual(zenit.request_of(zenit.build_parser().parse_args(["--port", "x", *argv])), expected, argv)
+        with self.assertRaises(ValueError):
+            zenit.request_of(zenit.build_parser().parse_args(["--port", "x", "favorite-start", "first"]))
+
     def test_raw_uses_its_own_seq_and_matches_the_reply_on_it(self):
         status, out, _, link = self.run_main(["raw", '{"cmd":"light","on":true,"seq":424242}'], self.board)
         self.assertEqual(status, 0)
@@ -1026,7 +1042,7 @@ class SimulatorTest(unittest.TestCase):
 
     def test_info(self):
         self.assertEqual(self.client.info["board"], "simulator")
-        self.assertEqual(self.client.info["limits"], {"line": 1024})
+        self.assertEqual(self.client.info["limits"], {"line": 1024, "favorites": 6, "favorite_name": 20})
 
     def test_settings_round_trip(self):
         reply = self.client.request("settings_set", brightness=40, colors=["blue", "white"])
@@ -1034,6 +1050,18 @@ class SimulatorTest(unittest.TestCase):
         self.assertEqual(reply["settings"]["brightness"], 40)
         self.assertEqual(self.client.request("settings_get")["settings"]["colors"], ["blue", "white"])
         self.assertEqual(self.client.request("settings_reset")["settings"]["brightness"], 60)
+
+    def test_favorites_round_trip(self):
+        self.assertEqual([f["name"] for f in self.client.request("favorites")["favorites"]], ["Starry night", "Christmas"])
+        saved = self.client.request("favorite_save", name="Bedtime")
+        self.assertTrue(saved["ok"])
+        self.assertEqual(saved["favorites"][-1]["id"], 3)
+        self.assertEqual(self.client.request("favorite_start", id=3)["start"], 3)
+        applied = self.client.request("favorite_apply", id=2)
+        self.assertEqual(applied["settings"]["effect"], "christmas")
+        self.assertEqual(self.client.request("favorite_save", name="bedtime")["error"], "name_taken")
+        self.assertEqual(self.client.request("favorite_delete", id=3)["start"], None)
+        self.assertEqual(self.client.request("settings_reset")["settings"]["effect"], "static")
 
     def test_light_and_errors(self):
         self.assertFalse(self.client.request("light", on=False)["light"]["on"])

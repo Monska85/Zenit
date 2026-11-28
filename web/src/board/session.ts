@@ -10,12 +10,15 @@ import { isToken, login } from "../protocol/auth";
 import { BoardError, Client, ClientError } from "../protocol/client";
 import type { ImprovLink, LineTransport } from "../protocol/transport";
 import {
+  toFavorites,
   toLight,
   toSettings,
   toStatus,
   toUpdate,
   type BoardInfo,
   type BoardStatus,
+  type Favorite,
+  type FavoriteList,
   type LightStatus,
   type Settings,
   type TimeStatus,
@@ -35,6 +38,10 @@ export interface BoardState {
   info: BoardInfo | null;
   settings: Settings | null;
   light: LightStatus | null;
+  /** The favorites in the board's order; null until they are read, and on a board that reports no favorites limits. */
+  favorites: Favorite[] | null;
+  /** The id of the favorite Zenit turns on with, or null. */
+  start: number | null;
   /** From the WiFi and updates milestone; null from a board that does not report them. */
   wifi: WifiStatus | null;
   time: TimeStatus | null;
@@ -70,6 +77,23 @@ export class OpenFailed extends Error {}
  */
 export type Opener = (interactive: boolean) => Promise<LineTransport | null>;
 
+/**
+ * What a favorites request came to. `code` is the board's error code when it refused. For a request made from a dialog
+ * the refusal is not put in the session's `error` (the bottom message sits behind the dialog): `message` is its sentence,
+ * for the dialog to show, and `nameProblem` says it is about the name, which the dialog shows next to its field.
+ */
+export interface FavoriteOutcome {
+  ok: boolean;
+  code: string | null;
+  nameProblem: boolean;
+  message: string | null;
+}
+
+const NAME_ERRORS: readonly string[] = ["bad_name", "name_taken"];
+
+/** Where the sentence of a refused favorites request goes: the bottom message, or the dialog the request came from. */
+type ErrorPlace = "page" | "dialog";
+
 export const POLL_MS = 1000;
 /** The wait between the tries to open a lost connection again by itself, and how many tries: about a minute. */
 const RETRY_MS = 3000;
@@ -82,6 +106,8 @@ const INITIAL: BoardState = {
   info: null,
   settings: null,
   light: null,
+  favorites: null,
+  start: null,
   wifi: null,
   time: null,
   update: null,
@@ -98,6 +124,8 @@ const INITIAL: BoardState = {
 const RESTARTING_STATES = ["downloading", "verifying", "restarting"];
 
 const isUnauthorized = (error: unknown): boolean => error instanceof BoardError && error.code === "unauthorized";
+
+const listPatch = (list: FavoriteList): Partial<BoardState> => ({ favorites: list.favorites, start: list.start });
 
 const statusPatch = (status: BoardStatus): Partial<BoardState> => ({
   light: status.light,
@@ -242,12 +270,15 @@ export class BoardSession {
       const settings = toSettings(await client.call("settings_get"));
       const problem = settingsProblem(settings, info);
       if (problem) throw new ClientError("invalid_reply", problem);
+      // The favorites come before the Light view shows, so its card never has a loading state of its own
+      const list = info.limits.favorites === undefined ? null : toFavorites(await client.call("favorites"));
       const status = toStatus(await client.call("status"));
       if (generation !== this.generation) return;
       if (settings.token !== undefined) this.token = settings.token;
       this.update({
         phase: "connected",
         settings,
+        ...(list ? listPatch(list) : {}),
         ...statusPatch(status),
         error: null,
         loginProblem: null,
@@ -335,6 +366,11 @@ export class BoardSession {
     return released;
   }
 
+  /** A sentence for the bottom message, for a caller that has a refusal to show and no dialog left to show it in. */
+  showError(message: string): void {
+    this.update({ error: message });
+  }
+
   dismissError(): void {
     this.update({ error: null });
   }
@@ -360,18 +396,122 @@ export class BoardSession {
 
   /** `light`: on or off, not saved. */
   async setPower(on: boolean): Promise<void> {
-    await this.run(async (client) => {
+    await this.run(async (client, info) => {
       this.show(client, { light: toLight(await client.call("light", { on })), error: null });
+      // A turn-on with a favorite marked shows that favorite's look: the board applied it, so read the settings
+      if (on && this.state.start !== null) await this.refreshSettings(client, info);
     });
+  }
+
+  /** `favorite_apply`: the whole look and the light on, in one request; the reply holds the light and the settings. */
+  applyFavorite(id: number): Promise<FavoriteOutcome> {
+    return this.favoriteRequest("page", async (client, info) => {
+      const reply = await client.call("favorite_apply", { id });
+      const settings = toSettings(reply);
+      const problem = settingsProblem(settings, info);
+      if (problem) throw new ClientError("invalid_reply", problem);
+      this.show(client, { light: toLight(reply), settings, error: null });
+    });
+  }
+
+  /** `favorite_save` of the light as it is now, as a new favorite called `name`. */
+  saveFavorite(name: string): Promise<FavoriteOutcome> {
+    return this.favoriteList("favorite_save", { name });
+  }
+
+  /** `favorite_save` over an existing favorite: its look becomes the light as it is now; its name and mark stay. */
+  replaceFavorite(id: number): Promise<FavoriteOutcome> {
+    return this.favoriteList("favorite_save", { id });
+  }
+
+  renameFavorite(id: number, name: string): Promise<FavoriteOutcome> {
+    return this.favoriteList("favorite_rename", { id, name });
+  }
+
+  deleteFavorite(id: number): Promise<FavoriteOutcome> {
+    return this.favoriteList("favorite_delete", { id });
+  }
+
+  /** `favorite_start`: the favorite Zenit turns on with, or null for the last light. */
+  setStartFavorite(id: number | null): Promise<FavoriteOutcome> {
+    return this.favoriteList("favorite_start", { id });
+  }
+
+  /** A favorites command whose reply is the whole list. */
+  private favoriteList(cmd: string, fields: Record<string, string | number | null>): Promise<FavoriteOutcome> {
+    return this.favoriteRequest("dialog", async (client) => {
+      this.show(client, { ...listPatch(toFavorites(await client.call(cmd, fields))), error: null });
+    });
+  }
+
+  /**
+   * Runs a favorites request. When the board refuses it the list is read again, so what is shown is what the board
+   * holds. `place` says where the sentence goes: the bottom message, or the outcome for the dialog that asked.
+   */
+  private async favoriteRequest(
+    place: ErrorPlace,
+    request: (client: Client, info: BoardInfo) => Promise<void>,
+  ): Promise<FavoriteOutcome> {
+    let code: string | null = null;
+    let message: string | null = null;
+    let attempts = 0;
+    const ran = await this.run(async (client, info) => {
+      // A run after a login is the retry `run` makes once the outcome was already returned, and the login screen has
+      // closed every dialog: its refusal goes to the bottom message, which nothing covers then
+      const where: ErrorPlace = attempts++ === 0 ? place : "page";
+      try {
+        await request(client, info);
+      } catch (error) {
+        // A login is not a refusal of this request: `run` asks for it and runs the request again
+        if (error instanceof BoardError && this.client === client && !isUnauthorized(error)) {
+          code = error.code;
+          await this.refreshFavorites(client);
+          if (where === "dialog") {
+            message = describeError(error);
+            return;
+          }
+        }
+        throw error;
+      }
+    });
+    return { ok: ran && code === null, code, nameProblem: code !== null && NAME_ERRORS.includes(code), message };
+  }
+
+  private async refreshFavorites(client: Client): Promise<void> {
+    try {
+      this.show(client, listPatch(toFavorites(await client.call("favorites"))));
+    } catch {
+      // the error being reported is the one that matters
+    }
   }
 
   /** `settings_reset`, USB only: every setting back to its default. */
   async resetSettings(): Promise<void> {
     await this.run(async (client, info) => {
-      const settings = toSettings(await client.call("settings_reset"));
+      const favorites = info.limits.favorites !== undefined;
+      let settings: Settings;
+      try {
+        settings = toSettings(await client.call("settings_reset"));
+      } catch (error) {
+        // `storage_error` may come after the settings were reset, when only the favorites could not be written: show
+        // what the board holds, and keep the error
+        if (error instanceof BoardError && this.client === client) {
+          await this.refreshSettings(client, info);
+          if (favorites) await this.refreshFavorites(client);
+          await this.refreshLight(client);
+        }
+        throw error;
+      }
       const problem = settingsProblem(settings, info);
       if (problem) throw new ClientError("invalid_reply", problem);
-      this.show(client, { settings, ...statusPatch(toStatus(await client.call("status"))), error: null });
+      // A reset brings back the ready-made favorites, with none marked to turn on with
+      const list = favorites ? toFavorites(await client.call("favorites")) : null;
+      this.show(client, {
+        settings,
+        ...(list ? listPatch(list) : {}),
+        ...statusPatch(toStatus(await client.call("status"))),
+        error: null,
+      });
     });
   }
 
@@ -489,6 +629,14 @@ export class BoardSession {
     if (this.client === client) this.update(patch);
   }
 
+  private async refreshLight(client: Client): Promise<void> {
+    try {
+      this.show(client, statusPatch(toStatus(await client.call("status"))));
+    } catch {
+      // the error being reported is the one that matters
+    }
+  }
+
   private async refreshSettings(client: Client, info: BoardInfo): Promise<void> {
     try {
       const settings = toSettings(await client.call("settings_get"));
@@ -499,23 +647,25 @@ export class BoardSession {
   }
 
   /** Runs a request for the user: its failure is shown, and a board that stops answering is lost. */
-  private async run(request: (client: Client, info: BoardInfo) => Promise<void>): Promise<void> {
+  private async run(request: (client: Client, info: BoardInfo) => Promise<void>): Promise<boolean> {
     const client = this.client;
     const info = this.state.info;
-    if (!client || !info || this.state.phase !== "connected") return;
+    if (!client || !info || this.state.phase !== "connected") return false;
     try {
       await request(client, info);
+      return true;
     } catch (error) {
-      if (this.client !== client) return;
+      if (this.client !== client) return false;
       if (isUnauthorized(error) && client.kind === "websocket") {
-        this.pendingRetry = () => this.run(request);
+        this.pendingRetry = async () => void (await this.run(request));
         this.stopPolling();
         this.update({ phase: "login", loginProblem: null });
         // A token kept from earlier is tried first, so a board that only forgot the login is not a question to the person
         if (this.token !== null) await this.submitStored(client, info);
-        return;
+        return false;
       }
       this.fail(error);
+      return false;
     }
   }
 

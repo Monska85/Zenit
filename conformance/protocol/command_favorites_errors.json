@@ -1,0 +1,610 @@
+{
+  "description": "Favorites requests are checked before anything changes: wrong types and unknown fields are bad_request, a name that breaks the rules is bad_name, a name another favorite has (ASCII letters without case) is name_taken, a seventh favorite is favorites_full, an id no favorite has is unknown_favorite.",
+  "steps": [
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "favorite_save"
+      },
+      "expect": {
+        "seq": 1,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "favorite_save",
+        "name": "A",
+        "id": 1
+      },
+      "expect": {
+        "seq": 2,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "favorite_save",
+        "name": 7
+      },
+      "expect": {
+        "seq": 3,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "favorite_save",
+        "id": 0
+      },
+      "expect": {
+        "seq": 4,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "favorite_save",
+        "id": 256
+      },
+      "expect": {
+        "seq": 5,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "favorite_save",
+        "id": "1"
+      },
+      "expect": {
+        "seq": 6,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": "@ZN aa7e740d {\"seq\":7,\"cmd\":\"favorite_save\",\"id\":1.0}",
+      "expect": {
+        "seq": 7,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 8,
+        "cmd": "favorite_save",
+        "id": null
+      },
+      "expect": {
+        "seq": 8,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 9,
+        "cmd": "favorite_rename",
+        "id": 1,
+        "name": "A",
+        "color": "red"
+      },
+      "expect": {
+        "seq": 9,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 10,
+        "cmd": "favorite_save",
+        "name": ""
+      },
+      "expect": {
+        "seq": 10,
+        "ok": false,
+        "error": "bad_name"
+      }
+    },
+    {
+      "send": {
+        "seq": 11,
+        "cmd": "favorite_save",
+        "name": " Night"
+      },
+      "expect": {
+        "seq": 11,
+        "ok": false,
+        "error": "bad_name"
+      }
+    },
+    {
+      "send": {
+        "seq": 12,
+        "cmd": "favorite_save",
+        "name": "Night "
+      },
+      "expect": {
+        "seq": 12,
+        "ok": false,
+        "error": "bad_name"
+      }
+    },
+    {
+      "send": {
+        "seq": 13,
+        "cmd": "favorite_save",
+        "name": "abcdefghijklmnopqrstu"
+      },
+      "expect": {
+        "seq": 13,
+        "ok": false,
+        "error": "bad_name"
+      }
+    },
+    {
+      "send": "@ZN 069306eb {\"seq\":14,\"cmd\":\"favorite_save\",\"name\":\"a\\u0007b\"}",
+      "expect": {
+        "seq": 14,
+        "ok": false,
+        "error": "bad_name"
+      }
+    },
+    {
+      "send": "@ZN cce66cbc {\"seq\":15,\"cmd\":\"favorite_save\",\"name\":\"a\\u200bb\"}",
+      "expect": {
+        "seq": 15,
+        "ok": false,
+        "error": "bad_name"
+      }
+    },
+    {
+      "send": {
+        "seq": 16,
+        "cmd": "favorite_save",
+        "name": "STARRY NIGHT"
+      },
+      "expect": {
+        "seq": 16,
+        "ok": false,
+        "error": "name_taken"
+      }
+    },
+    {
+      "send": {
+        "seq": 17,
+        "cmd": "favorite_rename",
+        "id": 2,
+        "name": "starry night"
+      },
+      "expect": {
+        "seq": 17,
+        "ok": false,
+        "error": "name_taken"
+      }
+    },
+    {
+      "send": {
+        "seq": 18,
+        "cmd": "favorite_rename",
+        "id": 2,
+        "name": ""
+      },
+      "expect": {
+        "seq": 18,
+        "ok": false,
+        "error": "bad_name"
+      }
+    },
+    {
+      "send": {
+        "seq": 19,
+        "cmd": "favorite_rename",
+        "id": 9,
+        "name": "Fine"
+      },
+      "expect": {
+        "seq": 19,
+        "ok": false,
+        "error": "unknown_favorite"
+      }
+    },
+    {
+      "send": {
+        "seq": 20,
+        "cmd": "favorite_delete",
+        "id": 9
+      },
+      "expect": {
+        "seq": 20,
+        "ok": false,
+        "error": "unknown_favorite"
+      }
+    },
+    {
+      "send": {
+        "seq": 21,
+        "cmd": "favorite_apply",
+        "id": 9
+      },
+      "expect": {
+        "seq": 21,
+        "ok": false,
+        "error": "unknown_favorite"
+      }
+    },
+    {
+      "send": {
+        "seq": 22,
+        "cmd": "favorite_start",
+        "id": 9
+      },
+      "expect": {
+        "seq": 22,
+        "ok": false,
+        "error": "unknown_favorite"
+      }
+    },
+    {
+      "send": {
+        "seq": 23,
+        "cmd": "favorite_save",
+        "id": 9
+      },
+      "expect": {
+        "seq": 23,
+        "ok": false,
+        "error": "unknown_favorite"
+      }
+    },
+    {
+      "send": {
+        "seq": 24,
+        "cmd": "favorite_rename",
+        "id": null,
+        "name": "A"
+      },
+      "expect": {
+        "seq": 24,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 25,
+        "cmd": "favorite_apply"
+      },
+      "expect": {
+        "seq": 25,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "send": {
+        "seq": 26,
+        "cmd": "favorite_save",
+        "name": "C"
+      },
+      "expect": {
+        "seq": 26,
+        "ok": true,
+        "favorites": [
+          {
+            "id": 1,
+            "name": "Starry night",
+            "effect": "shooting_star",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 2,
+            "name": "Christmas",
+            "effect": "christmas",
+            "brightness": 60,
+            "color_set": "christmas",
+            "hold_seconds": 30
+          },
+          {
+            "id": 3,
+            "name": "C",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          }
+        ],
+        "start": null
+      }
+    },
+    {
+      "send": {
+        "seq": 27,
+        "cmd": "favorite_save",
+        "name": "D"
+      },
+      "expect": {
+        "seq": 27,
+        "ok": true,
+        "favorites": [
+          {
+            "id": 1,
+            "name": "Starry night",
+            "effect": "shooting_star",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 2,
+            "name": "Christmas",
+            "effect": "christmas",
+            "brightness": 60,
+            "color_set": "christmas",
+            "hold_seconds": 30
+          },
+          {
+            "id": 3,
+            "name": "C",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 4,
+            "name": "D",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          }
+        ],
+        "start": null
+      }
+    },
+    {
+      "send": {
+        "seq": 28,
+        "cmd": "favorite_save",
+        "name": "E"
+      },
+      "expect": {
+        "seq": 28,
+        "ok": true,
+        "favorites": [
+          {
+            "id": 1,
+            "name": "Starry night",
+            "effect": "shooting_star",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 2,
+            "name": "Christmas",
+            "effect": "christmas",
+            "brightness": 60,
+            "color_set": "christmas",
+            "hold_seconds": 30
+          },
+          {
+            "id": 3,
+            "name": "C",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 4,
+            "name": "D",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 5,
+            "name": "E",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          }
+        ],
+        "start": null
+      }
+    },
+    {
+      "send": {
+        "seq": 29,
+        "cmd": "favorite_save",
+        "name": "F"
+      },
+      "expect": {
+        "seq": 29,
+        "ok": true,
+        "favorites": [
+          {
+            "id": 1,
+            "name": "Starry night",
+            "effect": "shooting_star",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 2,
+            "name": "Christmas",
+            "effect": "christmas",
+            "brightness": 60,
+            "color_set": "christmas",
+            "hold_seconds": 30
+          },
+          {
+            "id": 3,
+            "name": "C",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 4,
+            "name": "D",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 5,
+            "name": "E",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 6,
+            "name": "F",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          }
+        ],
+        "start": null
+      }
+    },
+    {
+      "send": {
+        "seq": 30,
+        "cmd": "favorite_save",
+        "name": "G"
+      },
+      "expect": {
+        "seq": 30,
+        "ok": false,
+        "error": "favorites_full"
+      }
+    },
+    {
+      "send": {
+        "seq": 31,
+        "cmd": "favorites"
+      },
+      "expect": {
+        "seq": 31,
+        "ok": true,
+        "favorites": [
+          {
+            "id": 1,
+            "name": "Starry night",
+            "effect": "shooting_star",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 2,
+            "name": "Christmas",
+            "effect": "christmas",
+            "brightness": 60,
+            "color_set": "christmas",
+            "hold_seconds": 30
+          },
+          {
+            "id": 3,
+            "name": "C",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 4,
+            "name": "D",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 5,
+            "name": "E",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 6,
+            "name": "F",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          }
+        ],
+        "start": null
+      }
+    },
+    {
+      "send": {
+        "seq": 32,
+        "cmd": "favorite_rename",
+        "id": 3,
+        "name": "c"
+      },
+      "expect": {
+        "seq": 32,
+        "ok": true,
+        "favorites": [
+          {
+            "id": 1,
+            "name": "Starry night",
+            "effect": "shooting_star",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 2,
+            "name": "Christmas",
+            "effect": "christmas",
+            "brightness": 60,
+            "color_set": "christmas",
+            "hold_seconds": 30
+          },
+          {
+            "id": 3,
+            "name": "c",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 4,
+            "name": "D",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 5,
+            "name": "E",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 6,
+            "name": "F",
+            "effect": "static",
+            "brightness": 60,
+            "color": "white"
+          }
+        ],
+        "start": null
+      }
+    }
+  ]
+}
