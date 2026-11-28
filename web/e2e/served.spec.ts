@@ -67,13 +67,14 @@ test("changes a board setting when it is chosen, and the board keeps it", async 
   await page.getByText("Advanced settings", { exact: true }).click();
   await page.getByRole("radio", { name: "Tell me" }).check({ force: true });
   await expect(page.getByTestId("update-mode-hint")).toContainText("tells you");
-  await page.getByLabel("Time zone", { exact: true }).selectOption({ label: "Rome, Paris, Berlin, Madrid" });
+  await page.getByRole("combobox", { name: "Find a time zone" }).fill("rome");
+  await page.getByRole("option", { name: /Rome/ }).click();
   await expect.poll(() => answers.some((answer) => answer.includes('"timezone":"CET-1CEST'))).toBe(true);
   await page.reload();
   await expect(page.getByLabel("WiFi strength")).toHaveValue("13");
   await page.getByText("Advanced settings", { exact: true }).click();
   await expect(page.getByRole("radio", { name: "Tell me" })).toBeChecked();
-  await expect(page.getByLabel("Time zone", { exact: true })).toHaveValue("CET-1CEST,M3.5.0,M10.5.0/3");
+  await expect(page.getByLabel("Time zone text")).toHaveValue("CET-1CEST,M3.5.0,M10.5.0/3");
 });
 
 test("asks for the token after the login is turned on, and says so when it is wrong three times", async ({

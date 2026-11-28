@@ -6,7 +6,6 @@
 import { describe, expect, it } from "vitest";
 import {
   BOARD_LIMITS,
-  TIME_ZONES,
   UPDATE_MODES,
   WIFI_POWERS,
   WIFI_POWER_LABELS,
@@ -18,7 +17,6 @@ import {
   HOUR_CHOICES,
   hourOptions,
   windowToSend,
-  zoneOfBrowser,
   ntpServerProblem,
   parseMinute,
   timezoneProblem,
@@ -70,11 +68,6 @@ describe("the limits of the board settings", () => {
   it("has a label for every value", () => {
     for (const power of WIFI_POWERS) expect(WIFI_POWER_LABELS[power]).toBeTruthy();
     for (const mode of UPDATE_MODES) expect(UPDATE_MODE_LABELS[mode]).toBeTruthy();
-  });
-
-  it("offers time zones the board accepts", () => {
-    for (const zone of TIME_ZONES) expect(timezoneProblem(zone.value), zone.value).toBeNull();
-    expect(new Set(TIME_ZONES.map((zone) => zone.value)).size).toBe(TIME_ZONES.length);
   });
 });
 
@@ -420,23 +413,6 @@ describe("windowToSend", () => {
   it("refuses a time that is empty or not a time of day", () => {
     expect(windowToSend("", "05:00", 180, 300)).toBe("invalid");
     expect(windowToSend("03:00", "24:00", 180, 300)).toBe("invalid");
-  });
-});
-
-describe("zoneOfBrowser", () => {
-  it("finds the listed zone of a browser's zone, named by its city", () => {
-    expect(zoneOfBrowser("Europe/Rome")).toEqual({ value: "CET-1CEST,M3.5.0,M10.5.0/3", city: "Rome" });
-    expect(zoneOfBrowser("America/New_York")).toEqual({ value: "EST5EDT,M3.2.0,M11.1.0", city: "New York" });
-  });
-
-  it("finds nothing for a zone the list does not stand for", () => {
-    expect(zoneOfBrowser("America/Mexico_City")).toBeNull();
-    expect(zoneOfBrowser("Asia/Kolkata")).toBeNull();
-  });
-
-  it("names every browser zone at most once", () => {
-    const names = TIME_ZONES.flatMap((zone) => zone.iana);
-    expect(new Set(names).size).toBe(names.length);
   });
 });
 

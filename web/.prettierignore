@@ -7,3 +7,4 @@ playwright-report*
 package-lock.json
 coverage
 screenshots/baselines
+src/device/zones.json

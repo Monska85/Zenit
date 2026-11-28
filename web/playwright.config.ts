@@ -14,6 +14,8 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${PORT}`,
     browserName: "chromium",
+    // The same time zone everywhere, UTC like the simulator's board: a test that needs another sets its own
+    timezoneId: "UTC",
     trace: process.env["CI"] ? "retain-on-failure" : "off",
   },
   // Serves the built app (just web-build first) with a fixture firmware release next to it, as Pages would. The

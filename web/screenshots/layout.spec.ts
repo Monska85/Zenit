@@ -9,14 +9,17 @@ import { layoutProblems } from "./layout.ts";
 import { STATES, THEMES, WIDTHS } from "./states.ts";
 
 for (const state of STATES) {
-  for (const size of WIDTHS) {
-    for (const theme of THEMES) {
-      test(`${state.name} at ${size.width} px, ${theme} theme`, async ({ page }) => {
-        await page.setViewportSize({ width: size.width, height: size.height });
-        await page.emulateMedia({ colorScheme: theme });
-        await state.reach(page);
-        expect(await layoutProblems(page)).toEqual([]);
-      });
+  test.describe(() => {
+    test.use({ timezoneId: state.timezoneId ?? "UTC" });
+    for (const size of WIDTHS) {
+      for (const theme of THEMES) {
+        test(`${state.name} at ${size.width} px, ${theme} theme`, async ({ page }) => {
+          await page.setViewportSize({ width: size.width, height: size.height });
+          await page.emulateMedia({ colorScheme: theme });
+          await state.reach(page);
+          expect(await layoutProblems(page)).toEqual([]);
+        });
+      }
     }
-  }
+  });
 }

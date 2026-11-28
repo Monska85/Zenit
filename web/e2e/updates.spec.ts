@@ -383,23 +383,109 @@ test.describe("the settings", () => {
     await expect(page.getByLabel("Until")).toBeDisabled();
   });
 
-  test("chooses a time zone from the list, or types one and checks it", async ({ page }) => {
+  test("finds a time zone by city or country and sends it when chosen, with the keyboard or a tap", async ({
+    page,
+  }) => {
     const mock = await deviceView(page);
     await openAdvanced(page);
-    await page.getByLabel("Time zone", { exact: true }).selectOption({ label: "Rome, Paris, Berlin, Madrid" });
-    await expect.poll(() => mock.board.settings["timezone"]).toBe("CET-1CEST,M3.5.0,M10.5.0/3");
     const card = page.getByRole("region", { name: "Time", exact: true });
-    await expect(card.getByLabel("Time zone text")).toHaveCount(0);
-    await page.getByLabel("Time zone", { exact: true }).selectOption({ label: "Another time zone..." });
+    await expect(card.getByTestId("time-zone-current")).toHaveText("UTC");
+    const search = card.getByRole("combobox", { name: "Find a time zone" });
+    const list = card.getByRole("listbox", { name: "Time zones" });
+    await expect(search).toHaveAttribute("aria-expanded", "false");
+    await search.fill("india");
+    await expect(search).toHaveAttribute("aria-expanded", "true");
+    await expect(list.getByRole("option").first()).toHaveText(/^Kolkata \(India\)/);
+    // Down points at the first option, Enter chooses it: sent at once, the field emptied and the list closed
+    await search.press("ArrowDown");
+    const first = list.getByRole("option").first();
+    await expect(first).toHaveAttribute("aria-selected", "true");
+    await expect(search).toHaveAttribute("aria-activedescendant", (await first.getAttribute("id"))!);
+    await search.press("Enter");
+    await expect.poll(() => mock.board.settings["timezone"]).toBe("IST-5:30");
+    await expect(search).toHaveValue("");
+    await expect(search).toHaveAttribute("aria-expanded", "false");
+    await expect(card.getByTestId("time-zone-current")).toHaveText("Kolkata (India)");
+    // At most 8 suggestions; a tap chooses one, and the board's string is named by the zone chosen here
+    await search.fill("united");
+    await expect(list.getByRole("option")).toHaveCount(8);
+    await search.fill("amsterdam");
+    await list.getByRole("option", { name: /Amsterdam/ }).click();
+    await expect.poll(() => mock.board.settings["timezone"]).toBe("CET-1CEST,M3.5.0,M10.5.0/3");
+    await expect(card.getByTestId("time-zone-current")).toHaveText("Amsterdam (Netherlands)");
+    // Escape closes the list, a second Escape clears the text; nothing found says so
+    await search.fill("rome");
+    await search.press("Escape");
+    await expect(search).toHaveAttribute("aria-expanded", "false");
+    await expect(search).toHaveValue("rome");
+    await search.press("Escape");
+    await expect(search).toHaveValue("");
+    await search.fill("atlantis");
+    await expect(card.getByText("No time zone matches.", { exact: false })).toBeVisible();
+    // Only the two choices reached the board: typing and moving through the list send nothing
+    expect(sets(mock)).toHaveLength(2);
+  });
+
+  test("takes a POSIX time zone typed by hand, after checking it, and shows it as it is", async ({ page }) => {
+    const mock = await deviceView(page);
+    await openAdvanced(page);
+    const card = page.getByRole("region", { name: "Time", exact: true });
+    const raw = card.getByTestId("time-zone-raw");
+    await expect(raw).not.toHaveAttribute("open");
+    await raw.getByText("Type a POSIX time zone").click();
     const text = card.getByLabel("Time zone text");
     await text.fill("bad zone");
     await card.getByRole("button", { name: "Set", exact: true }).first().click();
     await expect(card.getByRole("alert")).toContainText("no spaces");
-    await text.fill("<+03>-3");
+    await text.fill("XYZ-5:15");
     await card.getByRole("button", { name: "Set", exact: true }).first().click();
-    await expect.poll(() => mock.board.settings["timezone"]).toBe("<+03>-3");
-    // A zone the list does not have shows as a custom one
-    await expect(page.getByLabel("Time zone", { exact: true })).toHaveValue("custom");
+    await expect.poll(() => mock.board.settings["timezone"]).toBe("XYZ-5:15");
+    // A string no zone has is shown as it is
+    await expect(card.getByTestId("time-zone-current")).toHaveText("XYZ-5:15");
+  });
+
+  test("opens the typed time zone by itself for a string no zone has", async ({ page }) => {
+    await deviceView(page, {}, (board) => {
+      board.settings["timezone"] = "XYZ-5:15";
+    });
+    await openAdvanced(page);
+    const card = page.getByRole("region", { name: "Time", exact: true });
+    await expect(card.getByTestId("time-zone-current")).toHaveText("XYZ-5:15");
+    await expect(card.getByTestId("time-zone-raw")).toHaveAttribute("open");
+    await expect(card.getByLabel("Time zone text")).toHaveValue("XYZ-5:15");
+    // A zone chosen by search closes it again
+    const search = card.getByRole("combobox", { name: "Find a time zone" });
+    await search.fill("kolkata");
+    await search.press("ArrowDown");
+    await search.press("Enter");
+    await expect(card.getByTestId("time-zone-current")).toHaveText("Kolkata (India)");
+    await expect(card.getByTestId("time-zone-raw")).not.toHaveAttribute("open");
+  });
+
+  test("keeps a person's open or close of the typed time zone for that string only", async ({ page }) => {
+    const mock = await deviceView(page);
+    await openAdvanced(page);
+    const card = page.getByRole("region", { name: "Time", exact: true });
+    const raw = card.getByTestId("time-zone-raw");
+    const summary = raw.getByText("Type a POSIX time zone");
+    // Opened by the person on a named zone, it stays open
+    await summary.click();
+    await expect(raw).toHaveAttribute("open");
+    await card.getByLabel("Time zone text").fill("XYZ-5:15");
+    await card.getByRole("button", { name: "Set", exact: true }).first().click();
+    await expect.poll(() => mock.board.settings["timezone"]).toBe("XYZ-5:15");
+    await expect(raw).toHaveAttribute("open");
+    // Closed by the person while the string has no zone, it stays closed
+    await summary.click();
+    await expect(raw).not.toHaveAttribute("open");
+    await page.waitForTimeout(1500);
+    await expect(raw).not.toHaveAttribute("open");
+    // A named zone chosen by search: closed by the rule
+    const search = card.getByRole("combobox", { name: "Find a time zone" });
+    await search.fill("rome");
+    await card.getByRole("option", { name: /Rome/ }).click();
+    await expect.poll(() => mock.board.settings["timezone"]).toBe("CET-1CEST,M3.5.0,M10.5.0/3");
+    await expect(raw).not.toHaveAttribute("open");
   });
 
   test("sends the time server after a check of what was typed, and the time check interval when chosen", async ({
@@ -424,23 +510,33 @@ test.describe("the settings", () => {
 test.describe("the time zone of this device", () => {
   test.use({ timezoneId: "Europe/Rome" });
 
-  test("offers the device's own zone when the list has it, and saves it", async ({ page }) => {
+  test("is offered first on the Device page, outside Advanced, and saved when pressed", async ({ page }) => {
     const mock = await deviceView(page);
-    await openAdvanced(page);
-    const offer = page.getByRole("button", { name: "Use this device's time zone (Rome)" });
-    await offer.click();
+    const offer = page.getByTestId("time-zone-offer");
+    await expect(page.locator("main h2").first()).toHaveText("Time zone");
+    await expect(offer).toContainText("Zenit uses UTC time.");
+    await offer.getByRole("button", { name: "Use this device's time zone (Rome)" }).click();
     await expect.poll(() => mock.board.settings["timezone"]).toBe("CET-1CEST,M3.5.0,M10.5.0/3");
     await expect(offer).toHaveCount(0);
-    await expect(page.getByLabel("Time zone", { exact: true })).toHaveValue("CET-1CEST,M3.5.0,M10.5.0/3");
-  });
-});
-
-test.describe("a zone the list does not have", () => {
-  test.use({ timezoneId: "Asia/Kolkata" });
-
-  test("offers nothing", async ({ page }) => {
-    await deviceView(page);
     await openAdvanced(page);
-    await expect(page.getByRole("button", { name: /Use this device's time zone/ })).toHaveCount(0);
+    await expect(page.getByTestId("time-zone-current")).toHaveText("Rome (Italy)");
+  });
+
+  test("is not offered when the board has the same rules, and names the board's zone by this device's", async ({
+    page,
+  }) => {
+    await deviceView(page, {}, (board) => {
+      board.settings["timezone"] = "CET-1CEST,M3.5.0,M10.5.0/3";
+    });
+    await expect(page.getByTestId("time-zone-offer")).toHaveCount(0);
+    await openAdvanced(page);
+    await expect(page.getByTestId("time-zone-current")).toHaveText("Rome (Italy)");
+  });
+
+  test("names the board's other zone in the offer", async ({ page }) => {
+    await deviceView(page, {}, (board) => {
+      board.settings["timezone"] = "IST-5:30";
+    });
+    await expect(page.getByTestId("time-zone-offer")).toContainText("Zenit uses Kolkata (India) time.");
   });
 });
