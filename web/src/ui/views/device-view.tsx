@@ -2,8 +2,10 @@
 
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { boardName } from "../../board/session";
 import { firmwareSummary } from "../../device/update";
+import { formatNumber } from "../../i18n";
 import { colorLabel, colorSetLabel, effectInfo } from "../../light/model";
 import { useBoard } from "../board-context";
 import { Banner } from "../components/banner";
@@ -15,8 +17,6 @@ import { TimeZoneOffer } from "../device/time-zone";
 import { WebAppCard } from "../device/web-app-card";
 import { WifiCard } from "../device/wifi-card";
 import type { Route } from "../route";
-
-const watts = (milliwatts: number): string => `${Number((milliwatts / 1000).toFixed(2))} W`;
 
 /** Rows of names and values. */
 function Rows({ rows }: { rows: Array<[string, string]> }) {
@@ -35,6 +35,7 @@ function Rows({ rows }: { rows: Array<[string, string]> }) {
 /** What matters first: the board's name, how it is connected, the firmware and its state. The rest is for technicians.
  */
 function BoardCard({ published }: { published: Published }) {
+  const { t } = useTranslation("device");
   const { board } = useBoard();
   const { info } = board;
   if (!info) return null;
@@ -45,36 +46,46 @@ function BoardCard({ published }: { published: Published }) {
     publishedState(info.firmware, published),
   );
   const rows: Array<[string, string]> = [
-    ...(name !== null ? [["Name", name] as [string, string]] : []),
-    ["Connection", board.kind === "usb" ? "USB cable" : board.label],
-    ["Firmware", summary === null ? info.firmware : `${info.firmware} · ${summary}`],
+    ...(name !== null ? [[t("board.name"), name] as [string, string]] : []),
+    [t("board.connection"), board.kind === "usb" ? t("board.usbCable") : board.label],
+    [
+      t("board.firmware"),
+      summary === null ? info.firmware : t("board.firmwareWithSummary", { version: info.firmware, summary }),
+    ],
   ];
+  // Watts with up to two decimals and no grouping
+  const watts = (milliwatts: number): string =>
+    t("details.watts", {
+      value: formatNumber(Number((milliwatts / 1000).toFixed(2)), { maximumFractionDigits: 2, useGrouping: false }),
+    });
   return (
     <Card aria-labelledby="device-title">
-      <CardTitle id="device-title">Your Zenit</CardTitle>
+      <CardTitle id="device-title">{t("board.title")}</CardTitle>
       <Rows rows={rows} />
       <details className="mt-3">
         <summary className="flex min-h-11 cursor-pointer items-center text-base font-medium">
-          Details for technicians
+          {t("details.title")}
         </summary>
         <div className="mt-1" data-testid="technician-details">
           <Rows
             rows={[
-              ["Hardware", info.board],
-              ["Light power limit", watts(info.power_limit_mw)],
-              ["Colors", info.colors.map(colorLabel).join(", ")],
-              ["Effects", info.effects.map((effect) => effectInfo(effect).label).join(", ")],
-              ["Palettes", info.color_sets.map(colorSetLabel).join(", ")],
-              ["Protocol", String(info.protocol)],
+              [t("details.hardware"), info.board],
+              [t("details.powerLimit"), watts(info.power_limit_mw)],
+              [t("details.colors"), info.colors.map(colorLabel).join(", ")],
+              [t("details.effects"), info.effects.map((effect) => effectInfo(effect).label).join(", ")],
+              [t("details.palettes"), info.color_sets.map(colorSetLabel).join(", ")],
+              [t("details.protocol"), String(info.protocol)],
               [
-                "Free memory",
-                info.memory.free === 0 ? "Not reported" : `${info.memory.free.toLocaleString("en-GB")} bytes`,
+                t("details.freeMemory"),
+                info.memory.free === 0
+                  ? t("details.notReported")
+                  : t("details.bytes", { value: formatNumber(info.memory.free) }),
               ],
               [
-                "Settings memory",
+                t("details.settingsMemory"),
                 info.nvs.used === 0 && info.nvs.free === 0
-                  ? "Not reported"
-                  : `${info.nvs.used} used, ${info.nvs.free} free`,
+                  ? t("details.notReported")
+                  : t("details.usedFree", { used: info.nvs.used, free: info.nvs.free }),
               ],
             ]}
           />
@@ -96,6 +107,7 @@ function Advanced({
   chosen: string | null;
   onChoose: (name: string) => void;
 }) {
+  const { t } = useTranslation("device");
   const { board } = useBoard();
   if (board.phase !== "connected" || !hasAdvancedSettings(board.settings)) return null;
   return (
@@ -107,8 +119,8 @@ function Advanced({
     >
       <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 rounded-2xl border border-border bg-card px-4 py-2 sm:px-5 [&::-webkit-details-marker]:hidden">
         <span>
-          <span className="block text-lg font-semibold">Advanced settings</span>
-          <span className="block text-sm text-muted-foreground">Updates and time</span>
+          <span className="block text-lg font-semibold">{t("advanced.title")}</span>
+          <span className="block text-sm text-muted-foreground">{t("advanced.subtitle")}</span>
         </span>
         <ChevronDown aria-hidden className="size-5 shrink-0 motion-safe:transition-transform group-open:rotate-180" />
       </summary>
@@ -121,6 +133,7 @@ function Advanced({
 }
 
 export function DeviceView({ go }: { go: (route: Route) => void }) {
+  const { t } = useTranslation("device");
   const { board } = useBoard();
   const served = board.served !== null;
   const published = usePublishedFirmware(!served);
@@ -129,15 +142,15 @@ export function DeviceView({ go }: { go: (route: Route) => void }) {
   const [zone, setZone] = useState<string | null>(null);
   return (
     <>
-      <h1 className="text-2xl font-semibold">Device</h1>
+      <h1 className="text-2xl font-semibold">{t("view.title")}</h1>
       <TimeZoneOffer chosen={zone} onChoose={setZone} />
       {board.info ? (
         <BoardCard published={published} />
       ) : (
         <Banner tone="info">
-          <p>Connect to see your Zenit.</p>
+          <p>{t("view.connectFirst")}</p>
           <a className="inline-flex min-h-11 items-center font-medium text-primary underline" href="#/connect">
-            Connect
+            {t("view.connect")}
           </a>
         </Banner>
       )}

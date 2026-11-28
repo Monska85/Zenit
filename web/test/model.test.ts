@@ -21,6 +21,7 @@ import {
   patternLabel,
   settingsProblem,
 } from "../src/light/model";
+import { translate } from "../src/i18n";
 import { toInfo, toSettings } from "../src/protocol/types";
 import type { JsonObject } from "../src/protocol/strict-json";
 import { DEFAULT_SETTINGS, INFO } from "./helpers";
@@ -375,6 +376,11 @@ describe("favoriteNameProblem", () => {
     { id: 2, name: "Christmas", effect: "static", brightness: 60 },
   ];
   const check = (name: string, exceptId: number | null = null) => favoriteNameProblem(name, list, exceptId);
+  /** The sentence of the problem, in English, or null. */
+  const sentence = (name: string, exceptId: number | null = null): string | null => {
+    const { problem } = check(name, exceptId);
+    return problem === null ? null : translate(problem);
+  };
 
   it("takes a name, trims its ends and writes it in NFC", () => {
     expect(check("  Bedtime  ")).toEqual({ name: "Bedtime", problem: null });
@@ -383,25 +389,25 @@ describe("favoriteNameProblem", () => {
   });
 
   it("says what is wrong, in the sentences of the design", () => {
-    expect(check("").problem).toBe("Give your favorite a name.");
-    expect(check("   ").problem).toBe("Give your favorite a name.");
-    expect(check("x".repeat(21)).problem).toBe("Keep the name to 20 characters or fewer.");
-    expect(check("a\tb").problem).toBe("That name has a character Zenit cannot keep. Try letters, numbers and spaces.");
-    expect(check(`a${ZERO_WIDTH}b`).problem).toBe(
+    expect(sentence("")).toBe("Give your favorite a name.");
+    expect(sentence("   ")).toBe("Give your favorite a name.");
+    expect(sentence("x".repeat(21))).toBe("Keep the name to 20 characters or fewer.");
+    expect(sentence("a\tb")).toBe("That name has a character Zenit cannot keep. Try letters, numbers and spaces.");
+    expect(sentence(`a${ZERO_WIDTH}b`)).toBe(
       "That name has a character Zenit cannot keep. Try letters, numbers and spaces.",
     );
-    expect(check("christmas").problem).toBe("You already have a favorite called Christmas. Choose another name.");
+    expect(sentence("christmas")).toBe("You already have a favorite called Christmas. Choose another name.");
   });
 
   it("counts characters, not UTF-16 units", () => {
     expect(check("\u{1f31f}".repeat(20)).problem).toBeNull();
-    expect(check("\u{1f31f}".repeat(21)).problem).toBe("Keep the name to 20 characters or fewer.");
+    expect(sentence("\u{1f31f}".repeat(21))).toBe("Keep the name to 20 characters or fewer.");
   });
 
   it("compares only ASCII letters without case, and lets a favorite keep its own name", () => {
     expect(favoriteNameProblem("École", [{ ...list[0]!, name: "école" }]).problem).toBeNull();
     expect(check("STARRY NIGHT", 1).problem).toBeNull();
-    expect(check("STARRY NIGHT", 2).problem).toContain("Starry night");
+    expect(sentence("STARRY NIGHT", 2)).toContain("Starry night");
   });
 });
 

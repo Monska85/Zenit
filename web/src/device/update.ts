@@ -2,7 +2,7 @@
 
 // What the firmware card says about `status.update` (docs/board/wifi-and-updates-v1.md#status), in plain words.
 
-import { own } from "../lib/own";
+import { i18n } from "../i18n";
 import type { FirmwareState } from "../release/manifest";
 import type { Settings, UpdateStatus, WebAppStatus, WifiStatus } from "../protocol/types";
 
@@ -10,25 +10,31 @@ import type { Settings, UpdateStatus, WebAppStatus, WifiStatus } from "../protoc
 export const webUpdatesOn = (settings: Settings | null): boolean =>
   settings !== null && settings.update_mode !== "off" && settings.update_web !== false;
 
-/** The sentence for each `last_result`. */
-const RESULTS: Record<string, string> = {
-  never: "Zenit has not looked for an update yet.",
-  up_to_date: "Your Zenit has the latest firmware.",
-  available: "A new version is available.",
-  skipped: "A newer version exists, but it did not work on this Zenit before, so Zenit does not install it by itself.",
-  installed: "The new version was installed. Zenit is restarting.",
-  no_network: "Zenit is not connected to WiFi, so it could not look for an update.",
-  no_time: "Zenit does not know the time yet, so it could not look for an update. Try again in a minute.",
-  unreachable: "Zenit could not reach the update site. Check that your internet connection works.",
-  not_published: "The project site has no firmware published yet, so there is nothing to install.",
-  tls_error: "Zenit did not trust the update site's security certificate, so it downloaded nothing.",
-  bad_manifest: "The update information on the site is not valid, so Zenit downloaded nothing.",
-  bad_download: "The download was damaged, so Zenit did not install it. Nothing was changed.",
-  flash_error: "Zenit could not write the new firmware. Nothing was changed.",
-};
+/** The `last_result` values with a sentence in the catalog (`firmware.results`). */
+const RESULTS = [
+  "never",
+  "up_to_date",
+  "available",
+  "skipped",
+  "installed",
+  "no_network",
+  "no_time",
+  "unreachable",
+  "not_published",
+  "tls_error",
+  "bad_manifest",
+  "bad_download",
+  "flash_error",
+] as const;
+
+/** Whether `word` is one of `words`: a list, so a word like `constructor` never reaches a prototype. */
+const among = <T extends string>(words: readonly T[], word: string): word is T =>
+  (words as readonly string[]).includes(word);
 
 export function describeResult(result: string): string {
-  return own(RESULTS, result) ?? `The last check ended with a result this app does not know (${result}).`;
+  return among(RESULTS, result)
+    ? i18n.t(`device:firmware.results.${result}`)
+    : i18n.t("device:firmware.unknownResult", { result });
 }
 
 /** What the board is doing now, or null when it is idle. */
@@ -37,17 +43,22 @@ export function describeUpdateState(update: UpdateStatus): string | null {
     case "idle":
       return null;
     case "checking":
-      return "Looking for an update...";
+      return i18n.t("device:firmware.progress.checking");
     case "downloading": {
-      const what = update.target === "web" ? "the new app" : "the update";
-      return update.progress === null ? `Downloading ${what}...` : `Downloading ${what}: ${update.progress} %`;
+      const web = update.target === "web";
+      if (update.progress === null)
+        return web ? i18n.t("device:firmware.progress.downloadingApp") : i18n.t("device:firmware.progress.downloading");
+      const values = { progress: update.progress };
+      return web
+        ? i18n.t("device:firmware.progress.downloadingAppPercent", values)
+        : i18n.t("device:firmware.progress.downloadingPercent", values);
     }
     case "verifying":
-      return "Checking the download...";
+      return i18n.t("device:firmware.progress.verifying");
     case "restarting":
-      return "Restarting to start the new version...";
+      return i18n.t("device:firmware.progress.restarting");
     default:
-      return `Zenit is busy with the update (${update.state}).`;
+      return i18n.t("device:firmware.progress.unknown", { state: update.state });
   }
 }
 
@@ -104,51 +115,45 @@ export function formatCheckTime(unixSeconds: number | null, locale?: string): st
   return new Date(unixSeconds * 1000).toLocaleString(locale, { dateStyle: "medium", timeStyle: "short" });
 }
 
-/** The sentence for each state of the web app in the board's own partition. */
-const WEB_STATES: Record<string, string> = {
-  ok: "Zenit has this app on board, ready for any phone or computer on your WiFi.",
-  installing: "Zenit is installing a new version of this app.",
-  missing: "Zenit has no copy of this app on board right now. It installs one by itself as soon as it can.",
-  incompatible: "The copy of this app on Zenit does not suit its firmware. Zenit installs a suitable one by itself.",
-};
+/** The states of the web app in the board's own partition with a sentence in the catalog (`webApp.states`). */
+const WEB_STATES = ["ok", "installing", "missing", "incompatible"] as const;
 
-/** The sentence for each `last_result` of the web app. */
-const WEB_RESULTS: Record<string, string> = {
-  never: "Zenit has not looked for a new version of the app yet.",
-  up_to_date: "Zenit has the latest version of the app.",
-  available: "A new version of the app is available.",
-  installed: "The new version of the app was installed. Pages open on Zenit load it by themselves.",
-  incompatible: "A newer version of the app exists, but it needs newer firmware, so Zenit keeps the one it has.",
-  no_network: "Zenit is not connected to WiFi, so it could not look for a new version of the app.",
-  no_time:
-    "Zenit does not know the time yet, so it could not look for a new version of the app. Try again in a minute.",
-  unreachable: "Zenit could not reach the update site. Check that your internet connection works.",
-  not_published: "The project site has no app published yet, so there is nothing to install.",
-  tls_error: "Zenit did not trust the update site's security certificate, so it downloaded nothing.",
-  bad_manifest: "The app's update information on the site is not valid, so Zenit downloaded nothing.",
-  bad_download: "The download of the app was damaged, so Zenit did not keep it.",
-  flash_error: "Zenit could not write the new version of the app.",
-};
+/** The `last_result` values of the web app with a sentence in the catalog (`webApp.results`). */
+const WEB_RESULTS = [
+  "never",
+  "up_to_date",
+  "available",
+  "installed",
+  "incompatible",
+  "no_network",
+  "no_time",
+  "unreachable",
+  "not_published",
+  "tls_error",
+  "bad_manifest",
+  "bad_download",
+  "flash_error",
+] as const;
 
 export function describeWebState(web: WebAppStatus): string {
-  return own(WEB_STATES, web.state) ?? `The app on Zenit is in a state this page does not know (${web.state}).`;
+  return among(WEB_STATES, web.state)
+    ? i18n.t(`device:webApp.states.${web.state}`)
+    : i18n.t("device:webApp.unknownState", { state: web.state });
 }
 
 export function describeWebResult(web: WebAppStatus): string {
   if (web.last_result === "available" && web.available !== null)
-    return `Version ${web.available} of the app is available.`;
-  return (
-    own(WEB_RESULTS, web.last_result) ??
-    `The last check ended with a result this app does not know (${web.last_result}).`
-  );
+    return i18n.t("device:webApp.availableVersion", { version: web.available });
+  return among(WEB_RESULTS, web.last_result)
+    ? i18n.t(`device:webApp.results.${web.last_result}`)
+    : i18n.t("device:webApp.unknownResult", { result: web.last_result });
 }
 
 /** When the board tries again to install a missing app, in plain words, or null when no try is waiting. */
 export function describeRetry(seconds: number | null): string | null {
   if (seconds === null) return null;
-  if (seconds < 60) return "Zenit tries again in less than a minute.";
-  const minutes = Math.round(seconds / 60);
-  return minutes === 1 ? "Zenit tries again in about a minute." : `Zenit tries again in about ${minutes} minutes.`;
+  if (seconds < 60) return i18n.t("device:webApp.retrySoon");
+  return i18n.t("device:webApp.retryIn", { count: Math.round(seconds / 60) });
 }
 
 /** Whether the card offers to install the web app version the last check found. */
@@ -192,27 +197,15 @@ export function firmwareStateSource(
   return published === null ? null : { from: "published", state: published };
 }
 
-const BOARD_SUMMARIES = {
-  available: "Update available",
-  up_to_date: "Up to date",
-  skipped: "Update set aside",
-} as const;
-const PUBLISHED_SUMMARIES: Record<FirmwareState, string | null> = {
-  up_to_date: "Up to date",
-  update_available: "Update available",
-  newer: "Newer than published",
-  unknown: null,
-};
-
 /** The short state of the firmware for "Your Zenit" (see `firmwareStateSource`); "Updating" while firmware installs. */
 export function firmwareSummary(
   update: UpdateStatus | null,
   settings: Settings | null,
   published: FirmwareState | null,
 ): string | null {
-  if (update !== null && firmwareBusy(update)) return "Updating";
+  if (update !== null && firmwareBusy(update)) return i18n.t("device:board.summary.updating");
   const source = firmwareStateSource(update, settings, published);
   if (source === null) return null;
-  if (source.from === "board") return BOARD_SUMMARIES[source.verdict];
-  return PUBLISHED_SUMMARIES[source.state];
+  if (source.from === "board") return i18n.t(`device:board.summary.${source.verdict}`);
+  return source.state === "unknown" ? null : i18n.t(`device:board.summary.${source.state}`);
 }

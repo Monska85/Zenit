@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useId, useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "./button";
 
 /**
  * A setting typed in a field and sent with its button, never while typing. `validate` returns the sentence to show, or
- * null when the text can be sent.
+ * null when the text can be sent. The sentence is made again at each render, so it follows the active language.
  */
 export function ValueForm({
   label,
@@ -14,7 +15,7 @@ export function ValueForm({
   validate,
   onSubmit,
   inputMode,
-  buttonLabel = "Set",
+  buttonLabel,
   disabled,
 }: {
   label: string;
@@ -27,7 +28,10 @@ export function ValueForm({
   disabled?: boolean;
 }) {
   const [text, setText] = useState(value);
-  const [problem, setProblem] = useState<string | null>(null);
+  const { t } = useTranslation();
+  // The text that was refused, not its sentence: the sentence is made when it is shown
+  const [refused, setRefused] = useState<string | null>(null);
+  const problem = refused === null ? null : validate(refused);
   const id = useId();
   const hintId = useId();
   const [seen, setSeen] = useState(value);
@@ -41,7 +45,7 @@ export function ValueForm({
     event.preventDefault();
     const trimmed = text.trim();
     const found = validate(trimmed);
-    setProblem(found);
+    setRefused(found === null ? null : trimmed);
     if (found === null) onSubmit(trimmed);
   }
 
@@ -66,7 +70,7 @@ export function ValueForm({
         />
       </div>
       <Button type="submit" variant="outline" disabled={disabled}>
-        {buttonLabel}
+        {buttonLabel ?? t("buttons.set")}
       </Button>
       {hint && (
         <p id={hintId} className="w-full text-sm text-muted-foreground">

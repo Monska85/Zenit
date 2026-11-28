@@ -14,6 +14,7 @@ import {
 import { ESPRESSIF_VENDOR_ID, openSerial, type SerialPortLike } from "../protocol/serial";
 import { openWebSocket } from "../protocol/websocket";
 import type { LineTransport } from "../protocol/transport";
+import { message, type Message } from "../i18n";
 import { OpenFailed, type BoardSession, type Opener, type Visibility } from "./session";
 
 export interface SerialApi {
@@ -48,12 +49,11 @@ interface BrandsApi {
 export const localNetworkAccess = (): boolean =>
   localNetworkAccessFor((navigator as Navigator & BrandsApi).userAgentData?.brands);
 
-export const MIXED_CONTENT_MESSAGE =
-  "This browser does not let this page reach a Zenit over WiFi. Open the Zenit's own address in the browser, or use an up-to-date Chrome or Edge.";
+export const MIXED_CONTENT_MESSAGE = message("errors:open.mixedContent");
 
-const UNREACHABLE = "Could not reach Zenit at that address. Check that it is on, and on the same network.";
+const UNREACHABLE = message("errors:open.unreachable");
 
-export const UNREACHABLE_FROM_SITE = `${UNREACHABLE} If Chrome asked to let this page find devices on your local network, allow it and connect again.`;
+export const UNREACHABLE_FROM_SITE = message("errors:open.unreachableFromSite");
 
 /**
  * The opener of a USB connection: it asks for a port, or uses the one it was given before when that still opens (a
@@ -65,7 +65,7 @@ export function usbOpener(api: () => SerialApi | undefined = serialApi): Opener 
   let last: SerialPortLike | null = null;
   return async (interactive) => {
     const serial = api();
-    if (!serial) throw new OpenFailed("This browser cannot use a USB cable. Use Chrome or Edge.");
+    if (!serial) throw new OpenFailed(message("errors:open.noSerial"));
     if (last) {
       try {
         return await openSerial(last);
@@ -86,7 +86,7 @@ export function usbOpener(api: () => SerialApi | undefined = serialApi): Opener 
           // not back yet either
         }
       }
-      throw new OpenFailed("The USB port is not there yet.");
+      throw new OpenFailed(message("errors:open.portNotThere"));
     }
     let port: SerialPortLike;
     try {
@@ -94,14 +94,14 @@ export function usbOpener(api: () => SerialApi | undefined = serialApi): Opener 
     } catch (error) {
       // No port chosen: the person closed the chooser
       if (error instanceof DOMException && error.name === "NotFoundError") return null;
-      throw new OpenFailed("The USB port could not be chosen.");
+      throw new OpenFailed(message("errors:open.portNotChosen"));
     }
     try {
       const transport = await openSerial(port);
       last = port;
       return transport;
     } catch {
-      throw new OpenFailed("The USB port could not be opened. Another program or browser tab may be using it.");
+      throw new OpenFailed(message("errors:open.portBusy"));
     }
   };
 }
@@ -138,7 +138,7 @@ const browserEnvironment = (): AddressEnvironment => ({
 });
 
 /** The opener of a connection to the address typed, or the sentence to show when it cannot start. */
-export function addressOpener(typed: string, environment: AddressEnvironment = browserEnvironment()): Opener | string {
+export function addressOpener(typed: string, environment: AddressEnvironment = browserEnvironment()): Opener | Message {
   const { protocol, hostname, localNetworkAccess: lna } = environment;
   const address = boardUrl(typed);
   if ("error" in address) return address.error;
@@ -172,9 +172,9 @@ export async function connectAddress(
   session: BoardSession,
   typed: string,
   environment?: AddressEnvironment,
-): Promise<{ problem: string | null; reached: boolean }> {
+): Promise<{ problem: Message | null; reached: boolean }> {
   const opener = addressOpener(typed, environment);
-  if (typeof opener === "string") return { problem: opener, reached: false };
+  if (typeof opener !== "function") return { problem: opener, reached: false };
   const label = typed.trim();
   await session.open(opener, label);
   const { phase, label: now } = session.getState();

@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import { useTranslation } from "react-i18next";
+
 /** What shows while the Device page loads: its heading and the outlines of its first cards. */
 export function DevicePlaceholder() {
+  const { t } = useTranslation("device");
   return (
     <div data-testid="device-placeholder" className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Device</h1>
+      <h1 className="text-2xl font-semibold">{t("view.title")}</h1>
       <p role="status" className="sr-only">
-        Loading the Device page...
+        {t("view.loading")}
       </p>
       {[40, 28, 32].map((height) => (
         <div

@@ -3,6 +3,8 @@
 // The light settings as the app shows and checks them (docs/board/light-v1.md, docs/protocol/protocol-v1.md#settings_get-settings_set).
 // The limits equal the protocol's; a change to one changes both.
 
+import { i18n, message, type Message } from "../i18n";
+import { en } from "../i18n/resources";
 import { own } from "../lib/own";
 import { boardSettingsProblem } from "../device/settings";
 import { favoriteNameKey, MAX_FAVORITE_NAME, MAX_FAVORITES, REFUSED_IN_NAME } from "../protocol/schema";
@@ -45,46 +47,32 @@ export interface EffectInfo {
 }
 
 /**
- * Labels and descriptions of the effects this app knows. `params` is what each effect reads on a board that does not
- * report `info.effect_settings` (firmware 1.0.0 and earlier), used only for such a board: there Color change and
- * Christmas still read `floor`. A later board reports its own lists (docs/board/light-v1.md#effects).
+ * The effects this app knows; their labels and descriptions are in the `light` catalog under `effects.<name>`.
+ * `params` is what each effect reads on a board that does not report `info.effect_settings` (firmware 1.0.0 and
+ * earlier), used only for such a board: there Color change and Christmas still read `floor`. A later board reports its
+ * own lists (docs/board/light-v1.md#effects).
  */
-export const EFFECTS: Record<string, EffectInfo> = {
-  static: { label: "Steady", description: "One color, always the same.", params: ["color"] },
-  color_change: {
-    label: "Color change",
-    description: "Slowly moves through the colors you pick.",
-    params: ["colors", "hold_seconds", "floor"],
-  },
-  breathing: {
-    label: "Breathing",
-    description: "Slowly brightens and dims.",
-    params: ["color", "period_seconds", "floor"],
-  },
-  twinkle: { label: "Twinkle", description: "A gentle shimmer, like a star.", params: ["color", "twinkle_strength"] },
-  fall_asleep: {
-    label: "Fall asleep",
-    description: "Dims slowly while the timer runs.",
-    params: ["color", "floor"],
-  },
-  christmas: {
-    label: "Christmas",
-    description: "Slowly moves through a palette of colors.",
-    params: ["color_set", "hold_seconds", "floor"],
-  },
-  shooting_star: {
-    label: "Shooting star",
-    description: "A calm sky with a bright flash now and then.",
-    params: ["color"],
-  },
-  guided_breathing: {
-    label: "Guided breathing",
-    description: "Breathe along: in as it brightens, out as it dims.",
-    params: ["color", "breath_pattern", "floor"],
-  },
-  jingle: { label: "Jingle", description: "Pulses to the beat of Jingle Bells.", params: ["color_set"] },
-  hop: { label: "Hop", description: "Hops from color to color.", params: ["color_set"] },
+export const EFFECTS: Record<string, { params: readonly ParamName[] }> = {
+  static: { params: ["color"] },
+  color_change: { params: ["colors", "hold_seconds", "floor"] },
+  breathing: { params: ["color", "period_seconds", "floor"] },
+  twinkle: { params: ["color", "twinkle_strength"] },
+  fall_asleep: { params: ["color", "floor"] },
+  christmas: { params: ["color_set", "hold_seconds", "floor"] },
+  shooting_star: { params: ["color"] },
+  guided_breathing: { params: ["color", "breath_pattern", "floor"] },
+  jingle: { params: ["color_set"] },
+  hop: { params: ["color_set"] },
 };
+
+/** The English catalog: which effects, colors, palettes and patterns have a text. Every language has the same keys. */
+const catalog = en.light;
+
+/**
+ * Whether `table` of the catalog has `id` as its own key, never one of the prototype ("constructor"). It also narrows
+ * the board's word to the catalog's keys, so the key built from it is a typed one.
+ */
+const has = <T extends object>(table: T, id: string): id is Extract<keyof T, string> => Object.hasOwn(table, id);
 
 const words = (identifier: string): string => {
   const text = identifier.replace(/_/g, " ").trim();
@@ -93,7 +81,13 @@ const words = (identifier: string): string => {
 
 /** An effect the app knows, or a plain description of one it does not: its name in words, no settings. */
 export function effectInfo(name: string): EffectInfo {
-  return own(EFFECTS, name) ?? { label: words(name), description: "", params: [] };
+  const known = own(EFFECTS, name);
+  if (known === undefined || !has(catalog.effects, name)) return { label: words(name), description: "", params: [] };
+  return {
+    label: i18n.t(`light:effects.${name}.label`),
+    description: i18n.t(`light:effects.${name}.description`),
+    params: known.params,
+  };
 }
 
 /** The controls of an effect: the settings the app shows, in order, and whether one it cannot show is missing. */
@@ -118,7 +112,6 @@ export function effectControls(name: string, info: BoardInfo): EffectControls {
   return { params, newer: params.length !== listed.length };
 }
 
-const COLOR_LABELS: Record<string, string> = { white: "Warm white", red: "Red", green: "Green", blue: "Blue" };
 /** What a color looks like as a swatch on screen. */
 export const COLOR_SWATCHES: Record<string, string> = {
   white: "#fff1cf",
@@ -127,13 +120,6 @@ export const COLOR_SWATCHES: Record<string, string> = {
   blue: "#2f6fe0",
 };
 
-const COLOR_SET_LABELS: Record<string, string> = {
-  christmas: "Christmas",
-  ice: "Ice",
-  aurora: "Aurora",
-  sunset: "Sunset",
-  all: "All colors",
-};
 /** The colors of each palette (docs/board/light-v1.md#palettes). */
 export const COLOR_SET_COLORS: Record<string, readonly string[]> = {
   christmas: ["red", "green", "white"],
@@ -143,16 +129,16 @@ export const COLOR_SET_COLORS: Record<string, readonly string[]> = {
   all: ["red", "green", "blue", "white"],
 };
 
-/** The patterns of Guided breathing (docs/board/light-v1.md#guided_breathing): a name and its timing in words. */
-const BREATH_PATTERNS: Record<string, { label: string; hint: string }> = {
-  "4-7-8": { label: "4-7-8", hint: "In 4 s, hold 7 s, out 8 s." },
-  box: { label: "Box", hint: "In, hold, out, hold: 4 s each." },
-};
-export const patternLabel = (name: string): string => own(BREATH_PATTERNS, name)?.label ?? words(name);
-export const patternHint = (name: string): string | undefined => own(BREATH_PATTERNS, name)?.hint;
+// The patterns of Guided breathing (docs/board/light-v1.md#guided_breathing) have a name and their timing in words
+export const patternLabel = (name: string): string =>
+  has(catalog.patterns, name) ? i18n.t(`light:patterns.${name}.label`) : words(name);
+export const patternHint = (name: string): string | undefined =>
+  has(catalog.patterns, name) ? i18n.t(`light:patterns.${name}.hint`) : undefined;
 
-export const colorLabel = (name: string): string => own(COLOR_LABELS, name) ?? words(name);
-export const colorSetLabel = (name: string): string => own(COLOR_SET_LABELS, name) ?? words(name);
+export const colorLabel = (name: string): string =>
+  has(catalog.colors, name) ? i18n.t(`light:colors.${name}`) : words(name);
+export const colorSetLabel = (name: string): string =>
+  has(catalog.palettes, name) ? i18n.t(`light:palettes.${name}`) : words(name);
 
 const inRange = (value: number, limit: { min: number; max: number }): boolean =>
   value >= limit.min && value <= limit.max;
@@ -188,33 +174,47 @@ export function settingsProblem(settings: Settings, info: BoardInfo): string | n
   return boardSettingsProblem(settings);
 }
 
+/** "12 %": a percentage setting. */
+export const formatPercent = (value: number): string => i18n.t("light:units.percent", { value });
+
+/** "45 s": a whole number of seconds. */
+export const formatWholeSeconds = (seconds: number): string => i18n.t("light:units.seconds", { seconds });
+
+/** "12 min", "2 h", "1 h 30 min": a whole number of minutes. */
+function formatMinutes(minutes: number): string {
+  if (minutes < 60) return i18n.t("light:units.minutes", { minutes });
+  const rest = minutes % 60;
+  const hours = Math.floor(minutes / 60);
+  return rest === 0
+    ? i18n.t("light:units.hours", { hours })
+    : i18n.t("light:units.hoursMinutes", { hours, minutes: rest });
+}
+
 /** "45 s", "12 min", "1 h 12 min": a duration in seconds, rounded down to what a person reads. */
 export function formatSeconds(total: number): string {
   const seconds = Math.max(0, Math.floor(total));
-  if (seconds < 60) return `${seconds} s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
-  const rest = minutes % 60;
-  return rest === 0 ? `${Math.floor(minutes / 60)} h` : `${Math.floor(minutes / 60)} h ${rest} min`;
+  if (seconds < 60) return formatWholeSeconds(seconds);
+  return formatMinutes(Math.floor(seconds / 60));
 }
 
 /** A setting of seconds, exactly: "30 s", "2 min", "1 min 30 s". */
 export function formatHold(seconds: number): string {
-  if (seconds < 60) return `${seconds} s`;
+  if (seconds < 60) return formatWholeSeconds(seconds);
   const rest = seconds % 60;
-  return rest === 0 ? `${seconds / 60} min` : `${Math.floor(seconds / 60)} min ${rest} s`;
+  const minutes = Math.floor(seconds / 60);
+  return rest === 0
+    ? i18n.t("light:units.minutes", { minutes })
+    : i18n.t("light:units.minutesSeconds", { minutes, seconds: rest });
 }
 
 /** "Off", "30 min", "2 h", "1 h 30 min": the timer setting. */
 export function formatTimer(minutes: number): string {
-  if (minutes === 0) return "Off";
-  if (minutes < 60) return `${minutes} min`;
-  const rest = minutes % 60;
-  return rest === 0 ? `${minutes / 60} h` : `${Math.floor(minutes / 60)} h ${rest} min`;
+  return minutes === 0 ? i18n.t("light:timer.off") : formatMinutes(minutes);
 }
 
 /** The time left of a running timer in words that never count seconds: "12 min", "1 h 5 min", "less than a minute". */
-export const timeLeft = (seconds: number): string => (seconds < 60 ? "less than a minute" : formatSeconds(seconds));
+export const timeLeft = (seconds: number): string =>
+  seconds < 60 ? i18n.t("light:timer.lessThanMinute") : formatSeconds(seconds);
 
 /** What the light does now in one line: "Warm white · Steady · fades out in 12 min", or "Off". */
 export function liveLine(light: {
@@ -229,17 +229,20 @@ export function liveLine(light: {
 } | null {
   if (!light.on) return null;
   return {
-    color: light.color === null ? "On" : colorLabel(light.color),
+    color: light.color === null ? i18n.t("light:hero.on") : colorLabel(light.color),
     effect: effectInfo(light.effect).label,
-    timer: light.timer !== null && light.timer.remaining > 0 ? `fades out in ${timeLeft(light.timer.remaining)}` : null,
+    timer:
+      light.timer !== null && light.timer.remaining > 0
+        ? i18n.t("light:hero.fadesOut", { time: timeLeft(light.timer.remaining) })
+        : null,
   };
 }
 
 /** The label of the timer's Custom choice: with the stored value when it is a custom one. */
 export function customTimerLabel(minutes: number): string {
   return minutes !== 0 && !(TIMER_PRESETS as readonly number[]).includes(minutes)
-    ? `Custom · ${formatTimer(minutes)}`
-    : "Custom";
+    ? i18n.t("light:timer.customWith", { time: formatTimer(minutes) })
+    : i18n.t("light:timer.custom");
 }
 
 /** The most favorites and the longest name this board accepts, from `info.limits` (the protocol's numbers otherwise). */
@@ -282,7 +285,7 @@ const cut = (text: string, characters: number): string => [...text].slice(0, cha
 export function defaultFavoriteName(effectLabel: string, existing: readonly string[], max = MAX_FAVORITE_NAME): string {
   const taken = new Set(existing.map(favoriteNameKey));
   const clean = effectLabel.trim().normalize("NFC");
-  const base = clean !== "" && !REFUSED_IN_NAME.test(clean) ? cut(clean, max) : "My light";
+  const base = clean !== "" && !REFUSED_IN_NAME.test(clean) ? cut(clean, max) : i18n.t("favorites:name.default");
   for (let number = 1; ; number++) {
     const suffix = number === 1 ? "" : ` ${number}`;
     const name = `${cut(base, max - suffix.length)}${suffix}`;
@@ -292,23 +295,26 @@ export function defaultFavoriteName(effectLabel: string, existing: readonly stri
 
 /**
  * Checks a name typed by a person. `name` is what to send (normalized, ends trimmed); `problem` is the sentence to show,
- * or null when the board will take it. `exceptId` is the favorite being renamed: it may keep its own name.
+ * kept as a message, or null when the board will take it. `exceptId` is the favorite being renamed: it may keep its own
+ * name.
  */
 export function favoriteNameProblem(
   typed: string,
   favorites: readonly Favorite[],
   exceptId: number | null = null,
   max = MAX_FAVORITE_NAME,
-): { name: string; problem: string | null } {
+): { name: string; problem: Message | null } {
   const name = typed.normalize("NFC").trim();
-  const problem = (sentence: string | null): { name: string; problem: string | null } => ({ name, problem: sentence });
-  if (name === "") return problem("Give your favorite a name.");
-  if (REFUSED_IN_NAME.test(name))
-    return problem("That name has a character Zenit cannot keep. Try letters, numbers and spaces.");
-  if (length(name) > max) return problem(`Keep the name to ${max} characters or fewer.`);
+  const problem = (sentence: Message | null): { name: string; problem: Message | null } => ({
+    name,
+    problem: sentence,
+  });
+  if (name === "") return problem(message("favorites:name.empty"));
+  if (REFUSED_IN_NAME.test(name)) return problem(message("favorites:name.badCharacter"));
+  if (length(name) > max) return problem(message("favorites:name.tooLong", { max }));
   const key = favoriteNameKey(name);
   const other = favorites.find((item) => item.id !== exceptId && favoriteNameKey(item.name) === key);
-  if (other) return problem(`You already have a favorite called ${other.name}. Choose another name.`);
+  if (other) return problem(message("favorites:name.taken", { name: other.name }));
   return problem(null);
 }
 

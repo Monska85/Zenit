@@ -3,6 +3,8 @@
 import { own } from "../../lib/own";
 import { Check } from "lucide-react";
 import { useId, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { message, translate, type Message } from "../../i18n";
 import {
   COLOR_SET_COLORS,
   COLOR_SWATCHES,
@@ -11,6 +13,8 @@ import {
   colorSetLabel,
   effectControls,
   formatHold,
+  formatPercent,
+  formatWholeSeconds,
   patternHint,
   patternLabel,
   type ParamName,
@@ -24,9 +28,6 @@ import { SettingSlider } from "./setting-slider";
 
 type Commit = (patch: Partial<Settings>) => Promise<void>;
 
-const percent = (value: number): string => `${value} %`;
-const seconds = (value: number): string => `${value} s`;
-
 function Swatch({ color }: { color: string }) {
   return (
     <span
@@ -38,9 +39,10 @@ function Swatch({ color }: { color: string }) {
 }
 
 function ColorChoice({ info, settings, commit }: { info: BoardInfo; settings: Settings; commit: Commit }) {
+  const { t } = useTranslation("light");
   return (
     <ChoiceGroup
-      legend="Color"
+      legend={t("settings.color")}
       groupName="color"
       value={settings.color}
       onChange={(color) => void commit({ color })}
@@ -60,16 +62,17 @@ function ColorChoice({ info, settings, commit }: { info: BoardInfo; settings: Se
 }
 
 /** Why a color box cannot change now, or null: the last colors cannot be unticked, nor a color added past the limit. */
-export function colorsLimit(colors: readonly string[], color: string): string | null {
-  if (colors.includes(color))
-    return colors.length <= LIMITS.colors.min ? `Keep at least ${LIMITS.colors.min} colors.` : null;
-  return colors.length >= LIMITS.colors.max ? `Pick at most ${LIMITS.colors.max} colors.` : null;
+export function colorsLimit(colors: readonly string[], color: string): Message | null {
+  const { min, max } = LIMITS.colors;
+  if (colors.includes(color)) return colors.length <= min ? message("light:settings.colorsAtLeast", { min }) : null;
+  return colors.length >= max ? message("light:settings.colorsAtMost", { max }) : null;
 }
 
 /** Two to four colors for Color change, in the order they are picked. */
 function ColorsChoice({ info, settings, commit }: { info: BoardInfo; settings: Settings; commit: Commit }) {
+  const { t } = useTranslation("light");
   const { colors } = settings;
-  const [refused, setRefused] = useState<string | null>(null);
+  const [refused, setRefused] = useState<Message | null>(null);
   const hintId = useId();
   const toggle = (color: string): void => {
     const limit = colorsLimit(colors, color);
@@ -79,9 +82,9 @@ function ColorsChoice({ info, settings, commit }: { info: BoardInfo; settings: S
   };
   return (
     <fieldset className="min-w-0" aria-describedby={hintId}>
-      <legend className="mb-1 text-base font-medium">Colors</legend>
+      <legend className="mb-1 text-base font-medium">{t("settings.colors")}</legend>
       <p id={hintId} className="mb-2 text-sm text-muted-foreground">
-        Pick {LIMITS.colors.min} to {LIMITS.colors.max}. They show in the order you pick them.
+        {t("settings.colorsHint", { min: LIMITS.colors.min, max: LIMITS.colors.max })}
       </p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {info.colors.map((color) => {
@@ -94,7 +97,11 @@ function ColorsChoice({ info, settings, commit }: { info: BoardInfo; settings: S
                 checked={chosen}
                 onChange={() => toggle(color)}
                 aria-disabled={colorsLimit(colors, color) !== null || undefined}
-                aria-label={chosen ? `${colorLabel(color)}, number ${position + 1}` : colorLabel(color)}
+                aria-label={
+                  chosen
+                    ? t("settings.colorNumbered", { color: colorLabel(color), number: position + 1 })
+                    : colorLabel(color)
+                }
                 className="peer sr-only"
               />
               <span
@@ -118,22 +125,23 @@ function ColorsChoice({ info, settings, commit }: { info: BoardInfo; settings: S
           );
         })}
       </div>
-      <div role="status">{refused && <p className="mt-2 text-sm">{refused}</p>}</div>
+      <div role="status">{refused && <p className="mt-2 text-sm">{translate(refused)}</p>}</div>
     </fieldset>
   );
 }
 
 function PaletteChoice({ info, settings, commit }: { info: BoardInfo; settings: Settings; commit: Commit }) {
+  const { t } = useTranslation("light");
   return (
     <ChoiceGroup
-      legend="Palette"
+      legend={t("settings.palette")}
       groupName="palette"
       value={settings.color_set}
       onChange={(color_set) => void commit({ color_set })}
       options={info.color_sets.map((set) => ({
         value: set,
         label: colorSetLabel(set),
-        hint: own(COLOR_SET_COLORS, set)?.map(colorLabel).join(", "),
+        hint: own(COLOR_SET_COLORS, set)?.map(colorLabel).join(t("settings.paletteSeparator")),
       }))}
     />
   );
@@ -141,9 +149,10 @@ function PaletteChoice({ info, settings, commit }: { info: BoardInfo; settings: 
 
 /** The pattern of Guided breathing, from the patterns the board lists. */
 function PatternChoice({ patterns, settings, commit }: { patterns: string[]; settings: Settings; commit: Commit }) {
+  const { t } = useTranslation("light");
   return (
     <ChoiceGroup
-      legend="Breathing pattern"
+      legend={t("settings.pattern")}
       groupName="breath-pattern"
       value={settings.breath_pattern ?? null}
       onChange={(breath_pattern) => void commit({ breath_pattern })}
@@ -155,9 +164,6 @@ function PatternChoice({ patterns, settings, commit }: { patterns: string[]; set
     />
   );
 }
-
-/** What the app says in place of the controls of a setting it does not know. */
-export const NEWER_EFFECT = "This Zenit has a newer effect. Update the app to adjust its settings.";
 
 /** The settings the selected effect reads, and no others: the ones the board names, or the app's own list. */
 export function EffectSettings({
@@ -171,6 +177,7 @@ export function EffectSettings({
   commit: Commit;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation("light");
   const effect = effectControls(settings.effect, info);
   const control = (param: ParamName) => {
     switch (param) {
@@ -183,7 +190,7 @@ export function EffectSettings({
       case "hold_seconds":
         return (
           <SettingSlider
-            label="Time on each color"
+            label={t("settings.hold")}
             value={settings.hold_seconds}
             {...LIMITS.hold_seconds}
             format={formatHold}
@@ -194,10 +201,10 @@ export function EffectSettings({
       case "period_seconds":
         return (
           <SettingSlider
-            label="Length of a breath"
+            label={t("settings.period")}
             value={settings.period_seconds}
             {...LIMITS.period_seconds}
-            format={seconds}
+            format={formatWholeSeconds}
             disabled={disabled}
             onCommit={(period_seconds) => commit({ period_seconds })}
           />
@@ -207,10 +214,10 @@ export function EffectSettings({
       case "floor":
         return (
           <SettingSlider
-            label="Dimmest level"
+            label={t("settings.floor")}
             value={settings.floor}
             {...LIMITS.floor}
-            format={percent}
+            format={formatPercent}
             disabled={disabled}
             onCommit={(floor) => commit({ floor })}
           />
@@ -218,10 +225,10 @@ export function EffectSettings({
       case "twinkle_strength":
         return (
           <SettingSlider
-            label="Twinkle strength"
+            label={t("settings.twinkle")}
             value={settings.twinkle_strength}
             {...LIMITS.twinkle_strength}
-            format={percent}
+            format={formatPercent}
             disabled={disabled}
             onCommit={(twinkle_strength) => commit({ twinkle_strength })}
           />
@@ -231,14 +238,14 @@ export function EffectSettings({
   return (
     <div className="mt-4 flex flex-col gap-4 border-t border-border pt-4" data-testid="effect-settings">
       {settings.effect === "fall_asleep" && settings.timer_minutes === 0 && (
-        <Banner tone="info">This effect dims while the sleep timer runs. Set a sleep timer below.</Banner>
+        <Banner tone="info">{t("settings.fallAsleep")}</Banner>
       )}
       {effect.params.map((param) => (
         <div key={param}>{control(param)}</div>
       ))}
       {effect.newer && (
         <p className="text-base text-muted-foreground" data-testid="newer-effect">
-          {NEWER_EFFECT}
+          {t("settings.newerEffect")}
         </p>
       )}
     </div>

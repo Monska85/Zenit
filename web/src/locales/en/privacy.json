@@ -1,0 +1,22 @@
+{
+  "title": "Privacy",
+  "data": {
+    "title": "Your information stays with you",
+    "nothingSent": "This app sends nothing to any server on the internet. It has no analytics, no tracking and no ads.",
+    "ownFiles": "The app asks for nothing but its own files and your Zenit. It uses no fonts, scripts or images from other sites.",
+    "localOnly": "It connects only to a Zenit on your own network, or to this computer: an address on the internet is refused.",
+    "settings": "Your settings and your Zenit's details travel only between this page and your Zenit.",
+    "stored": "The browser keeps two things on this device: your theme choice, and the last address you connected to.",
+    "secrets": "Your WiFi password goes from this page to your Zenit over the USB cable, and nowhere else. The page does not keep it. The access token, if you use one, stays in the page's memory until you close it.",
+    "firmware": "Installing firmware downloads the firmware file from this same site and writes it to your Zenit over the USB cable."
+  },
+  "about": {
+    "title": "About this app",
+    "version": "Version {{version}}",
+    "source": "Source code",
+    "license": "License",
+    "and": "and",
+    "permission": "additional permission",
+    "notices": "Third-party notices"
+  }
+}

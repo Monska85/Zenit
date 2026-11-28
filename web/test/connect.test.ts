@@ -12,6 +12,7 @@ import {
 } from "../src/board/connect";
 import { BoardSession, OpenFailed } from "../src/board/session";
 import { PRIVATE_ONLY_MESSAGE, type LocalPermission } from "../src/protocol/address";
+import { translate } from "../src/i18n";
 import { ESPRESSIF_VENDOR_ID, type SerialPortLike } from "../src/protocol/serial";
 import type { LineTransport } from "../src/protocol/transport";
 import { FakeBoard } from "./helpers";
@@ -39,7 +40,7 @@ function site(permission: LocalPermission, overrides: Partial<AddressEnvironment
 
 async function openWith(typed: string, environment: AddressEnvironment): Promise<void> {
   const opener = addressOpener(typed, environment);
-  if (typeof opener === "string") throw new Error(opener);
+  if (typeof opener !== "function") throw new Error(translate(opener));
   await opener(true);
 }
 
@@ -96,7 +97,7 @@ describe("addressOpener", () => {
   it("says to allow the permission when a connection from the site fails", async () => {
     const { environment } = site("prompt", { open: () => Promise.reject(new Error("closed")) });
     const opener = addressOpener("192.168.1.20", environment);
-    if (typeof opener === "string") throw new Error(opener);
+    if (typeof opener !== "function") throw new Error(translate(opener));
     await expect(opener(true)).rejects.toEqual(new OpenFailed(UNREACHABLE_FROM_SITE));
   });
 });

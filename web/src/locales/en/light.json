@@ -1,0 +1,125 @@
+{
+  "view": {
+    "legend": "Light",
+    "effectTitle": "Effect"
+  },
+  "hero": {
+    "title": "Light now",
+    "off": "Off",
+    "on": "On",
+    "separator": " · ",
+    "fadesOut": "fades out in {{time}}",
+    "reduced": "Light reduced to {{value}} % to stay cool.",
+    "brightness": "Brightness",
+    "usb": "Connected by USB. The light gets no power from USB: plug in the panel power socket and use WiFi to see it."
+  },
+  "power": {
+    "label": "Light"
+  },
+  "picker": {
+    "legend": "Effect"
+  },
+  "effects": {
+    "static": {
+      "label": "Steady",
+      "description": "One color, always the same."
+    },
+    "color_change": {
+      "label": "Color change",
+      "description": "Slowly moves through the colors you pick."
+    },
+    "breathing": {
+      "label": "Breathing",
+      "description": "Slowly brightens and dims."
+    },
+    "twinkle": {
+      "label": "Twinkle",
+      "description": "A gentle shimmer, like a star."
+    },
+    "fall_asleep": {
+      "label": "Fall asleep",
+      "description": "Dims slowly while the timer runs."
+    },
+    "christmas": {
+      "label": "Christmas",
+      "description": "Slowly moves through a palette of colors."
+    },
+    "shooting_star": {
+      "label": "Shooting star",
+      "description": "A calm sky with a bright flash now and then."
+    },
+    "guided_breathing": {
+      "label": "Guided breathing",
+      "description": "Breathe along: in as it brightens, out as it dims."
+    },
+    "jingle": {
+      "label": "Jingle",
+      "description": "Pulses to the beat of Jingle Bells."
+    },
+    "hop": {
+      "label": "Hop",
+      "description": "Hops from color to color."
+    }
+  },
+  "colors": {
+    "white": "Warm white",
+    "red": "Red",
+    "green": "Green",
+    "blue": "Blue"
+  },
+  "palettes": {
+    "christmas": "Christmas",
+    "ice": "Ice",
+    "aurora": "Aurora",
+    "sunset": "Sunset",
+    "all": "All colors"
+  },
+  "patterns": {
+    "4-7-8": {
+      "label": "4-7-8",
+      "hint": "In 4 s, hold 7 s, out 8 s."
+    },
+    "box": {
+      "label": "Box",
+      "hint": "In, hold, out, hold: 4 s each."
+    }
+  },
+  "settings": {
+    "color": "Color",
+    "colors": "Colors",
+    "colorsHint": "Pick {{min}} to {{max}}. They show in the order you pick them.",
+    "colorNumbered": "{{color}}, number {{number}}",
+    "colorsAtLeast": "Keep at least {{min}} colors.",
+    "colorsAtMost": "Pick at most {{max}} colors.",
+    "palette": "Palette",
+    "paletteSeparator": ", ",
+    "pattern": "Breathing pattern",
+    "hold": "Time on each color",
+    "period": "Length of a breath",
+    "floor": "Dimmest level",
+    "twinkle": "Twinkle strength",
+    "fallAsleep": "This effect dims while the sleep timer runs. Set a sleep timer below.",
+    "newerEffect": "This Zenit has a newer effect. Update the app to adjust its settings."
+  },
+  "timer": {
+    "title": "Sleep timer",
+    "off": "Off",
+    "custom": "Custom",
+    "customWith": "Custom · {{time}}",
+    "minutesLabel": "Minutes (1 to {{max}})",
+    "set": "Set",
+    "wholeMinutes": "Choose a whole number of minutes from 1 to {{max}}.",
+    "fadesOut": "Fades out in {{time}}.",
+    "fadesOutSoon": "Fades out in less than a minute.",
+    "ended": "The timer ended. The light stays off until you turn it on.",
+    "lessThanMinute": "less than a minute"
+  },
+  "units": {
+    "percent": "{{value}} %",
+    "seconds": "{{seconds}} s",
+    "minutes": "{{minutes}} min",
+    "hours": "{{hours}} h",
+    "minutesSeconds": "{{minutes}} min {{seconds}} s",
+    "hoursMinutes": "{{hours}} h {{minutes}} min"
+  }
+}

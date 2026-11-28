@@ -2,6 +2,7 @@
 
 import { ChevronDown, History, Usb, Wifi } from "lucide-react";
 import { useEffect, useId, useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import {
   connectAddress,
   connectUsb,
@@ -10,6 +11,7 @@ import {
   serialSupported,
 } from "../../board/connect";
 import { servedOpener } from "../../board/served";
+import { translate, type Message } from "../../i18n";
 import { addressUnavailableHere, localHost } from "../../protocol/address";
 import { loadAddress, saveAddress } from "../../lib/storage";
 import { useBoard, useSession } from "../board-context";
@@ -20,48 +22,48 @@ import type { Route } from "../route";
 
 /** The USB choice: a button that opens the browser's port chooser, behind a warning about the panel power. */
 function UsbChoice({ disabled, onConnect }: { disabled: boolean; onConnect: () => void }) {
+  const { t } = useTranslation("connect");
   return (
     <>
       <Banner tone="warning" className="mb-3">
-        Unplug the panel power socket before you connect the USB cable. Never use both at the same time.
+        {t("usb.warning")}
       </Banner>
       <Button disabled={disabled} onClick={onConnect}>
-        Connect with USB
+        {t("usb.connect")}
       </Button>
     </>
   );
 }
 
-type Connect = (address: string, report: (problem: string | null) => void) => void;
+type Connect = (address: string, report: (problem: Message | null) => void) => void;
 
 /** Served by a Zenit: it is the board to talk to, so there is nothing to choose. */
 function ServedConnect({ hostname, connecting }: { hostname: string; connecting: boolean }) {
+  const { t } = useTranslation("connect");
   const session = useSession();
   return (
     <>
-      <h1 className="text-2xl font-semibold">Your Zenit</h1>
+      <h1 className="text-2xl font-semibold">{t("served.title")}</h1>
       <Card>
         <CardTitle>{hostname}</CardTitle>
-        <p className="mb-3 text-base">This page comes from your Zenit, so it connects to it by itself.</p>
+        <p className="mb-3 text-base">{t("served.text")}</p>
         {connecting ? (
           <p role="status" className="text-base text-muted-foreground">
-            Waiting for Zenit...
+            {t("waiting")}
           </p>
         ) : (
-          <Button onClick={() => void session.open(servedOpener(location.host), location.host)}>Connect</Button>
+          <Button onClick={() => void session.open(servedOpener(location.host), location.host)}>{t("connect")}</Button>
         )}
       </Card>
-      <p className="text-base text-muted-foreground">
-        To install firmware on a new Zenit, use the USB cable from the project's own page. A page from a Zenit cannot do
-        it.
-      </p>
+      <p className="text-base text-muted-foreground">{t("served.noInstall")}</p>
     </>
   );
 }
 
 /** The last board that worked, for one tap. A problem with the stored address itself shows here. */
 function LastBoardCard({ address, disabled, connect }: { address: string; disabled: boolean; connect: Connect }) {
-  const [problem, setProblem] = useState<string | null>(null);
+  const { t } = useTranslation("connect");
+  const [problem, setProblem] = useState<Message | null>(null);
   return (
     <Card aria-labelledby="last-title" data-testid="last-board">
       <div className="flex flex-wrap items-center gap-3">
@@ -70,15 +72,19 @@ function LastBoardCard({ address, disabled, connect }: { address: string; disabl
           <h2 id="last-title" className="text-lg font-semibold break-all">
             {address}
           </h2>
-          <p className="text-base text-muted-foreground">The Zenit you used last.</p>
+          <p className="text-base text-muted-foreground">{t("last.text")}</p>
         </div>
-        <Button disabled={disabled} aria-label={`Connect to ${address}`} onClick={() => connect(address, setProblem)}>
-          Connect
+        <Button
+          disabled={disabled}
+          aria-label={t("last.connectTo", { address })}
+          onClick={() => connect(address, setProblem)}
+        >
+          {t("connect")}
         </Button>
       </div>
       {problem && (
         <Banner tone="error" className="mt-3">
-          {problem}
+          {translate(problem)}
         </Banner>
       )}
     </Card>
@@ -99,8 +105,9 @@ function AddressCard({
   asksFirst: boolean;
   connect: Connect;
 }) {
+  const { t } = useTranslation("connect");
   const [address, setAddress] = useState("");
-  const [problem, setProblem] = useState<string | null>(null);
+  const [problem, setProblem] = useState<Message | null>(null);
   const addressId = useId();
   const hintId = useId();
   function submit(event: FormEvent): void {
@@ -111,17 +118,17 @@ function AddressCard({
     <Card>
       <CardTitle className="flex items-center gap-2">
         <Wifi aria-hidden className="size-5" />
-        {another ? "With another address" : "With an address"}
+        {t(another ? "address.titleAnother" : "address.title")}
       </CardTitle>
       {noAddress && (
         <Banner tone="info" className="mb-3">
-          {MIXED_CONTENT_MESSAGE}
+          {translate(MIXED_CONTENT_MESSAGE)}
         </Banner>
       )}
       <form onSubmit={submit} className="flex flex-col gap-3">
         <div>
           <label htmlFor={addressId} className="mb-1 block text-base font-medium">
-            Address of your Zenit
+            {t("address.label")}
           </label>
           <input
             id={addressId}
@@ -134,31 +141,35 @@ function AddressCard({
             disabled={noAddress}
             onChange={(event) => setAddress(event.target.value)}
             aria-describedby={hintId}
-            placeholder="zenit-1a2b.local"
+            placeholder={t("address.placeholder")}
             className="block min-h-11 w-full rounded-xl border border-border bg-background px-3 text-base"
           />
           <p id={hintId} className="mt-1 text-sm text-muted-foreground">
-            For example zenit-1a2b.local or 192.168.1.20.
-            {asksFirst && " The first time, Chrome asks to let this page find devices on your local network: allow it."}
+            {t("address.hint")}
+            {asksFirst && ` ${t("address.asksFirst")}`}
           </p>
         </div>
-        {problem && <Banner tone="error">{problem}</Banner>}
+        {problem && <Banner tone="error">{translate(problem)}</Banner>}
         <Button type="submit" disabled={connecting || noAddress}>
-          Connect
+          {t("connect")}
         </Button>
       </form>
     </Card>
   );
 }
 
-const usbTitle = (
-  <>
-    <Usb aria-hidden className="size-5" />
-    With a USB cable
-  </>
-);
+function UsbTitle() {
+  const { t } = useTranslation("connect");
+  return (
+    <>
+      <Usb aria-hidden className="size-5" />
+      {t("usb.title")}
+    </>
+  );
+}
 
 export function ConnectView({ go }: { go: (route: Route) => void }) {
+  const { t } = useTranslation("connect");
   const { board, session } = useBoard();
   const [last] = useState(loadAddress);
   // From click to answer, no second connection may start: the board has one slot
@@ -189,7 +200,7 @@ export function ConnectView({ go }: { go: (route: Route) => void }) {
   if (board.probing) {
     return (
       <p role="status" className="text-base text-muted-foreground">
-        Looking for your Zenit...
+        {t("looking")}
       </p>
     );
   }
@@ -208,17 +219,19 @@ export function ConnectView({ go }: { go: (route: Route) => void }) {
 
   return (
     <>
-      <h1 className="text-2xl font-semibold">Connect to your Zenit</h1>
+      <h1 className="text-2xl font-semibold">{t("title")}</h1>
       {connecting && (
         <p role="status" className="text-base text-muted-foreground">
-          Waiting for Zenit...
+          {t("waiting")}
         </p>
       )}
       {hasLast && <LastBoardCard address={last} disabled={connecting} connect={connect} />}
       {usbSupported ? (
         <>
           <Card>
-            <CardTitle className="flex items-center gap-2">{usbTitle}</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <UsbTitle />
+            </CardTitle>
             <UsbChoice disabled={connecting} onConnect={() => void connectUsb(session)} />
           </Card>
           {addressCard}
@@ -229,24 +242,22 @@ export function ConnectView({ go }: { go: (route: Route) => void }) {
           {/* This browser has no Web Serial (most phones): the USB choice is folded, with the reason in sight */}
           <details className="group rounded-2xl border border-border bg-card" data-testid="usb-folded">
             <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 p-4 text-lg font-semibold sm:px-5 [&::-webkit-details-marker]:hidden">
-              {usbTitle}
+              <UsbTitle />
               <ChevronDown aria-hidden className="ml-auto size-5 transition-transform group-open:rotate-180" />
             </summary>
             <div className="px-4 pb-4 sm:px-5 sm:pb-5">
-              <p className="mb-3 text-base text-muted-foreground">
-                This browser cannot use a USB cable. Open the app in Chrome or Edge.
-              </p>
+              <p className="mb-3 text-base text-muted-foreground">{t("usb.unsupported")}</p>
               <UsbChoice disabled onConnect={() => undefined} />
             </div>
           </details>
         </>
       )}
       <p className="text-base text-muted-foreground">
-        New Zenit with no firmware yet?{" "}
+        {t("install.question")}{" "}
         <a className="font-medium text-primary underline" href="#/device">
-          Install the firmware
+          {t("install.link")}
         </a>
-        .
+        {t("install.end")}
       </p>
     </>
   );

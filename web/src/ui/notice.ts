@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // The confirmation shown in the bottom message after something the person did worked ("Saved Bedtime."): one at a time,
-// gone after a few seconds. Errors are not here: they are the session's own `error`.
+// gone after a few seconds, kept as a message and translated where it is shown. Errors are not here: they are the
+// session's own `error`.
 //
 // This store is part of the page, not of the session: the session knows nothing of it. Whoever shows a confirmation
 // calls `showNotice` (the Favorites card, for a request that closes its dialog); the timer clears it after NOTICE_MS,
@@ -9,15 +10,16 @@
 // connection it was about.
 
 import { useSyncExternalStore } from "react";
+import type { Message } from "../i18n";
 
 /** How long a confirmation stays, in ms. */
 export const NOTICE_MS = 4000;
 
-let current: string | null = null;
+let current: Message | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
 
-function set(text: string | null): void {
+function set(text: Message | null): void {
   current = text;
   for (const listener of listeners) listener();
 }
@@ -29,14 +31,14 @@ export function clearNotice(): void {
 }
 
 /** Shows `text`, in place of an earlier confirmation, for NOTICE_MS. */
-export function showNotice(text: string): void {
+export function showNotice(text: Message): void {
   if (timer !== null) clearTimeout(timer);
   timer = setTimeout(clearNotice, NOTICE_MS);
   set(text);
 }
 
 /** The confirmation now, outside React (the hook below is for components). */
-export const currentNotice = (): string | null => current;
+export const currentNotice = (): Message | null => current;
 
 const subscribe = (listener: () => void): (() => void) => {
   listeners.add(listener);
@@ -44,7 +46,7 @@ const subscribe = (listener: () => void): (() => void) => {
 };
 
 /** The confirmation to show now, or null. */
-export const useNotice = (): string | null =>
+export const useNotice = (): Message | null =>
   useSyncExternalStore(
     subscribe,
     () => current,

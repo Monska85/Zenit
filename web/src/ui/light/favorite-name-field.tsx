@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useId } from "react";
+import { useTranslation } from "react-i18next";
 
 /** A text cut to its first `max` characters (code points, as the board counts them: an emoji is one). */
 export const clipName = (text: string, max: number): string => {
@@ -29,13 +30,14 @@ export function FavoriteNameField({
   hint?: string;
   onChange: (value: string) => void;
 }) {
+  const { t } = useTranslation("favorites");
   const id = useId();
   const hintId = useId();
   const problemId = useId();
   return (
     <div>
       <label htmlFor={id} className="mb-1 block text-base font-medium">
-        Name
+        {t("name.label")}
       </label>
       <input
         id={id}

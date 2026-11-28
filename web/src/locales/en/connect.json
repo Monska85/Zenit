@@ -1,0 +1,44 @@
+{
+  "title": "Connect to your Zenit",
+  "looking": "Looking for your Zenit...",
+  "waiting": "Waiting for Zenit...",
+  "connect": "Connect",
+  "served": {
+    "title": "Your Zenit",
+    "text": "This page comes from your Zenit, so it connects to it by itself.",
+    "noInstall": "To install firmware on a new Zenit, use the USB cable from the project's own page. A page from a Zenit cannot do it."
+  },
+  "last": {
+    "text": "The Zenit you used last.",
+    "connectTo": "Connect to {{address}}"
+  },
+  "address": {
+    "title": "With an address",
+    "titleAnother": "With another address",
+    "label": "Address of your Zenit",
+    "placeholder": "zenit-1a2b.local",
+    "hint": "For example zenit-1a2b.local or 192.168.1.20.",
+    "asksFirst": "The first time, Chrome asks to let this page find devices on your local network: allow it."
+  },
+  "usb": {
+    "title": "With a USB cable",
+    "warning": "Unplug the panel power socket before you connect the USB cable. Never use both at the same time.",
+    "connect": "Connect with USB",
+    "unsupported": "This browser cannot use a USB cable. Open the app in Chrome or Edge."
+  },
+  "install": {
+    "question": "New Zenit with no firmware yet?",
+    "link": "Install the firmware",
+    "end": "."
+  },
+  "login": {
+    "title": "Log in to your Zenit",
+    "cardTitle": "Access to this Zenit",
+    "text": "This Zenit asks for a token before it lets you control it over WiFi. The token has 16 letters and digits. You find it in the Device page when Zenit is connected with the USB cable, or with the command line tool over USB.",
+    "token": "Token",
+    "tokenHint": "Zenit never sends the token over WiFi. This page keeps it only until you close it.",
+    "idle": "Zenit closed the idle connection after 10 seconds. Type the token and press Log in: this page connects again by itself.",
+    "submit": "Log in",
+    "another": "Use another Zenit"
+  }
+}

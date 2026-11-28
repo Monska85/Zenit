@@ -6,11 +6,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BoardSession, POLL_MS } from "../src/board/session";
 import { CLOSE_MESSAGES, INVALID_REPLY } from "../src/board/messages";
+import { translate, type Message } from "../src/i18n";
 import { ConnectionClosed } from "../src/protocol/transport";
 import { FakeBoard, TOKEN, UPDATE_STATUS, type ScriptedTransport } from "./helpers";
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
+
+/** The sentence of a message kept in the state, in English. */
+const said = (text: Message | null | undefined): string | null => (text ? translate(text) : null);
 
 const commands = (board: FakeBoard): string[] => board.requests.map((request) => String(request["cmd"]));
 const settle = async (): Promise<void> => {
@@ -82,10 +86,10 @@ describe("the login", () => {
     const { session } = await opened(board);
     const before = board.requests.length;
     await session.submitToken("short");
-    expect(session.getState().loginProblem).toContain("16 characters");
+    expect(said(session.getState().loginProblem)).toContain("16 characters");
     expect(board.requests.length).toBe(before);
     await session.submitToken("zzzzzzzzzzzzzzzz");
-    expect(session.getState().loginProblem).toContain("not right");
+    expect(said(session.getState().loginProblem)).toContain("not right");
     expect(session.getState().phase).toBe("login");
   });
 
@@ -134,7 +138,7 @@ describe("the login", () => {
     await settle();
     await session.submitToken("zzzzzzzzzzzzzzzz");
     expect(session.getState().phase).toBe("login");
-    expect(session.getState().loginProblem).toContain("not right");
+    expect(said(session.getState().loginProblem)).toContain("not right");
     await session.submitToken(TOKEN);
     expect(session.getState().phase).toBe("connected");
   });
@@ -172,7 +176,7 @@ describe("the login", () => {
     expect(session.getState().phase).toBe("login");
     await session.submitToken(TOKEN);
     // The login screen closed the dialog: the retried request's refusal is the page's error
-    expect(session.getState().error).toBe("You already have a favorite with that name.");
+    expect(said(session.getState().error)).toBe("You already have a favorite with that name.");
   });
 
   it("asks for the login, and runs a favorites request of a dialog after it, when the board refuses it", async () => {
@@ -242,7 +246,7 @@ describe("the commands of the milestone", () => {
   it("says USB is needed when the board answers usb_only", async () => {
     const { session } = await opened(networked(), "websocket");
     await session.forgetWifi();
-    expect(session.getState().error).toBe("This works only with a USB cable.");
+    expect(said(session.getState().error)).toBe("This works only with a USB cable.");
     expect(session.getState().phase).toBe("connected");
   });
 
@@ -278,7 +282,7 @@ describe("the commands of the milestone", () => {
     });
     const { session } = await opened(board);
     await session.installUpdate(false);
-    expect(session.getState().error).toContain("no update to install");
+    expect(said(session.getState().error)).toContain("no update to install");
     await session.installUpdate(true);
     expect(board.requests.at(-1)).toMatchObject({ cmd: "update_install", target: "firmware", force: true });
   });
@@ -292,7 +296,7 @@ describe("the commands of the milestone", () => {
     const board = networked((fake) => fake.errors.set("update_check", code));
     const { session } = await opened(board);
     await session.checkUpdate();
-    expect(session.getState().error).toContain(words);
+    expect(said(session.getState().error)).toContain(words);
   });
 });
 
@@ -326,7 +330,7 @@ describe("a board that restarts", () => {
     await vi.advanceTimersByTimeAsync(200);
     expect(tries).toBe(5);
     expect(session.getState()).toMatchObject({ phase: "lost", auto: null });
-    expect(session.getState().error).toContain("did not come back");
+    expect(said(session.getState().error)).toContain("did not come back");
   });
 
   it("stops trying when the person disconnects", async () => {

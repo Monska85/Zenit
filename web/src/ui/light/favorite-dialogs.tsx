@@ -2,7 +2,9 @@
 
 import { ChevronRight } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import type { FavoriteOutcome } from "../../board/session";
+import { translate, type Message } from "../../i18n";
 import { favoriteLimits, favoriteNameProblem } from "../../light/model";
 import type { BoardInfo, Favorite } from "../../protocol/types";
 import { Button } from "../components/button";
@@ -14,7 +16,7 @@ import { FavoriteNameField } from "./favorite-name-field";
 /** A line inside a dialog: what a request made in it came to. Shown here because the bottom message is behind the dialog. */
 export interface Note {
   tone: "error" | "done";
-  text: string;
+  text: Message;
 }
 
 /**
@@ -25,11 +27,11 @@ export function DialogNote({ note }: { note: Note | null }) {
   return (
     <>
       <p role="status" className="text-base">
-        {note?.tone === "done" ? note.text : null}
+        {note?.tone === "done" ? translate(note.text) : null}
       </p>
       {note?.tone === "error" && (
         <p role="alert" className="text-base text-danger">
-          {note.text}
+          {translate(note.text)}
         </p>
       )}
     </>
@@ -45,7 +47,7 @@ function useNameForm(
   send: (name: string) => Promise<FavoriteOutcome>,
 ) {
   const [text, setText] = useState(initial);
-  const [problem, setProblem] = useState<string | null>(null);
+  const [problem, setProblem] = useState<Message | null>(null);
   const [busy, setBusy] = useState(false);
   const [seen, setSeen] = useState(initial);
   // The board's name replaces what was typed (another phone renamed it, or a rename worked)
@@ -97,8 +99,9 @@ export function SaveDialog({
   note: Note | null;
   onSave: (name: string) => Promise<FavoriteOutcome>;
 }) {
+  const { t } = useTranslation("favorites");
   return (
-    <ModalDialog open={open} onClose={onClose} title="Save this light">
+    <ModalDialog open={open} onClose={onClose} title={t("save.title")}>
       <SaveForm
         info={info}
         favorites={favorites}
@@ -126,6 +129,7 @@ function SaveForm({
   onSave: (name: string) => Promise<FavoriteOutcome>;
   onClose: () => void;
 }) {
+  const { t } = useTranslation("favorites");
   const limits = favoriteLimits(info);
   const form = useNameForm(defaultName, favorites, null, limits.name, onSave);
   return (
@@ -133,19 +137,19 @@ function SaveForm({
       <FavoriteNameField
         value={form.text}
         max={limits.name}
-        problem={form.problem}
+        problem={form.problem === null ? null : translate(form.problem)}
         disabled={form.busy}
         autoFocus
-        hint={`Up to ${limits.name} characters.`}
+        hint={t("name.hint", { max: limits.name })}
         onChange={form.change}
       />
       <DialogNote note={note} />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={onClose}>
-          Cancel
+          {t("buttons.cancel")}
         </Button>
         <Button type="submit" disabled={form.busy}>
-          Save
+          {t("buttons.save")}
         </Button>
       </div>
     </form>
@@ -168,8 +172,9 @@ export function FullDialog({
   note: Note | null;
   onReplace: (favorite: Favorite) => Promise<FavoriteOutcome>;
 }) {
+  const { t } = useTranslation("favorites");
   return (
-    <ModalDialog open={open} onClose={onClose} title="Your favorites are full">
+    <ModalDialog open={open} onClose={onClose} title={t("full.title")}>
       <FullForm info={info} favorites={favorites} note={note} onReplace={onReplace} onClose={onClose} />
     </ModalDialog>
   );
@@ -188,6 +193,7 @@ function FullForm({
   onReplace: (favorite: Favorite) => Promise<FavoriteOutcome>;
   onClose: () => void;
 }) {
+  const { t } = useTranslation("favorites");
   const [chosen, setChosen] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const target = favorites.find((item) => String(item.id) === chosen);
@@ -203,12 +209,9 @@ function FullForm({
   }
   return (
     <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
-      <p>
-        Zenit keeps up to {favoriteLimits(info).count} favorites. Choose one to replace with this light, or delete one
-        first in Edit.
-      </p>
+      <p>{t("full.body", { max: favoriteLimits(info).count })}</p>
       <ChoiceGroup
-        legend="Favorite to replace"
+        legend={t("full.legend")}
         hideLegend
         groupName="replace-favorite"
         layout="grid-cols-1"
@@ -220,10 +223,10 @@ function FullForm({
       <DialogNote note={note} />
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={onClose}>
-          Cancel
+          {t("buttons.cancel")}
         </Button>
         <Button type="submit" disabled={!target || busy}>
-          Replace
+          {t("buttons.replace")}
         </Button>
       </div>
     </form>
@@ -244,8 +247,9 @@ export function EditDialog({
   note: Note | null;
   onOpen: (favorite: Favorite) => void;
 }) {
+  const { t } = useTranslation("favorites");
   return (
-    <ModalDialog open={open} onClose={onClose} title="Edit favorites">
+    <ModalDialog open={open} onClose={onClose} title={t("edit.title")}>
       <ul className="mb-4 flex flex-col gap-2">
         {favorites.map((item) => (
           <li key={item.id}>
@@ -263,7 +267,7 @@ export function EditDialog({
       <DialogNote note={note} />
       <div className="mt-4 flex justify-end">
         <Button type="button" onClick={onClose}>
-          Done
+          {t("buttons.done")}
         </Button>
       </div>
     </ModalDialog>
@@ -332,6 +336,7 @@ function SheetBody({
   note: Note | null;
   onClose: () => void;
 }) {
+  const { t } = useTranslation("favorites");
   const limits = favoriteLimits(info);
   const [busy, setBusy] = useState(false);
   const [asking, setAsking] = useState(false);
@@ -356,12 +361,12 @@ function SheetBody({
         <FavoriteNameField
           value={form.text}
           max={limits.name}
-          problem={form.problem}
+          problem={form.problem === null ? null : translate(form.problem)}
           disabled={working}
           onChange={form.change}
         />
         <Button type="submit" variant="outline" disabled={working} className="self-start">
-          Rename
+          {t("buttons.rename")}
         </Button>
       </form>
       <div className="flex flex-col gap-1">
@@ -372,20 +377,18 @@ function SheetBody({
           aria-describedby={hintId}
           onClick={() => void act(actions.useNow(favorite))}
         >
-          Use the light as it is now
+          {t("sheet.useNow")}
         </Button>
         <p id={hintId} className="text-sm text-muted-foreground">
-          {favorite.name} will show the light you see now.
+          {t("sheet.useNowHint", { name: favorite.name })}
         </p>
       </div>
       <SwitchField
-        label="Turn on with this"
+        label={t("sheet.start")}
         hint={
           <>
-            <span className="block">
-              Zenit shows {favorite.name} when it gets power and when you turn the light on.
-            </span>
-            {holder && <span className="block">Now {holder.name} has it; this moves it here.</span>}
+            <span className="block">{t("sheet.startHint", { name: favorite.name })}</span>
+            {holder && <span className="block">{t("sheet.startHolder", { name: holder.name })}</span>}
           </>
         }
         checked={start === favorite.id}
@@ -395,25 +398,25 @@ function SheetBody({
       <DialogNote note={note} />
       <div className="flex justify-between gap-2 border-t border-border pt-4">
         <Button type="button" variant="danger" disabled={working} onClick={() => setAsking(true)}>
-          Delete
+          {t("buttons.delete")}
         </Button>
         <Button type="button" onClick={onClose}>
-          Done
+          {t("buttons.done")}
         </Button>
       </div>
       <ModalDialog
         open={asking}
         onClose={() => setAsking(false)}
-        title={`Delete ${favorite.name}?`}
+        title={t("sheet.deleteTitle", { name: favorite.name })}
         role="alertdialog"
         describedBy={questionId}
       >
         <p id={questionId} className="mb-4">
-          You can save a new favorite any time.
+          {t("sheet.deleteQuestion")}
         </p>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" data-autofocus onClick={() => setAsking(false)}>
-            Cancel
+            {t("buttons.cancel")}
           </Button>
           <Button
             type="button"
@@ -423,7 +426,7 @@ function SheetBody({
               void act(actions.remove(favorite));
             }}
           >
-            Delete
+            {t("buttons.delete")}
           </Button>
         </div>
       </ModalDialog>

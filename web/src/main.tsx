@@ -3,6 +3,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
+import "./i18n";
 import { connectServed } from "./board/served";
 import { startTheme } from "./lib/theme";
 import { App } from "./ui/app";

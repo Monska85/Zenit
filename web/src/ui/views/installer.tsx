@@ -2,8 +2,10 @@
 
 // Loaded on demand: importing ESP Web Tools registers its install button element.
 import "esp-web-tools/dist/web/install-button.js";
+import { useTranslation } from "react-i18next";
 
 export default function Installer({ manifest }: { manifest: string }) {
+  const { t } = useTranslation("device");
   return (
     <esp-web-install-button manifest={manifest}>
       <button
@@ -11,13 +13,13 @@ export default function Installer({ manifest }: { manifest: string }) {
         type="button"
         className="min-h-11 w-full rounded-xl bg-primary px-4 py-2 text-base font-medium text-primary-foreground"
       >
-        Start the installation
+        {t("install.start")}
       </button>
       <span slot="unsupported" className="text-base">
-        This browser cannot install firmware. Use Chrome or Edge on a computer.
+        {t("install.unsupported")}
       </span>
       <span slot="not-allowed" className="text-base">
-        The browser does not allow the installer here.
+        {t("install.notAllowed")}
       </span>
     </esp-web-install-button>
   );
