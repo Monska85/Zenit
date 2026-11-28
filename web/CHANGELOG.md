@@ -2,6 +2,21 @@
 
 All notable changes to the web app are listed here, in the format of [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Release-please writes a section for each release from the commits on `main` that touch `web/`.
 
+## [1.2.0](https://github.com/Monska85/Zenit/compare/web-v1.1.0...web-v1.2.0) (2026-11-28)
+
+
+### Added
+
+* add favorites ([#33](https://github.com/Monska85/Zenit/issues/33)) ([d92dbd6](https://github.com/Monska85/Zenit/commit/d92dbd663cae127f379e5148415bf82c2c77cdc6))
+* **light:** add four effects, three palettes and a breathing pattern setting ([#29](https://github.com/Monska85/Zenit/issues/29)) ([f8d5a65](https://github.com/Monska85/Zenit/commit/f8d5a65b1a62ded49ed870a7128306248fe1ac53))
+* **web:** move the app's text into translation catalogs ([#34](https://github.com/Monska85/Zenit/issues/34)) ([19718a4](https://github.com/Monska85/Zenit/commit/19718a45ad47587652f7ff5d5705e0d04eb548f2))
+* **web:** offer every time zone and the device's own ([#32](https://github.com/Monska85/Zenit/issues/32)) ([536b67e](https://github.com/Monska85/Zenit/commit/536b67eb8fdad2eac0d6cf01701b39e29629ed99))
+
+
+### Fixed
+
+* **web:** send a choice at once while a status poll waits for its reply ([#27](https://github.com/Monska85/Zenit/issues/27)) ([64f10f7](https://github.com/Monska85/Zenit/commit/64f10f795ef14e3df1512ca65a937e5d7d09de6e))
+
 ## [1.1.0](https://github.com/Monska85/Zenit/compare/web-v1.0.0...web-v1.1.0) (2026-11-27)
 
 
