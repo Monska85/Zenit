@@ -1,0 +1,14 @@
+{
+  "description": "Shooting star, seed 1, brightness 100: the sky at 450; the first draw gives a wait of 10000 + (270369 mod 50001) = 30,364 ms. The flash rises to full in 120 ms (725 at 60 ms) and falls back with a 450 ms time constant (652.33 at 570 ms, 524.43 at 1,020 ms).",
+  "settings": { "effect": "shooting_star", "brightness": 100 },
+  "seed": 1,
+  "expect": [
+    { "at": 10000, "duties": [0, 0, 0, 2382] },
+    { "at": 30360, "duties": [0, 0, 0, 2382] },
+    { "at": 30364, "duties": [0, 0, 0, 2382] },
+    { "at": 30424, "duties": [0, 0, 0, 7275] },
+    { "at": 30484, "duties": [0, 0, 0, 16383] },
+    { "at": 30934, "duties": [0, 0, 0, 5626] },
+    { "at": 31384, "duties": [0, 0, 0, 3365] }
+  ]
+}

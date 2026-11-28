@@ -1,0 +1,261 @@
+{
+  "description": "The breath_pattern setting: default 4-7-8, the values info.breath_patterns lists (4-7-8 and box), and every other value is bad_request and changes nothing.",
+  "steps": [
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "breath_pattern": "4-7-8",
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      },
+      "note": "the default pattern is 4-7-8"
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "settings_set",
+        "effect": "guided_breathing",
+        "breath_pattern": "box"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "guided_breathing",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "breath_pattern": "box",
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      },
+      "note": "guided breathing with the box pattern"
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "settings_set",
+        "breath_pattern": "478"
+      },
+      "expect": {
+        "seq": 3,
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "a pattern the board does not have"
+    },
+    {
+      "send": {
+        "seq": 4,
+        "cmd": "settings_set",
+        "breath_pattern": "Box"
+      },
+      "expect": {
+        "seq": 4,
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "names are exact: Box is not box"
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "settings_set",
+        "breath_pattern": 4
+      },
+      "expect": {
+        "seq": 5,
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "a number is not a pattern"
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "settings_set",
+        "breath_pattern": null
+      },
+      "expect": {
+        "seq": 6,
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "null is not a pattern"
+    },
+    {
+      "send": {
+        "seq": 7,
+        "cmd": "settings_set",
+        "breath_pattern": [
+          "box"
+        ]
+      },
+      "expect": {
+        "seq": 7,
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "an array is not a pattern"
+    },
+    {
+      "send": {
+        "seq": 8,
+        "cmd": "settings_set",
+        "brightness": 80,
+        "breath_pattern": "square"
+      },
+      "expect": {
+        "seq": 8,
+        "ok": false,
+        "error": "bad_request"
+      },
+      "note": "a bad pattern with a good field changes nothing"
+    },
+    {
+      "send": {
+        "seq": 9,
+        "cmd": "settings_set",
+        "breath_pattern": "4-7-8"
+      },
+      "expect": {
+        "seq": 9,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "guided_breathing",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "breath_pattern": "4-7-8",
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      },
+      "note": "back to 4-7-8"
+    },
+    {
+      "send": {
+        "seq": 10,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 10,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "guided_breathing",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "breath_pattern": "4-7-8",
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      },
+      "note": "the refused requests changed nothing"
+    }
+  ]
+}

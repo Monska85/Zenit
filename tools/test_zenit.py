@@ -69,6 +69,7 @@ SETTINGS = {
     "color_set": "christmas",
     "hold_seconds": 30,
     "period_seconds": 8,
+    "breath_pattern": "4-7-8",
     "floor": 20,
     "twinkle_strength": 20,
     "timer_minutes": 0,
@@ -441,6 +442,7 @@ class ReplyValidationTest(unittest.TestCase):
 class ArgumentsTest(unittest.TestCase):
     def test_parse_value(self):
         self.assertEqual(zenit.parse_value("brightness", "40"), 40)
+        self.assertEqual(zenit.parse_value("breath_pattern", "4-7-8"), "4-7-8")
         self.assertEqual(zenit.parse_value("brightness", "-3"), -3)
         self.assertEqual(zenit.parse_value("effect", "breathing"), "breathing")
         self.assertEqual(zenit.parse_value("colors", "red,blue"), ["red", "blue"])

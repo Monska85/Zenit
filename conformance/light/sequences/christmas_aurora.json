@@ -1,0 +1,10 @@
+{
+  "description": "Christmas with the aurora palette (green, blue), hold 5 s, brightness 100.",
+  "settings": { "effect": "christmas", "color_set": "aurora", "hold_seconds": 5, "brightness": 100 },
+  "expect": [
+    { "at": 3000, "duties": [0, 16383, 0, 0] },
+    { "at": 7500, "duties": [0, 0, 3018, 0] },
+    { "at": 10000, "duties": [0, 0, 16383, 0] },
+    { "at": 17000, "duties": [0, 16383, 0, 0] }
+  ]
+}

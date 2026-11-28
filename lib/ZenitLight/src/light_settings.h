@@ -19,16 +19,31 @@ enum class Effect : uint8_t
   Breathing,
   Twinkle,
   FallAsleep,
-  Christmas
+  Christmas,
+  ShootingStar,
+  GuidedBreathing,
+  Jingle,
+  Hop
 };
-constexpr size_t EFFECT_COUNT = 6;
+constexpr size_t EFFECT_COUNT = 10;
 
 enum class ColorSet : uint8_t
 {
   Christmas,
-  Ice
+  Ice,
+  Aurora,
+  Sunset,
+  All
 };
-constexpr size_t COLOR_SET_COUNT = 2;
+constexpr size_t COLOR_SET_COUNT = 5;
+
+// The patterns of `guided_breathing`.
+enum class BreathPattern : uint8_t
+{
+  FourSevenEight,
+  Box
+};
+constexpr size_t BREATH_PATTERN_COUNT = 2;
 
 constexpr uint8_t MIN_BRIGHTNESS = 1;
 constexpr uint8_t MAX_BRIGHTNESS = 100;
@@ -62,6 +77,7 @@ struct LightSettings
   ColorSet color_set = ColorSet::Christmas;
   uint16_t hold_seconds = 30;
   uint8_t period_seconds = 8;
+  BreathPattern breath_pattern = BreathPattern::FourSevenEight;
   uint8_t floor = 20;
   uint8_t twinkle_strength = 20;
   uint16_t timer_minutes = 0; // 0: no timer
@@ -84,15 +100,17 @@ const char *effect_name(Effect effect);
 bool effect_from_name(const char *name, Effect &effect);
 const char *color_set_name(ColorSet set);
 bool color_set_from_name(const char *name, ColorSet &set);
-// The colors of a preset list of the `christmas` effect.
+// The colors of a palette (docs/board/light-v1.md#palettes).
 ColorList color_set_colors(ColorSet set);
+const char *breath_pattern_name(BreathPattern pattern);
+bool breath_pattern_from_name(const char *name, BreathPattern &pattern);
 
 // The light settings as the readers of a request see them (the protocol's JSON and the simulator's `key=value` text):
 // one row per setting, in the order of the protocol's table, so both readers check the same names and ranges.
 enum class FieldKind : uint8_t
 {
   Number, // a whole number from `min` to `max`
-  Name,   // one of the names of an enumeration: an effect, a color or a color set
+  Name,   // one of the names of an enumeration: an effect, a color, a color set or a breathing pattern
   Colors  // a list of `MIN_COLORS` to `MAX_COLORS` colors, each listed once (valid_colors)
 };
 struct LightField

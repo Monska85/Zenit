@@ -1,0 +1,9 @@
+{
+  "description": "Color change no longer reads floor: a floor change while it runs changes nothing on the light.",
+  "settings": { "effect": "color_change", "brightness": 100 },
+  "events": [{ "at": 3000, "set": { "floor": 60 } }],
+  "expect": [
+    { "at": 3250, "duties": [16383, 0, 0, 0] },
+    { "at": 3500, "duties": [16383, 0, 0, 0] }
+  ]
+}

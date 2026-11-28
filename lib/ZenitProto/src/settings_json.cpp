@@ -203,6 +203,7 @@ void write_settings(JsonObject target, const LightSettings &s, const net::BoardS
   target["color_set"] = color_set_name(s.color_set);
   target["hold_seconds"] = s.hold_seconds;
   target["period_seconds"] = s.period_seconds;
+  target["breath_pattern"] = breath_pattern_name(s.breath_pattern);
   target["floor"] = s.floor;
   target["twinkle_strength"] = s.twinkle_strength;
   target["timer_minutes"] = s.timer_minutes;

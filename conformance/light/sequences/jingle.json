@@ -1,0 +1,17 @@
+{
+  "description": "Jingle with the christmas palette (red, green, white), brightness 100. Notes start at 0, 600, 1200, 2400, 3000, 3600, 4800, 5400, 6000, 6600 and 7200 ms of a 12 s cycle; note k of cycle c takes color (11 c + k) mod 3. Each rises from 300 to full in 60 ms (650 at 30 ms) and decays toward 300 with a time constant of 0.35 of its length (480.18 at 630 ms of the 1,200 ms note). The long note decays through the rest: 343.18 at 9.6 s, 302.51 at 11.99 s.",
+  "settings": { "effect": "jingle", "brightness": 100 },
+  "expect": [
+    { "at": 1200, "duties": [0, 0, 0, 1022] },
+    { "at": 1230, "duties": [0, 0, 0, 5578] },
+    { "at": 1260, "duties": [0, 0, 0, 16383] },
+    { "at": 1830, "duties": [0, 0, 0, 2754] },
+    { "at": 2400, "duties": [1022, 0, 0, 0] },
+    { "at": 7200, "duties": [0, 1022, 0, 0] },
+    { "at": 7260, "duties": [0, 16383, 0, 0] },
+    { "at": 9600, "duties": [0, 1337, 0, 0] },
+    { "at": 11990, "duties": [0, 1038, 0, 0] },
+    { "at": 12000, "duties": [0, 0, 0, 1022] },
+    { "at": 12600, "duties": [1022, 0, 0, 0] }
+  ]
+}

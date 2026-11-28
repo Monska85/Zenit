@@ -1,12 +1,14 @@
 {
-  "description": "From breathing at its floor (factor 200) to static: the held factor goes down to 20 % of itself (40), then moves to the new effect's factor (1000) in 500 ms.",
-  "settings": { "effect": "breathing", "brightness": 100 },
-  "events": [{ "at": 4000, "set": { "effect": "static" } }],
+  "description": "From guided breathing (box) at its floor (factor 200, held from 12 to 16 s) to static: the held factor goes down to 20 % of itself (40), then moves to the new effect's factor (1000) in 500 ms.",
+  "settings": { "effect": "guided_breathing", "breath_pattern": "box", "brightness": 100 },
+  "events": [
+    {"at": 12000, "set": {"effect": "static"}}
+  ],
   "expect": [
-    { "at": 4000, "duties": [0, 0, 0, 490] },
-    { "at": 4250, "duties": [0, 0, 0, 230] },
-    { "at": 4500, "duties": [0, 0, 0, 73] },
-    { "at": 4750, "duties": [0, 0, 0, 3300] },
-    { "at": 5000, "duties": [0, 0, 0, 16383] }
+    { "at": 12000, "duties": [0, 0, 0, 490] },
+    { "at": 12250, "duties": [0, 0, 0, 230] },
+    { "at": 12500, "duties": [0, 0, 0, 73] },
+    { "at": 12750, "duties": [0, 0, 0, 3300] },
+    { "at": 13000, "duties": [0, 0, 0, 16383] }
   ]
 }

@@ -53,11 +53,11 @@ for (const list of LISTS) {
 test("keeps an effect chosen on the Light page when the page closes at once", async ({ browser, servedSimulator }) => {
   const page = await openServed(browser, servedSimulator);
   await expect(page.getByRole("radio", { name: "Steady" })).toBeChecked();
-  await page.getByRole("radio", { name: "Breathing" }).check({ force: true });
+  await page.getByRole("radio", { name: "Breathing", exact: true }).check({ force: true });
   await page.close();
 
   const next = await openServed(browser, servedSimulator);
-  await expect(next.getByRole("radio", { name: "Breathing" })).toBeChecked();
+  await expect(next.getByRole("radio", { name: "Breathing", exact: true })).toBeChecked();
   await next.close();
 });
 

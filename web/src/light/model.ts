@@ -30,6 +30,7 @@ const PARAM_NAMES = [
   "color_set",
   "hold_seconds",
   "period_seconds",
+  "breath_pattern",
   "floor",
   "twinkle_strength",
 ] as const;
@@ -43,8 +44,9 @@ export interface EffectInfo {
 }
 
 /**
- * Labels and descriptions of the effects this app knows. `params` is what each effect reads in lib/ZenitLight
- * (docs/board/light-v1.md#effects), used only for a board that does not report `info.effect_settings`.
+ * Labels and descriptions of the effects this app knows. `params` is what each effect reads on a board that does not
+ * report `info.effect_settings` (firmware 1.0.0 and earlier), used only for such a board: there Color change and
+ * Christmas still read `floor`. A later board reports its own lists (docs/board/light-v1.md#effects).
  */
 export const EFFECTS: Record<string, EffectInfo> = {
   static: { label: "Steady", description: "One color, always the same.", params: ["color"] },
@@ -66,9 +68,21 @@ export const EFFECTS: Record<string, EffectInfo> = {
   },
   christmas: {
     label: "Christmas",
-    description: "Red, green and white, or icy blue.",
+    description: "Slowly moves through a palette of colors.",
     params: ["color_set", "hold_seconds", "floor"],
   },
+  shooting_star: {
+    label: "Shooting star",
+    description: "A calm sky with a bright flash now and then.",
+    params: ["color"],
+  },
+  guided_breathing: {
+    label: "Guided breathing",
+    description: "Breathe along: in as it brightens, out as it dims.",
+    params: ["color", "breath_pattern", "floor"],
+  },
+  jingle: { label: "Jingle", description: "Pulses to the beat of Jingle Bells.", params: ["color_set"] },
+  hop: { label: "Hop", description: "Hops from color to color.", params: ["color_set"] },
 };
 
 const words = (identifier: string): string => {
@@ -93,13 +107,14 @@ export interface EffectControls {
  * board, leaves a control missing: `newer` is then true.
  */
 export function effectControls(name: string, info: BoardInfo): EffectControls {
+  // The pattern choice needs the patterns the board lists: without them the control cannot show
+  const showable = (param: string): param is ParamName =>
+    isParamName(param) && (param !== "breath_pattern" || info.breath_patterns !== undefined);
   const reported = info.effect_settings === undefined ? undefined : own(info.effect_settings, name);
-  if (reported !== undefined) {
-    const params = reported.filter(isParamName);
-    return { params, newer: params.length !== reported.length };
-  }
-  const known = own(EFFECTS, name);
-  return known === undefined ? { params: [], newer: true } : { params: [...known.params], newer: false };
+  const listed = reported ?? own(EFFECTS, name)?.params;
+  if (listed === undefined) return { params: [], newer: true };
+  const params = listed.filter(showable);
+  return { params, newer: params.length !== listed.length };
 }
 
 const COLOR_LABELS: Record<string, string> = { white: "Warm white", red: "Red", green: "Green", blue: "Blue" };
@@ -111,11 +126,29 @@ export const COLOR_SWATCHES: Record<string, string> = {
   blue: "#2f6fe0",
 };
 
-const COLOR_SET_LABELS: Record<string, string> = { christmas: "Christmas", ice: "Ice" };
+const COLOR_SET_LABELS: Record<string, string> = {
+  christmas: "Christmas",
+  ice: "Ice",
+  aurora: "Aurora",
+  sunset: "Sunset",
+  all: "All colors",
+};
+/** The colors of each palette (docs/board/light-v1.md#palettes). */
 export const COLOR_SET_COLORS: Record<string, readonly string[]> = {
   christmas: ["red", "green", "white"],
   ice: ["blue", "white"],
+  aurora: ["green", "blue"],
+  sunset: ["red", "white"],
+  all: ["red", "green", "blue", "white"],
 };
+
+/** The patterns of Guided breathing (docs/board/light-v1.md#guided_breathing): a name and its timing in words. */
+const BREATH_PATTERNS: Record<string, { label: string; hint: string }> = {
+  "4-7-8": { label: "4-7-8", hint: "In 4 s, hold 7 s, out 8 s." },
+  box: { label: "Box", hint: "In, hold, out, hold: 4 s each." },
+};
+export const patternLabel = (name: string): string => own(BREATH_PATTERNS, name)?.label ?? words(name);
+export const patternHint = (name: string): string | undefined => own(BREATH_PATTERNS, name)?.hint;
 
 export const colorLabel = (name: string): string => own(COLOR_LABELS, name) ?? words(name);
 export const colorSetLabel = (name: string): string => own(COLOR_SET_LABELS, name) ?? words(name);
@@ -142,6 +175,12 @@ export function settingsProblem(settings: Settings, info: BoardInfo): string | n
   if (!info.effects.includes(settings.effect)) return "the effect is not one the board lists";
   if (!info.colors.includes(settings.color)) return "the color is not one the board lists";
   if (!info.color_sets.includes(settings.color_set)) return "the color set is not one the board lists";
+  if (
+    settings.breath_pattern !== undefined &&
+    info.breath_patterns !== undefined &&
+    !info.breath_patterns.includes(settings.breath_pattern)
+  )
+    return "the breathing pattern is not one the board lists";
   if (!inRange(settings.colors.length, LIMITS.colors)) return "colors is out of its limits";
   if (new Set(settings.colors).size !== settings.colors.length) return "colors names a color twice";
   if (!settings.colors.every((color) => info.colors.includes(color))) return "a color is not one the board lists";

@@ -56,3 +56,10 @@ ESP32-C3 SuperMini, one CREE RGBW-1225 LED driven by four low-side MOSFET module
 10. **Board LED (GPIO 8):** always off, except a blink during WiFi setup, so no blue light leaks from the base at night.
 11. **PWM:** a firmware constant, not a setting: 1 kHz at 14 bits (the ESP32-C3's maximum at that frequency) with a perceptual brightness curve. Changed in the firmware if hum, flicker or steps show up on the first unit; the fallback is about 19.5 kHz at 12 bits.
 12. **Partition table** (4 MB): `nvs` 0x9000 size 0x5000, `otadata` 0xE000 size 0x2000, `app0` 0x10000 size 0x1B0000, `app1` 0x1C0000 size 0x1B0000, `www` 0x370000 size 0x80000 (the web app, [ADR 0005](../adr/0005-web-app-partition.md)), `coredump` 0x3F0000 size 0x10000.
+
+## Decided with the user (2026-11-28)
+
+1. **Effects reviewed on a preview:** color change and Christmas fade each color to dark before the switch and rise from dark, and no longer read the floor; breathing drifts a little in length and depth; twinkle wanders smoothly at an uneven pace with an occasional deeper dip. This replaces the dip to the floor of decisions 3 and 9 above.
+2. **New effects:** shooting star (a sky at 45 % with a flash every 10 to 60 seconds), guided breathing (a pacer with the 4-7-8 or box pattern, a new setting), jingle (pulses in the rhythm of the Jingle Bells chorus, each note in the next color of a palette) and hop (a new color of a palette every 0.7 seconds).
+3. **New palettes:** aurora (green, blue), sunset (red, white) and all (red, green, blue, white).
+4. **At most 3 light changes a second** in every effect, for photosensitive safety. The formulas are in [Light](../board/light-v1.md#effects).

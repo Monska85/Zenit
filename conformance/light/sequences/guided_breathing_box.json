@@ -1,0 +1,13 @@
+{
+  "description": "Guided breathing, pattern box, floor 20, brightness 100: in 0 to 4 s, full 4 to 8 s, out 8 to 12 s (600 at 10 s), at the floor 12 to 16 s, in again from 16 s (600 at 18 s).",
+  "settings": { "effect": "guided_breathing", "breath_pattern": "box", "brightness": 100 },
+  "expect": [
+    { "at": 2000, "duties": [0, 0, 0, 4607] },
+    { "at": 6000, "duties": [0, 0, 0, 16383] },
+    { "at": 10000, "duties": [0, 0, 0, 4607] },
+    { "at": 12000, "duties": [0, 0, 0, 490] },
+    { "at": 14000, "duties": [0, 0, 0, 490] },
+    { "at": 16000, "duties": [0, 0, 0, 490] },
+    { "at": 18000, "duties": [0, 0, 0, 4607] }
+  ]
+}

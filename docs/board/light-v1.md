@@ -44,24 +44,52 @@ An effect produces a color and a factor `F` from 0 to 1,000 (per mille). The lig
 
 ## Engine tick
 
-The engine computes the outputs every 10 ms from a monotonic clock in milliseconds, starting at 0 when the light starts. Each effect is a pure function of the time `t` elapsed since the effect started, of its parameters and, for `twinkle`, of its random sequence. The duties are computed at every tick; the board writes a channel's duty to its LEDC channel only when it differs from the one last written, the channels going to 0 first. A tick that comes late computes the value of its real time: nothing accumulates.
+The engine computes the outputs every 10 ms from a monotonic clock in milliseconds, starting at 0 when the light starts. Each effect is a pure function of the time `t` elapsed since the effect started, of its parameters and, for `twinkle`, `shooting_star` and `hop`, of the [random sequence](#random-choices). The duties are computed at every tick; the board writes a channel's duty to its LEDC channel only when it differs from the one last written, the channels going to 0 first. A tick that comes late computes the value of its real time: nothing accumulates.
 
 ## Effects
 
 The `effect` setting chooses one of these. Parameters are settings; each effect reads only its own and ignores the others.
 
-| Effect         | Parameters                                     | Default parameters                 |
-| -------------- | ---------------------------------------------- | ---------------------------------- |
-| `static`       | `color`                                        | `white`                            |
-| `color_change` | `colors`, `hold_seconds`, `floor`              | `red, green, blue, white`, 30, 20  |
-| `breathing`    | `color`, `period_seconds`, `floor`             | `white`, 8, 20                     |
-| `twinkle`      | `color`, `twinkle_strength`                    | `white`, 20                        |
-| `fall_asleep`  | `color`, `floor`                               | `white`, 20                        |
-| `christmas`    | `color_set`, `hold_seconds`, `floor`           | `christmas`, 30, 20                |
+| Effect             | Parameters                              | Default parameters                |
+| ------------------ | --------------------------------------- | --------------------------------- |
+| `static`           | `color`                                 | `white`                           |
+| `color_change`     | `colors`, `hold_seconds`                | `red, green, blue, white`, 30     |
+| `breathing`        | `color`, `period_seconds`, `floor`      | `white`, 8, 20                    |
+| `twinkle`          | `color`, `twinkle_strength`             | `white`, 20                       |
+| `fall_asleep`      | `color`, `floor`                        | `white`, 20                       |
+| `christmas`        | `color_set`, `hold_seconds`             | `christmas`, 30                   |
+| `shooting_star`    | `color`                                 | `white`                           |
+| `guided_breathing` | `color`, `breath_pattern`, `floor`      | `white`, `4-7-8`, 20              |
+| `jingle`           | `color_set`                             | `christmas`                       |
+| `hop`              | `color_set`                             | `christmas`                       |
 
-`floor` is a percentage of the full factor: `floor = 20` means `F = 200`.
+`floor` is a percentage of the full factor: `floor = 20` means `F = 200`, and `low = 10 * floor` below.
 
 `info.effect_settings` reports the Parameters column of this table, in this order ([protocol](../protocol/protocol-v1.md#info)). It is built from the same registry in `lib/ZenitLight` that decides which parameter changes restart an effect. `fall_asleep` also follows the countdown of `timer_minutes`, a setting of the whole light that is not listed (see [Timer](#timer)).
+
+Times are whole milliseconds and `t` is the time since the effect started. The formulas are computed in IEEE 754 double precision; `F` is not rounded (the curve rounds the duty). `ease(p) = (1 - cos(pi * p)) / 2` is a cosine easing from 0 at `p = 0` to 1 at `p = 1`.
+
+### Random choices
+
+`twinkle`, `shooting_star` and `hop` make their random choices from one sequence of the engine, a 32-bit xorshift generator: each draw is the step `x ^= x << 13; x ^= x >> 17; x ^= x << 5` on the unsigned 32-bit state `x`, and the draw is the new `x`. It is seeded from the hardware random number generator at each boot on the board and from a fixed seed in the simulator and the tests (a seed of 0 counts as 1). Each start of an effect takes the sequence where the previous effect left it (the effects above draw from it, the others leave it as it was), so a restart after an effect change or light on goes on with the next draws and never repeats a pattern it has already shown, until the sequence comes round after 2^32 - 1 draws. Each effect says which draws it makes and in which order; `x mod m` is the remainder of the draw divided by `m`. The engine runs the effect at every tick whether anything shows, so while the light is off or fully dark an effect keeps drawing, and the next start goes on from a later point of the sequence.
+
+### Palettes
+
+`color_set` chooses a palette, a preset list of colors in order, read by `christmas`, `jingle` and `hop`:
+
+| `color_set` | Colors                       |
+| ----------- | ---------------------------- |
+| `christmas` | `red`, `green`, `white`      |
+| `ice`       | `blue`, `white`              |
+| `aurora`    | `green`, `blue`              |
+| `sunset`    | `red`, `white`               |
+| `all`       | `red`, `green`, `blue`, `white` |
+
+`n` below is the number of colors of the list an effect cycles through.
+
+### At most 3 light changes a second
+
+Light that flashes more than 3 times a second can trigger seizures in people with photosensitive epilepsy ([WCAG 2.2, success criterion 2.3.1](https://www.w3.org/TR/WCAG22/#three-flashes-or-below-threshold)). No effect shows more than 3 light changes in any one second. A light change is a flash, a rise of `F` by 100 or more followed by a fall of 100 or more (or a fall followed by a rise), or a switch to another color; a switch of color inside a flash, as in `jingle` and `hop`, counts with that flash. Every effect keeps the rule by its own timing, at any value of its parameters: the shortest time between two changes is 600 ms in `jingle`, 700 ms in `hop` and in a `twinkle` dip (two knots of at least 350 ms), 3.5 s in `breathing` (its shortest breath, 0.89 of the shortest period), 7 s in `color_change` and `christmas`, 10 s in `shooting_star`, 16 s in `guided_breathing`. The rule binds what an effect shows by itself; the [transitions](#transitions) follow the person's own changes. The native tests run every effect at its fastest settings and count.
 
 ### `static`
 
@@ -69,19 +97,33 @@ The `effect` setting chooses one of these. Parameters are settings; each effect 
 
 ### `color_change`
 
-Cycles through `colors` (2 to 4 colors, in order, a color may appear once only). Each color takes `hold_seconds + 2` seconds: it fades down to the floor during its last second, the next color starts at the floor and fades up during its first second. With `T = (hold_seconds + 2) * 1000` ms, color index `i = floor(t / T) mod n` and `u = t mod T`:
+Cycles through `colors` (2 to 4 colors, in order, a color may appear once only). Each color takes `hold_seconds + 2` seconds: it fades to dark during its last second and the next color rises from dark during its first second, so the switch happens with the light dark. With `T = (hold_seconds + 2) * 1000` ms, color index `i = floor(t / T) mod n` and `u = t mod T`:
 
-- `u < 1000`: `F = floor + (1000 - floor) * u / 1000`, except for the very first color after the effect starts, which starts at `F = 1000`;
+- `u < 1000`: `F = u`, except for the very first color after the effect starts (`t < T`), which starts at `F = 1000`;
 - `1000 <= u < T - 1000`: `F = 1000`;
-- `u >= T - 1000`: `F = 1000 - (1000 - floor) * (u - (T - 1000)) / 1000`.
+- `u >= T - 1000`: `F = T - u`.
+
+`floor` is not read.
 
 ### `breathing`
 
-`color`, `F = floor + (1000 - floor) * (1 + cos(2 * pi * t / T)) / 2` with `T = period_seconds * 1000` ms, so it starts at full and reaches the floor at half the period.
+`color`. Slow breaths that drift a little in length and depth. With `T = period_seconds * 1000` ms, `u = t mod (1961 * T)` and `a = u / T`:
+
+- `phase = 2 * pi * a + 0.45 * sin(2 * pi * a / 3.7)`;
+- `depth = 0.86 + 0.14 * sin(2 * pi * a / 5.3 + 1.1)`;
+- `F = low + (1000 - low) * depth * (1 + cos(phase)) / 2`.
+
+A breath lasts from 0.89 to 1.14 times `T` and reaches from 0.72 to 1 times the span above `low`; the light is at `low` when `cos(phase) = -1`. `1961 * T` is a whole number of each of the three periods (`T`, `3.7 * T` and `5.3 * T`), so `u` changes nothing but keeps the arithmetic exact over days. At `t = 0`, `F = low + (1000 - low) * (0.86 + 0.14 * sin(1.1))`, 987.80 with `floor` 20.
 
 ### `twinkle`
 
-`color`, with a factor that wanders below full like a star in the atmosphere. Every 200 ms the effect draws a target `G` uniformly from `1000 - 10 * twinkle_strength` to 1,000, and `F` moves linearly from its value to `G` over the next 200 ms. The draws come from a 32-bit xorshift generator (`x ^= x << 13; x ^= x >> 17; x ^= x << 5`), seeded from the hardware random number generator at each boot on the board and from a fixed seed in the simulator and the tests. The engine has one sequence: each start of an effect takes it where the previous effect left it (twinkle draws from it, the other effects leave it as it was), so a restart of twinkle after an effect change or light on goes on with the next draws and never repeats a pattern it has already shown, until the sequence comes round after 2^32 - 1 draws; `G = 1000 - 10 * twinkle_strength + (x mod (10 * twinkle_strength + 1))`. `F` starts at 1,000. The engine runs the effect at every tick whether anything shows, so while the light is off or fully dark twinkle keeps drawing one target every 200 ms, and the next start goes on from a later point of the sequence.
+`color`, with a factor that wanders below full at an uneven pace, like a star in the atmosphere. The wander goes from knot to knot. With `s = twinkle_strength`, each knot makes three draws, in this order:
+
+1. its length `d = 350 + (x mod 551)` ms, from 350 to 900;
+2. whether it is a deep dip: deep when `x mod 100 < 7`;
+3. its target `G`: deep, `G = 1000 - 14 * s + (x mod (4 * s + 1))`; otherwise `G = 1000 - 10 * s * (q / 1000)^1.6` with `q = x mod 1001`, so targets lean toward full.
+
+The first knot starts with the effect at `t = 0` from `F = 1000`, and each knot starts where the previous one ends, from its target. Within a knot that starts at `k` and goes from `A` to `G`, `F = A + (G - A) * ease((t - k) / d)`. The next knot is drawn when `t` reaches the end of the current one.
 
 ### `fall_asleep`
 
@@ -89,7 +131,52 @@ Cycles through `colors` (2 to 4 colors, in order, a color may appear once only).
 
 ### `christmas`
 
-`color_change` with a preset list: `color_set` `christmas` is `red, green, white`; `ice` is `blue, white`.
+`color_change` with the colors of the [palette](#palettes) `color_set`.
+
+### `shooting_star`
+
+`color`. A sky at a fixed level, `S = 450` (a constant of the effect, not `floor`), and now and then a flash: 120 ms up to full, then back toward the sky with a time constant of 450 ms. The time from the start to the first flash, and from each flash to the next, is `10000 + (x mod 50001)` ms, from 10 to 60 seconds: one draw when the effect starts, then one at each flash. Before the first flash `F = S`. With `e` the time since the last flash started:
+
+- `e < 120`: `F = S + (1000 - S) * e / 120`;
+- `e >= 120`: `F = S + (1000 - S) * exp(-(e - 120) / 450)`.
+
+### `guided_breathing`
+
+`color`. A pacer to breathe with: the light rises while breathing in, stays at full while holding, falls while breathing out, and with `box` stays at `low` while holding empty. `breath_pattern` chooses the phases, in seconds:
+
+| `breath_pattern` | In | Hold at full | Out | Hold at `low` | Cycle |
+| ---------------- | -- | ------------ | --- | ------------- | ----- |
+| `4-7-8`          | 4  | 7            | 8   | none          | 19    |
+| `box`            | 4  | 4            | 4   | 4             | 16    |
+
+With `u = t mod cycle` and `p` the fraction of the current phase gone by:
+
+- in: `F = low + (1000 - low) * ease(p)`;
+- hold at full: `F = 1000`;
+- out: `F = 1000 - (1000 - low) * ease(p)`;
+- hold at `low`: `F = low`.
+
+The effect starts at the start of "in", at `low`.
+
+### `jingle`
+
+`color_set`. Pulses in the rhythm of the Jingle Bells chorus at 100 beats a minute (a beat is 600 ms): notes of 1, 1, 2, 1, 1, 2, 1, 1, 1, 1 and 4 beats, then 4 beats of rest, a cycle of 20 beats, 12,000 ms. The notes start at 0, 600, 1,200, 2,400, 3,000, 3,600, 4,800, 5,400, 6,000, 6,600 and 7,200 ms of the cycle, with lengths `N` of 600, 600, 1,200, 600, 600, 1,200, 600, 600, 600, 600 and 2,400 ms. With `c = floor(t / 12000)`, `u = t mod 12000`, `k` the last note (0 to 10) that starts at or before `u`, and `e = u - start of k`:
+
+- color: palette color `(11 * c + k) mod n`, so each note takes the next color of the palette;
+- `e < 60`: `F = 300 + 700 * e / 60`;
+- `e >= 60`: `F = 300 + 700 * exp(-(e - 60) / (0.35 * N))`.
+
+The last note's decay goes on through the rest, to the end of the cycle.
+
+### `hop`
+
+`color_set`. A new color of the palette every 700 ms, never the same twice in a row, with a short dip around each hop. Hop `h = floor(t / 700)` and `u = t mod 700`. The color of hop 0 is palette color `x mod n`, one draw when the effect starts. Each later hop makes one draw, `j = x mod (n - 1)`, and takes palette color `j` when `j` is below the current color's index, `j + 1` otherwise: one of the other colors.
+
+- `h > 0` and `u < 150`: `F = 400 + 600 * ease(u / 150)`;
+- `u >= 550`: `F = 1000 - 600 * ease((u - 550) / 150)`;
+- otherwise `F = 1000`.
+
+So the light dips to 40 % in 150 ms, switches color at the bottom and rises in 150 ms; the very first color starts at full.
 
 ## Transitions
 
@@ -126,24 +213,27 @@ The ESP32-C3 SuperMini's blue LED (GPIO 8, on when low) is always off, except wh
 
 ## Stored settings
 
-The light settings are a record of 17 bytes, stored in NVS (namespace `zenit`) together with the [board record](wifi-and-updates-v1.md#stored-settings) as one blob under the key `settings`: the light record first, then the board record, 272 bytes. The blob is written in one step, so a save is all or nothing even when the power fails during it, and a save of both records has no state in between to repair. A blob of another size is damaged: both records take their defaults. `conformance/board/stored.json` gives what is read from each combination. Version 1 is 17 bytes:
+The light settings are a record of 18 bytes, stored in NVS (namespace `zenit`) together with the [board record](wifi-and-updates-v1.md#stored-settings) as one blob under the key `settings`: the light record first, then the board record, 273 bytes. The blob is written in one step, so a save is all or nothing even when the power fails during it, and a save of both records has no state in between to repair. `conformance/board/stored.json` gives what is read from each combination. Version 2 is 18 bytes:
 
-| Byte  | Content                                                                           |
-| ----- | --------------------------------------------------------------------------------- |
-| 0     | Version, `1`                                                                      |
-| 1     | `brightness`                                                                      |
-| 2     | `effect`: `static` 0, `color_change` 1, `breathing` 2, `twinkle` 3, `fall_asleep` 4, `christmas` 5 |
-| 3     | `color`: `white` 0, `red` 1, `green` 2, `blue` 3                                  |
-| 4     | Number of colors in `colors`                                                      |
-| 5..8  | The colors of `colors`, coded as `color`; unused bytes are 0                      |
-| 9     | `color_set`: `christmas` 0, `ice` 1                                               |
-| 10..11 | `hold_seconds`, little endian                                                    |
-| 12    | `period_seconds`                                                                  |
-| 13    | `floor`                                                                           |
-| 14    | `twinkle_strength`                                                                |
-| 15..16 | `timer_minutes`, little endian                                                   |
+| Byte   | Content                                                                           |
+| ------ | --------------------------------------------------------------------------------- |
+| 0      | Version, `2`                                                                      |
+| 1      | `brightness`                                                                      |
+| 2      | `effect`: `static` 0, `color_change` 1, `breathing` 2, `twinkle` 3, `fall_asleep` 4, `christmas` 5, `shooting_star` 6, `guided_breathing` 7, `jingle` 8, `hop` 9 |
+| 3      | `color`: `white` 0, `red` 1, `green` 2, `blue` 3                                  |
+| 4      | Number of colors in `colors`                                                      |
+| 5..8   | The colors of `colors`, coded as `color`; unused bytes are 0                      |
+| 9      | `color_set`: `christmas` 0, `ice` 1, `aurora` 2, `sunset` 3, `all` 4              |
+| 10..11 | `hold_seconds`, little endian                                                     |
+| 12     | `period_seconds`                                                                  |
+| 13     | `floor`                                                                           |
+| 14     | `twinkle_strength`                                                                |
+| 15..16 | `timer_minutes`, little endian                                                    |
+| 17     | `breath_pattern`: `4-7-8` 0, `box` 1                                              |
 
-These codes never change meaning: a new effect, color or color set takes the next free code. A record of another size or version is ignored and the defaults apply; a field out of its range keeps its default and the others load. Nothing is written when no setting changes. The cases in `conformance/light/record.json` give records and their settings both ways.
+Version 1, written by firmware 1.1.0 and earlier, is the first 17 bytes of this table with `1` in byte 0, in a blob of 272 bytes; its codes are those of version 2. A blob is read when it is 273 bytes with a light record of version 2, or 272 bytes with a light record of version 1: a version 1 record keeps every value and takes the default `breath_pattern`. Any other blob is damaged: both records take their defaults. The board writes version 2 at the next save. Reading an older record writes nothing, except a new token when the stored one is damaged, written in the layout the blob had (version 1 stays version 1). A firmware from before version 2 reads a 273-byte blob as damaged. While a new firmware is on trial (see [Rollback](wifi-and-updates-v1.md#rollback)) the previous one may boot again, so a version 1 blob keeps the version 1 layout at every save of that boot, unless the save sets a `breath_pattern` other than the default, which version 1 cannot hold; the first save after the firmware confirms writes version 2. An older firmware flashed over USB over a version 2 blob starts from the defaults.
+
+These codes never change meaning: a new effect, color, color set or pattern takes the next free code. A record of another size or version is ignored and the defaults apply; a field out of its range keeps its default and the others load. Nothing is written when no setting changes. The cases in `conformance/light/record.json` give records and their settings both ways.
 
 ## Measurements
 
@@ -151,7 +241,7 @@ On an ESP32-C3 SuperMini with this milestone's firmware (2026-11-21): the firmwa
 
 ## Simulator and tests
 
-The simulator runs the engine with a virtual clock and writes the duty of each channel at every tick. `--seed N` fixes the `twinkle` seed. The conformance cases in `conformance/light/` give settings, a sequence of events (setting changes, light on and off) and the expected duties at chosen times, worked out by hand from this document.
+The simulator runs the engine with a virtual clock and writes the duty of each channel at every tick. `--seed N` fixes the seed of the random sequence. The conformance cases in `conformance/light/` give settings, a sequence of events (setting changes, light on and off) and the expected duties at chosen times, worked out by hand from this document.
 
 ## Limits
 
@@ -163,6 +253,7 @@ The simulator runs the engine with a virtual clock and writes the duty of each c
 | `period_seconds`        | 4 to 20                   |
 | `floor`                 | 5 to 80                   |
 | `twinkle_strength`      | 5 to 50                   |
+| `breath_pattern`        | `4-7-8` or `box`          |
 | `timer_minutes`         | 0, or 1 to 360            |
 | `LIMIT_MW`              | 1,000 (firmware constant) |
 | Engine tick             | 10 ms                     |

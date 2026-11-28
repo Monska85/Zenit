@@ -1,0 +1,11 @@
+{
+  "description": "Hop with the ice palette (blue, white), seed 1, brightness 100: the first color is draw 1 mod 2 = 1 (white); with two colors each hop takes the other one (j = x mod 1 = 0).",
+  "settings": { "effect": "hop", "color_set": "ice", "brightness": 100 },
+  "seed": 1,
+  "expect": [
+    { "at": 1000, "duties": [0, 0, 16383, 0] },
+    { "at": 1400, "duties": [0, 0, 0, 1843] },
+    { "at": 2100, "duties": [0, 0, 1843, 0] },
+    { "at": 2800, "duties": [0, 0, 0, 1843] }
+  ]
+}

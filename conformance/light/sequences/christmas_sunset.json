@@ -1,0 +1,10 @@
+{
+  "description": "Christmas with the sunset palette (red, white), hold 5 s, brightness 100.",
+  "settings": { "effect": "christmas", "color_set": "sunset", "hold_seconds": 5, "brightness": 100 },
+  "expect": [
+    { "at": 3000, "duties": [16383, 0, 0, 0] },
+    { "at": 7500, "duties": [0, 0, 0, 3018] },
+    { "at": 10000, "duties": [0, 0, 0, 16383] },
+    { "at": 17000, "duties": [16383, 0, 0, 0] }
+  ]
+}

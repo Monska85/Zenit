@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // The effects of docs/board/light-v1.md#effects. Each effect is one class with two static functions, listed in one
-// registry table (effects.cpp). Adding an effect: its value in Effect and its name (light_settings), its class
+// registry table (effects.cpp). Adding an effect: its value in Effect and its name (light_settings), its stored code
+// (light_record), its class
 // declaration here and its definition in its own file, a row in the table, its specification and its conformance
 // cases. A new setting an effect reads also needs a bit in EffectParam, a line in effect_changes() and a row in
 // EFFECT_SETTINGS.
@@ -32,13 +33,18 @@ struct TimerView
   uint64_t duration_ms = 0; // the whole countdown
 };
 
-// What an effect keeps between ticks. Only `twinkle` needs it; the others are pure functions of time.
+// What an effect keeps between ticks: the random sequence and, for the effects that need them, the current step. Only
+// `twinkle` (a knot), `shooting_star` (the last and next flash) and `hop` (the hop and its color) use the other fields;
+// the others are pure functions of time.
 struct EffectState
 {
   uint32_t random = 1;
-  uint64_t segment = 0;
+  uint64_t start = 0;   // twinkle: the knot's start; shooting_star: the last flash; hop: the current hop
+  uint64_t until = 0;   // twinkle: the knot's end; shooting_star: the next flash
+  bool flashed = false; // shooting_star: a flash has started
   double from = 1000.0;
   double to = 1000.0;
+  uint8_t index = 0; // hop: the palette index of the current color
 };
 
 // The settings an effect reads, as a bit mask: a change of one of them restarts the effect with a transition.
@@ -51,7 +57,8 @@ enum EffectParam : uint16_t
   PARAM_PERIOD = 1 << 4,
   PARAM_FLOOR = 1 << 5,
   PARAM_STRENGTH = 1 << 6,
-  PARAM_TIMER = 1 << 7 // the effect follows the countdown: a timer change restarts it with a transition
+  PARAM_TIMER = 1 << 7, // the effect follows the countdown: a timer change restarts it with a transition
+  PARAM_PATTERN = 1 << 8
 };
 
 // The settings a client shows with an effect, in the order it shows them (docs/board/light-v1.md#effects): one row per
@@ -62,7 +69,7 @@ struct EffectSetting
   EffectParam param;
   const char *name; // the setting's name in the protocol
 };
-constexpr size_t EFFECT_SETTING_COUNT = 7;
+constexpr size_t EFFECT_SETTING_COUNT = 8;
 extern const EffectSetting EFFECT_SETTINGS[EFFECT_SETTING_COUNT];
 
 struct EffectInfo
@@ -80,8 +87,12 @@ const EffectInfo &effect_info(Effect effect);
 // Whether a change from `a` to `b` restarts the effect: another effect, or a parameter it reads.
 bool effect_changes(const LightSettings &a, const LightSettings &b);
 
-// The 32-bit xorshift step of `twinkle`. A zero state is replaced by 1.
+// The 32-bit xorshift step of the engine's random sequence (docs/board/light-v1.md#random-choices). A zero state is
+// replaced by 1.
 uint32_t xorshift32(uint32_t &state);
+
+// Cosine easing from 0 at p = 0 to 1 at p = 1: (1 - cos(pi p)) / 2, with p clamped to [0, 1].
+double ease(double p);
 
 class StaticEffect
 {
@@ -96,7 +107,7 @@ public:
   static void reset(EffectState &, const LightSettings &, uint32_t) {}
   static EffectOutput at(EffectState &, const LightSettings &settings, uint64_t t_ms, const TimerView &);
   // The cycle shared with `christmas`.
-  static EffectOutput cycle(const ColorList &colors, uint16_t hold_seconds, uint8_t floor, uint64_t t_ms);
+  static EffectOutput cycle(const ColorList &colors, uint16_t hold_seconds, uint64_t t_ms);
 };
 
 class BreathingEffect
@@ -109,7 +120,8 @@ public:
 class TwinkleEffect
 {
 public:
-  static constexpr uint32_t SEGMENT_MS = 200;
+  static constexpr uint32_t MIN_KNOT_MS = 350;
+  static constexpr uint32_t MAX_KNOT_MS = 900;
   static void reset(EffectState &state, const LightSettings &settings, uint32_t seed);
   static EffectOutput at(EffectState &state, const LightSettings &settings, uint64_t t_ms, const TimerView &);
 };
@@ -126,6 +138,46 @@ class ChristmasEffect
 public:
   static void reset(EffectState &, const LightSettings &, uint32_t) {}
   static EffectOutput at(EffectState &, const LightSettings &settings, uint64_t t_ms, const TimerView &);
+};
+
+class ShootingStarEffect
+{
+public:
+  static constexpr double SKY = 450.0;
+  static constexpr uint32_t RISE_MS = 120;
+  static constexpr double DECAY_MS = 450.0;
+  static constexpr uint32_t MIN_WAIT_MS = 10000;
+  static constexpr uint32_t MAX_WAIT_MS = 60000;
+  static void reset(EffectState &state, const LightSettings &settings, uint32_t seed);
+  static EffectOutput at(EffectState &state, const LightSettings &settings, uint64_t t_ms, const TimerView &);
+};
+
+class GuidedBreathingEffect
+{
+public:
+  static void reset(EffectState &, const LightSettings &, uint32_t) {}
+  static EffectOutput at(EffectState &, const LightSettings &settings, uint64_t t_ms, const TimerView &);
+};
+
+class JingleEffect
+{
+public:
+  static constexpr uint32_t BEAT_MS = 600;
+  static constexpr uint32_t CYCLE_MS = 20 * BEAT_MS;
+  static constexpr double BASE = 300.0;
+  static constexpr uint32_t RISE_MS = 60;
+  static void reset(EffectState &, const LightSettings &, uint32_t) {}
+  static EffectOutput at(EffectState &, const LightSettings &settings, uint64_t t_ms, const TimerView &);
+};
+
+class HopEffect
+{
+public:
+  static constexpr uint32_t STEP_MS = 700;
+  static constexpr uint32_t EDGE_MS = 150;
+  static constexpr double DIP = 400.0;
+  static void reset(EffectState &state, const LightSettings &settings, uint32_t seed);
+  static EffectOutput at(EffectState &state, const LightSettings &settings, uint64_t t_ms, const TimerView &);
 };
 
 } // namespace zenit

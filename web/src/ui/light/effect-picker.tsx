@@ -7,7 +7,8 @@ import { ChoiceGroup } from "../components/choice";
 
 /**
  * How each effect's small preview moves (keyframes in index.css). The animation runs only when the person allows motion:
- * with reduced motion every preview is a still dot. An effect the app does not know gets a still, neutral dot.
+ * with reduced motion every preview is a still dot. An effect the app does not know gets a still, neutral dot. Like the
+ * light itself, no preview shows more than 3 changes a second.
  */
 const PREVIEWS: Record<string, string> = {
   static: "",
@@ -16,11 +17,17 @@ const PREVIEWS: Record<string, string> = {
   twinkle: "motion-safe:animate-[preview-twinkle_1.8s_linear_infinite]",
   fall_asleep: "motion-safe:animate-[preview-dim_5s_ease-in_infinite]",
   christmas: "motion-safe:animate-[preview-christmas_3s_steps(1,end)_infinite]",
+  shooting_star: "motion-safe:animate-[preview-shooting-star_5s_linear_infinite]",
+  guided_breathing: "motion-safe:animate-[preview-guided_8s_ease-in-out_infinite]",
+  jingle: "motion-safe:animate-[preview-jingle_2.4s_ease-out_infinite]",
+  hop: "motion-safe:animate-[preview-hop_2.1s_steps(1,end)_infinite]",
 };
 
 const PREVIEW_COLORS: Record<string, string> = {
   color_change: COLOR_SWATCHES["red"] ?? "",
   christmas: COLOR_SWATCHES["red"] ?? "",
+  jingle: COLOR_SWATCHES["red"] ?? "",
+  hop: COLOR_SWATCHES["red"] ?? "",
 };
 
 function Preview({ effect }: { effect: string }) {

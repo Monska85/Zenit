@@ -1,14 +1,14 @@
 {
-  "description": "Breathing at its floor (factor 200, brightness 100), a change to static at 4 s and back at 4.1 s: the fade-down reached 168, and the turn-back returns to breathing's own factor (201.23 at 4.1 s) at the full fade-down rate, in 21 ms.",
-  "settings": { "effect": "breathing", "brightness": 100 },
+  "description": "Guided breathing (box) at its floor (factor 200, held from 12 to 16 s), brightness 100, a change to static at 12 s and back at 12.1 s: the fade-down reached 168, and the turn-back returns to the effect's own factor (200) at the full fade-down rate, in 32 * 500 / 800 = 20 ms.",
+  "settings": { "effect": "guided_breathing", "breath_pattern": "box", "brightness": 100 },
   "events": [
-    { "at": 4000, "set": { "effect": "static" } },
-    { "at": 4100, "set": { "effect": "breathing" } }
+    {"at": 12000, "set": {"effect": "static"}},
+    {"at": 12100, "set": {"effect": "guided_breathing"}}
   ],
   "expect": [
-    { "at": 4100, "duties": [0, 0, 0, 370] },
-    { "at": 4110, "duties": [0, 0, 0, 427] },
-    { "at": 4121, "duties": [0, 0, 0, 497] },
-    { "at": 4300, "duties": [0, 0, 0, 536] }
+    { "at": 12100, "duties": [0, 0, 0, 370] },
+    { "at": 12110, "duties": [0, 0, 0, 427] },
+    { "at": 12120, "duties": [0, 0, 0, 490] },
+    { "at": 12300, "duties": [0, 0, 0, 490] }
   ]
 }
