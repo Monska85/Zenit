@@ -1,0 +1,394 @@
+{
+  "description": "favorite_start marks the favorite Zenit turns on with: a turn-on from off and a start apply it; null clears it, and deleting the marked favorite clears it; settings_reset brings back the ready-made favorites.",
+  "steps": [
+    {
+      "send": {
+        "seq": 1,
+        "cmd": "favorite_start",
+        "id": 1
+      },
+      "expect": {
+        "seq": 1,
+        "ok": true,
+        "favorites": [
+          {
+            "id": 1,
+            "name": "Starry night",
+            "effect": "shooting_star",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 2,
+            "name": "Christmas",
+            "effect": "christmas",
+            "brightness": 60,
+            "color_set": "christmas",
+            "hold_seconds": 30
+          }
+        ],
+        "start": 1
+      }
+    },
+    {
+      "send": {
+        "seq": 2,
+        "cmd": "favorite_start",
+        "id": "1"
+      },
+      "expect": {
+        "seq": 2,
+        "ok": false,
+        "error": "bad_request"
+      }
+    },
+    {
+      "advance_ms": 1100
+    },
+    {
+      "send": {
+        "seq": 3,
+        "cmd": "light",
+        "on": false
+      },
+      "expect": {
+        "seq": 3,
+        "ok": true,
+        "light": {
+          "on": false,
+          "effect": "static",
+          "color": "white",
+          "lightness": 60.0,
+          "power_scale": 100,
+          "timer": null
+        }
+      }
+    },
+    {
+      "advance_ms": 1000
+    },
+    {
+      "note": "The turn-on applies Starry night before it fades in.",
+      "send": {
+        "seq": 4,
+        "cmd": "light",
+        "on": true
+      },
+      "expect": {
+        "seq": 4,
+        "ok": true,
+        "light": {
+          "on": true,
+          "effect": "shooting_star",
+          "color": null,
+          "lightness": 0.0,
+          "power_scale": 100,
+          "timer": null
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 5,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 5,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "shooting_star",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "breath_pattern": "4-7-8",
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 6,
+        "cmd": "settings_set",
+        "effect": "hop"
+      },
+      "expect": {
+        "seq": 6,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "hop",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "breath_pattern": "4-7-8",
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      }
+    },
+    {
+      "note": "A restart is a power-up: the start favorite applies again.",
+      "control": "!restart"
+    },
+    {
+      "send": {
+        "seq": 7,
+        "cmd": "settings_get"
+      },
+      "expect": {
+        "seq": 7,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "shooting_star",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "breath_pattern": "4-7-8",
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 8,
+        "cmd": "favorite_start",
+        "id": null
+      },
+      "expect": {
+        "seq": 8,
+        "ok": true,
+        "favorites": [
+          {
+            "id": 1,
+            "name": "Starry night",
+            "effect": "shooting_star",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 2,
+            "name": "Christmas",
+            "effect": "christmas",
+            "brightness": 60,
+            "color_set": "christmas",
+            "hold_seconds": 30
+          }
+        ],
+        "start": null
+      }
+    },
+    {
+      "send": {
+        "seq": 9,
+        "cmd": "favorite_start",
+        "id": 2
+      },
+      "expect": {
+        "seq": 9,
+        "ok": true,
+        "favorites": [
+          {
+            "id": 1,
+            "name": "Starry night",
+            "effect": "shooting_star",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 2,
+            "name": "Christmas",
+            "effect": "christmas",
+            "brightness": 60,
+            "color_set": "christmas",
+            "hold_seconds": 30
+          }
+        ],
+        "start": 2
+      }
+    },
+    {
+      "send": {
+        "seq": 10,
+        "cmd": "favorite_delete",
+        "id": 2
+      },
+      "expect": {
+        "seq": 10,
+        "ok": true,
+        "favorites": [
+          {
+            "id": 1,
+            "name": "Starry night",
+            "effect": "shooting_star",
+            "brightness": 60,
+            "color": "white"
+          }
+        ],
+        "start": null
+      }
+    },
+    {
+      "control": "!restart"
+    },
+    {
+      "send": {
+        "seq": 11,
+        "cmd": "favorites"
+      },
+      "expect": {
+        "seq": 11,
+        "ok": true,
+        "favorites": [
+          {
+            "id": 1,
+            "name": "Starry night",
+            "effect": "shooting_star",
+            "brightness": 60,
+            "color": "white"
+          }
+        ],
+        "start": null
+      }
+    },
+    {
+      "send": {
+        "seq": 12,
+        "cmd": "settings_reset"
+      },
+      "expect": {
+        "seq": 12,
+        "ok": true,
+        "settings": {
+          "brightness": 60,
+          "effect": "static",
+          "color": "white",
+          "colors": [
+            "red",
+            "green",
+            "blue",
+            "white"
+          ],
+          "color_set": "christmas",
+          "hold_seconds": 30,
+          "period_seconds": 8,
+          "breath_pattern": "4-7-8",
+          "floor": 20,
+          "twinkle_strength": 20,
+          "timer_minutes": 0,
+          "wifi_power": "auto",
+          "update_mode": "automatic",
+          "update_firmware": true,
+          "update_web": true,
+          "check_hours": 6,
+          "install_start": 0,
+          "install_end": 0,
+          "timezone": "UTC0",
+          "time_sync_hours": 6,
+          "ntp_server": "pool.ntp.org",
+          "network_login": false,
+          "token": {
+            "$pattern": "^[a-z0-9]{16}$"
+          }
+        }
+      }
+    },
+    {
+      "send": {
+        "seq": 13,
+        "cmd": "favorites"
+      },
+      "expect": {
+        "seq": 13,
+        "ok": true,
+        "favorites": [
+          {
+            "id": 1,
+            "name": "Starry night",
+            "effect": "shooting_star",
+            "brightness": 60,
+            "color": "white"
+          },
+          {
+            "id": 2,
+            "name": "Christmas",
+            "effect": "christmas",
+            "brightness": 60,
+            "color_set": "christmas",
+            "hold_seconds": 30
+          }
+        ],
+        "start": null
+      }
+    }
+  ]
+}

@@ -76,7 +76,7 @@ What the board is and what it supports. No fields.
 
 ```text
 > {"seq":1,"cmd":"info"}
-< {"seq":1,"ok":true,"protocol":1,"firmware":"1.0.0","board":"esp32c3","boot_id":2864434397,"colors":["white","red","green","blue"],"effects":["static","color_change","breathing","twinkle","fall_asleep","christmas","shooting_star","guided_breathing","jingle","hop"],"effect_settings":{"static":["color"],"color_change":["colors","hold_seconds"],"breathing":["color","period_seconds","floor"],"twinkle":["color","twinkle_strength"],"fall_asleep":["color","floor"],"christmas":["color_set","hold_seconds"],"shooting_star":["color"],"guided_breathing":["color","breath_pattern","floor"],"jingle":["color_set"],"hop":["color_set"]},"color_sets":["christmas","ice","aurora","sunset","all"],"breath_patterns":["4-7-8","box"],"power_limit_mw":1000,"memory":{"free":182340,"largest":110580},"nvs":{"used":96,"free":408},"limits":{"line":1024}}
+< {"seq":1,"ok":true,"protocol":1,"firmware":"1.0.0","board":"esp32c3","boot_id":2864434397,"colors":["white","red","green","blue"],"effects":["static","color_change","breathing","twinkle","fall_asleep","christmas","shooting_star","guided_breathing","jingle","hop"],"effect_settings":{"static":["color"],"color_change":["colors","hold_seconds"],"breathing":["color","period_seconds","floor"],"twinkle":["color","twinkle_strength"],"fall_asleep":["color","floor"],"christmas":["color_set","hold_seconds"],"shooting_star":["color"],"guided_breathing":["color","breath_pattern","floor"],"jingle":["color_set"],"hop":["color_set"]},"color_sets":["christmas","ice","aurora","sunset","all"],"breath_patterns":["4-7-8","box"],"power_limit_mw":1000,"memory":{"free":182340,"largest":110580},"nvs":{"used":96,"free":408},"limits":{"line":1024,"favorites":6,"favorite_name":20}}
 ```
 
 | Field             | Meaning                                                                                                                                                     |
@@ -93,7 +93,7 @@ What the board is and what it supports. No fields.
 | `power_limit_mw`  | The power limit of the light, in mW.                                                                                                                        |
 | `memory`          | `free` bytes and the `largest` allocatable block, for diagnosis; `0` for both in the simulator.                                                             |
 | `nvs`             | `used` and `free` entries of the settings memory, for diagnosis; `0` for both in the simulator.                                                             |
-| `limits`          | `line`: the longest line the board reads.                                                                                                                   |
+| `limits`          | `line`: the longest line the board reads. From the firmware with [favorites](#favorites): `favorites`, the most favorites the board keeps (6), and `favorite_name`, the longest name in characters (20). A firmware from before leaves both out, and a client then shows no favorites. |
 
 A client offers only the colors, effects, color sets and breathing patterns the board lists, so later firmware can add them.
 
@@ -176,12 +176,13 @@ Turns the light on or off, without saving. One field, `on`: `true` or `false`.
 
 - `on: false` fades the light out in 1 second; it stays off until `light` with `on: true` or a restart.
 - `on: true` fades the light in to the current settings in 1 second and starts the timer again. When the light is already on, nothing changes, except during the timer's fade-out, which comes back up and restarts the timer (see [Light](../board/light-v1.md#timer)).
+- From off, when a favorite is marked to turn on with (see [Favorites](#favorites)), `on: true` first applies that favorite as `favorite_apply` does and saves it; if it cannot be saved the reply is `storage_error` and the light stays off. A client that shows the settings reads `settings_get` after such a turn-on.
 
 The reply holds `light`, as in `status`.
 
 ### `settings_reset`
 
-Puts every setting back to its default, forgets the WiFi network (a download that is running stops with `unreachable`) and makes a new token, which ends the WiFi client's login at once and closes its connection after the reply. No fields. USB only: over WiFi the reply is `usb_only`. The reply holds `settings` after the reset. The light fades to the default configuration. A firmware from before the WiFi and updates milestone puts the light settings back and has no network or token to forget. If the settings cannot be saved the reply is `storage_error` and nothing changes.
+Puts every setting back to its default, brings back the two ready-made [favorites](#favorites) with none marked to turn on with, forgets the WiFi network (a download that is running stops with `unreachable`) and makes a new token, which ends the WiFi client's login at once and closes its connection after the reply. No fields. USB only: over WiFi the reply is `usb_only`. The reply holds `settings` after the reset. The light fades to the default configuration. A firmware from before the WiFi and updates milestone puts the light settings back and has no network or token to forget. If the settings cannot be saved the reply is `storage_error` and nothing changes. The favorites are a separate record, written after the settings: if only that write fails, the reply is `storage_error` with the settings already reset (the favorites are as they were).
 
 ### `wifi_forget`
 
@@ -203,6 +204,38 @@ From the WiFi and updates milestone. Firmware and web app updates from the proje
 - `update_install` starts the download of the version the last check found for its target, and its reply holds `update` with `state` `downloading` and `target`. `nothing_to_install` when no check has found a newer version (or the board is on trial, or, for the firmware, the last check was not successful); `busy` when a check or an install is running; the firmware version on the skip list is installed only with `force: true`. A version that is not newer than the running one (or the web image in place) is never installed. `target` must be `firmware` or `web`, and `force` a boolean given with `firmware` only; anything else is `bad_request`.
 - When a firmware download is verified, the board restarts. The connection drops and the client reconnects. When a web image is installed, the board closes the WebSocket client with code `1012` and the app reloads the page.
 
+### Favorites
+
+From the firmware that reports `info.limits.favorites`; an older firmware answers these commands `unknown_command`. Named light looks the board keeps (see [Light](../board/light-v1.md#favorites)), the same for every client, over USB and WiFi alike. The board keeps at most 6. A board that never stored favorites has two ready-made ones, `Starry night` (id 1) and `Christmas` (id 2), which are ordinary favorites.
+
+Each favorite has an `id`, a whole number from 1 to 255 the board gives when it is saved and never changes, and a `name`:
+
+- 1 to 20 characters (Unicode code points; an escape such as `\u00e0` counts as the one character it stands for), stored as UTF-8;
+- no control character (U+0000 to U+001F, U+007F to U+009F), no invisible formatting character (U+200B to U+200F, U+2028 to U+202E, U+2060 to U+206F, U+FEFF), and no space (U+0020) at either end;
+- not the name of another favorite, two names being the same when they are equal with the ASCII letters `A` to `Z` compared without case. The board compares the bytes as they are, without Unicode normalization; a client sends names in normalization form C.
+
+A name that is not text is `bad_request`; text that breaks the first two rules is `bad_name`, and a name another favorite has is `name_taken`.
+
+`favorites` has no fields. Its reply, and the reply of every command below that changes the favorites, holds:
+
+| Field       | Meaning                                                                                                                                                                                                                         |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `favorites` | The favorites in the order they were saved, 0 to 6. Each has `id`, `name`, `effect`, `brightness` and the settings that effect reads, named as in `info.effect_settings` and with the values of `settings_get`; `timer_minutes` never. |
+| `start`     | The `id` of the favorite the board turns on with, or `null`.                                                                                                                                                                     |
+
+```text
+> {"seq":20,"cmd":"favorites"}
+< {"seq":20,"ok":true,"favorites":[{"id":1,"name":"Starry night","effect":"shooting_star","brightness":60,"color":"white"},{"id":2,"name":"Christmas","effect":"christmas","brightness":60,"color_set":"christmas","hold_seconds":30}],"start":null}
+```
+
+- `favorite_save` saves the board's current look: exactly one of `name` (a new favorite, last in the list; `favorites_full` when there are already 6) or `id` (that favorite takes the current look and keeps its name, its place and its mark). The look is the current `effect`, `brightness` and the other light settings but `timer_minutes`.
+- `favorite_rename` has `id` and `name`. A favorite may take its own name with other capitals.
+- `favorite_delete` has `id`. Deleting the favorite the board turns on with clears `start`.
+- `favorite_start` has `id`: a favorite's id marks it, `null` clears the mark. At most one favorite carries it.
+- `favorite_apply` has `id`. In one request it sets `effect`, `brightness` and the settings the favorite's effect reads, saves them as `settings_set` does (the other settings and `timer_minutes` keep their values), and turns the light on as `light` with `on: true` does, with the [transitions](../board/light-v1.md#transitions) of the light. Its reply holds `light`, as in `status`, and `settings`, as in `settings_get`.
+
+An `id` that is not a whole number from 1 to 255 is `bad_request` (`null` is accepted by `favorite_start` only); an `id` no favorite has is `unknown_favorite`. A field the command does not define is `bad_request`. A name another favorite has is reported before the limit of 6, and nothing changes on any error. If the favorites cannot be saved the reply is `storage_error` and nothing changes. The favorites are stored in one write, so a save is all or nothing even when the power fails during it; nothing is written when nothing changes.
+
 ## Errors
 
 | Code                 | Meaning                                                                                       |
@@ -217,8 +250,12 @@ From the WiFi and updates milestone. Firmware and web app updates from the proje
 | `updates_off`        | Updates are off for what the command asks.                                                    |
 | `no_network`         | The board is not connected to WiFi.                                                           |
 | `nothing_to_install` | The last check found nothing to install.                                                      |
+| `favorites_full`     | The board keeps 6 favorites already.                                                          |
+| `unknown_favorite`   | No favorite has that `id`.                                                                    |
+| `bad_name`           | The favorite name breaks the name rules.                                                      |
+| `name_taken`         | Another favorite has that name.                                                               |
 
-`unauthorized`, `no_network`, `updates_off` and `nothing_to_install` are produced from the WiFi and updates milestone. `busy` too: before it, a reply that does not fit the reply buffer would be answered `busy`, which no command does. Every error leaves the settings as they were.
+`unauthorized`, `no_network`, `updates_off` and `nothing_to_install` are produced from the WiFi and updates milestone, and `favorites_full`, `unknown_favorite`, `bad_name` and `name_taken` from the firmware with favorites. `busy` too: before it, a reply that does not fit the reply buffer would be answered `busy`, which no command does. Every error leaves the settings as they were, except the one case of `settings_reset` above: a `storage_error` after the settings were reset, when only the favorites could not be written (a client then reads the settings and the favorites again).
 
 ## Limits
 
@@ -227,7 +264,7 @@ From the WiFi and updates milestone. Firmware and web app updates from the proje
 | Line read by the board, newline excluded | 1,024 bytes |
 | JSON nesting in a request                | 4 levels    |
 
-Lines sent by the board can be longer; clients accept lines up to 4,096 bytes. The board builds replies of at most 1,536 bytes; `info`, with the longest values a build reports (a firmware version of 64 characters, `effect_settings` included), stays under 1,024 bytes.
+Lines sent by the board can be longer; clients accept lines up to 4,096 bytes. The board builds replies of at most 1,536 bytes (the longest `favorites` reply, six names of 80 bytes, is about 1,300); `info`, with the longest values a build reports (a firmware version of 64 characters, `effect_settings` included), stays under 1,024 bytes.
 
 ## Versions
 

@@ -9,6 +9,7 @@ Expected values are worked out by hand from the specification, with a calculator
 - `light/curve.json`: lightness to duty.
 - `light/power.json`: the power limit on given duties, in channel order red, green, blue, white.
 - `light/record.json`: the stored record of the light settings, encoded and decoded.
+- `light/favorites_record.json`: the stored record of the favorites, what is read from it (damaged records and entries left out included) and, for valid records, that writing it again gives the same bytes.
 - `light/sequences/*.json`: a start, events and expected outputs:
   - `settings`: the stored light settings at the start, as in the protocol (missing ones take their defaults).
   - `seed`: the seed of the random sequence of the effects, 1 when missing.

@@ -251,7 +251,10 @@ void run_event(const Event &event, uint64_t now)
 {
   if (event.kind == Event::Kind::On || event.kind == Event::Kind::Off)
   {
-    app::set_light(event.kind == Event::Kind::On, now);
+    if (event.kind == Event::Kind::On)
+      (void)app::turn_on(now);
+    else
+      app::set_light(false, now);
     platform::log("light %s at %llu ms", event.kind == Event::Kind::On ? "on" : "off", (unsigned long long)now);
     return;
   }

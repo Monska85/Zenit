@@ -24,6 +24,9 @@ void encode_light_record(const LightSettings &settings, uint8_t (&out)[LIGHT_REC
 // size or version gives the defaults; a field out of its range keeps its default.
 LightSettings decode_light_record(const uint8_t *record, size_t size);
 
+// Whether `record` (`size` bytes) is a light record of the current version whose effect code this firmware knows.
+bool light_record_is_current(const uint8_t *record, size_t size);
+
 // The size of the light record at the start of a settings blob of `size` bytes whose other part is `other_size` bytes
 // (the board record): LIGHT_RECORD_SIZE for a version 2 record, LIGHT_RECORD_V1_SIZE for a version 1 record, 0 when the
 // blob is damaged (another size, or a size that does not match its version).

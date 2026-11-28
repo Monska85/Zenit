@@ -162,6 +162,35 @@ describe("the login", () => {
     expect(board.settings["brightness"]).toBe(33);
   });
 
+  it("shows in the bottom message a refusal of a dialog's request retried after the login", async () => {
+    const board = networked();
+    board.withFavorites();
+    const { session } = await opened(board);
+    board.settings["network_login"] = true;
+    board.openConnection(); // the board forgot the login
+    await session.saveFavorite("christmas");
+    expect(session.getState().phase).toBe("login");
+    await session.submitToken(TOKEN);
+    // The login screen closed the dialog: the retried request's refusal is the page's error
+    expect(session.getState().error).toBe("You already have a favorite with that name.");
+  });
+
+  it("asks for the login, and runs a favorites request of a dialog after it, when the board refuses it", async () => {
+    const board = networked();
+    board.withFavorites();
+    const { session } = await opened(board);
+    board.settings["network_login"] = true;
+    board.openConnection(); // the board forgot the login
+    const outcome = await session.saveFavorite("Bedtime");
+    // Not a refusal to show in the dialog: the login comes first
+    expect(outcome).toMatchObject({ ok: false, code: null, message: null });
+    expect(session.getState()).toMatchObject({ phase: "login", error: null });
+    await session.submitToken(TOKEN);
+    expect(session.getState().phase).toBe("connected");
+    expect(session.getState().favorites?.map((item) => item.name)).toContain("Bedtime");
+    expect(board.favorites?.map((item) => item["name"])).toContain("Bedtime");
+  });
+
   it("never writes the token to the browser's storage", async () => {
     const stored: string[] = [];
     vi.stubGlobal("localStorage", {

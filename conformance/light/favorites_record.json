@@ -1,0 +1,1286 @@
+{
+  "description": "The stored record of the favorites, docs/board/light-v1.md#stored-favorites. Each case lays out a record of 598 bytes: `header` is bytes 0 to 3, `entries` are written from byte 4, 99 bytes each (the id, the name as UTF-8 or `name_hex`, padded with 0 to 80 bytes, the 18-byte light record `look`), every other byte is 0, and `size` cuts or extends it. `favorites` and `start` are what is read, in the form of the protocol's `favorites` reply, `next_id` is byte 3 as read, and `damaged` says the record was refused (the ready-made favorites). With `round_trip`, writing what was read gives the same bytes.",
+  "cases": [
+    {
+      "note": "The ready-made favorites as a written record.",
+      "header": [
+        1,
+        2,
+        0,
+        3
+      ],
+      "entries": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "look": [
+            2,
+            60,
+            5,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "round_trip": true,
+      "favorites": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "effect": "shooting_star",
+          "brightness": 60,
+          "color": "white"
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "effect": "christmas",
+          "brightness": 60,
+          "color_set": "christmas",
+          "hold_seconds": 30
+        }
+      ],
+      "start": null,
+      "next_id": 3
+    },
+    {
+      "note": "Three favorites, the third marked, a name with a 2-byte character.",
+      "header": [
+        1,
+        3,
+        3,
+        4
+      ],
+      "entries": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "look": [
+            2,
+            60,
+            5,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 3,
+          "name": "Città",
+          "look": [
+            2,
+            40,
+            2,
+            1,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            12,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "round_trip": true,
+      "favorites": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "effect": "shooting_star",
+          "brightness": 60,
+          "color": "white"
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "effect": "christmas",
+          "brightness": 60,
+          "color_set": "christmas",
+          "hold_seconds": 30
+        },
+        {
+          "id": 3,
+          "name": "Città",
+          "effect": "breathing",
+          "brightness": 40,
+          "color": "red",
+          "period_seconds": 12,
+          "floor": 20
+        }
+      ],
+      "start": 3,
+      "next_id": 4
+    },
+    {
+      "note": "Every favorite deleted: an empty list, not the ready-made ones.",
+      "header": [
+        1,
+        0,
+        0,
+        5
+      ],
+      "entries": [],
+      "round_trip": true,
+      "favorites": [],
+      "start": null,
+      "next_id": 5
+    },
+    {
+      "note": "Another size: damaged.",
+      "header": [
+        1,
+        2,
+        0,
+        3
+      ],
+      "entries": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "look": [
+            2,
+            60,
+            5,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "size": 597,
+      "damaged": true,
+      "favorites": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "effect": "shooting_star",
+          "brightness": 60,
+          "color": "white"
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "effect": "christmas",
+          "brightness": 60,
+          "color_set": "christmas",
+          "hold_seconds": 30
+        }
+      ],
+      "start": null,
+      "next_id": 3
+    },
+    {
+      "note": "Another version: damaged.",
+      "header": [
+        2,
+        2,
+        0,
+        3
+      ],
+      "entries": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "look": [
+            2,
+            60,
+            5,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "damaged": true,
+      "favorites": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "effect": "shooting_star",
+          "brightness": 60,
+          "color": "white"
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "effect": "christmas",
+          "brightness": 60,
+          "color_set": "christmas",
+          "hold_seconds": 30
+        }
+      ],
+      "start": null,
+      "next_id": 3
+    },
+    {
+      "note": "More than 6 favorites: damaged.",
+      "header": [
+        1,
+        7,
+        0,
+        3
+      ],
+      "entries": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "look": [
+            2,
+            60,
+            5,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "damaged": true,
+      "favorites": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "effect": "shooting_star",
+          "brightness": 60,
+          "color": "white"
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "effect": "christmas",
+          "brightness": 60,
+          "color_set": "christmas",
+          "hold_seconds": 30
+        }
+      ],
+      "start": null,
+      "next_id": 3
+    },
+    {
+      "note": "An effect code this firmware does not know: the entry is left out, and its mark with it.",
+      "header": [
+        1,
+        3,
+        3,
+        4
+      ],
+      "entries": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "look": [
+            2,
+            60,
+            5,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 3,
+          "name": "Future",
+          "look": [
+            2,
+            60,
+            10,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "favorites": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "effect": "shooting_star",
+          "brightness": 60,
+          "color": "white"
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "effect": "christmas",
+          "brightness": 60,
+          "color_set": "christmas",
+          "hold_seconds": 30
+        }
+      ],
+      "start": null,
+      "next_id": 4
+    },
+    {
+      "note": "The id of an earlier entry: left out.",
+      "header": [
+        1,
+        3,
+        0,
+        4
+      ],
+      "entries": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "look": [
+            2,
+            60,
+            5,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 1,
+          "name": "Again",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "favorites": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "effect": "shooting_star",
+          "brightness": 60,
+          "color": "white"
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "effect": "christmas",
+          "brightness": 60,
+          "color_set": "christmas",
+          "hold_seconds": 30
+        }
+      ],
+      "start": null,
+      "next_id": 4
+    },
+    {
+      "note": "Id 0: left out.",
+      "header": [
+        1,
+        3,
+        0,
+        4
+      ],
+      "entries": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "look": [
+            2,
+            60,
+            5,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 0,
+          "name": "Zero",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "favorites": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "effect": "shooting_star",
+          "brightness": 60,
+          "color": "white"
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "effect": "christmas",
+          "brightness": 60,
+          "color_set": "christmas",
+          "hold_seconds": 30
+        }
+      ],
+      "start": null,
+      "next_id": 4
+    },
+    {
+      "note": "A name with a space at the start: left out.",
+      "header": [
+        1,
+        3,
+        0,
+        4
+      ],
+      "entries": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "look": [
+            2,
+            60,
+            5,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 3,
+          "name": " Night",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "favorites": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "effect": "shooting_star",
+          "brightness": 60,
+          "color": "white"
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "effect": "christmas",
+          "brightness": 60,
+          "color_set": "christmas",
+          "hold_seconds": 30
+        }
+      ],
+      "start": null,
+      "next_id": 4
+    },
+    {
+      "note": "A name that is not UTF-8 (a lone lead byte): left out.",
+      "header": [
+        1,
+        3,
+        0,
+        4
+      ],
+      "entries": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "look": [
+            2,
+            60,
+            5,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 3,
+          "name_hex": "41c3",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "favorites": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "effect": "shooting_star",
+          "brightness": 60,
+          "color": "white"
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "effect": "christmas",
+          "brightness": 60,
+          "color_set": "christmas",
+          "hold_seconds": 30
+        }
+      ],
+      "start": null,
+      "next_id": 4
+    },
+    {
+      "note": "The name of an earlier entry with other capitals: left out.",
+      "header": [
+        1,
+        3,
+        0,
+        4
+      ],
+      "entries": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "look": [
+            2,
+            60,
+            5,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 3,
+          "name": "CHRISTMAS",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "favorites": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "effect": "shooting_star",
+          "brightness": 60,
+          "color": "white"
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "effect": "christmas",
+          "brightness": 60,
+          "color_set": "christmas",
+          "hold_seconds": 30
+        }
+      ],
+      "start": null,
+      "next_id": 4
+    },
+    {
+      "note": "A light record of version 1 inside an entry: left out.",
+      "header": [
+        1,
+        3,
+        0,
+        4
+      ],
+      "entries": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "look": [
+            2,
+            60,
+            5,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 3,
+          "name": "Old",
+          "look": [
+            1,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "favorites": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "effect": "shooting_star",
+          "brightness": 60,
+          "color": "white"
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "effect": "christmas",
+          "brightness": 60,
+          "color_set": "christmas",
+          "hold_seconds": 30
+        }
+      ],
+      "start": null,
+      "next_id": 4
+    },
+    {
+      "note": "Brightness 0 is out of range: it keeps its default, 60, and the entry loads.",
+      "header": [
+        1,
+        1,
+        0,
+        2
+      ],
+      "entries": [
+        {
+          "id": 1,
+          "name": "Dim",
+          "look": [
+            2,
+            0,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "favorites": [
+        {
+          "id": 1,
+          "name": "Dim",
+          "effect": "shooting_star",
+          "brightness": 60,
+          "color": "white"
+        }
+      ],
+      "start": null,
+      "next_id": 2
+    },
+    {
+      "note": "A mark that names no favorite counts as none.",
+      "header": [
+        1,
+        2,
+        9,
+        3
+      ],
+      "entries": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "look": [
+            2,
+            60,
+            6,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "look": [
+            2,
+            60,
+            5,
+            0,
+            4,
+            1,
+            2,
+            3,
+            0,
+            0,
+            30,
+            0,
+            8,
+            20,
+            20,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "favorites": [
+        {
+          "id": 1,
+          "name": "Starry night",
+          "effect": "shooting_star",
+          "brightness": 60,
+          "color": "white"
+        },
+        {
+          "id": 2,
+          "name": "Christmas",
+          "effect": "christmas",
+          "brightness": 60,
+          "color_set": "christmas",
+          "hold_seconds": 30
+        }
+      ],
+      "start": null,
+      "next_id": 3
+    }
+  ]
+}

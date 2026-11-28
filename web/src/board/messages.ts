@@ -15,7 +15,14 @@ const BOARD_ERRORS: Record<string, string> = {
   no_network: "Zenit is not connected to WiFi.",
   updates_off: "Updates are turned off. Turn them on in the Device page.",
   nothing_to_install: "There is no update to install. Check for updates first.",
+  favorites_full: "Your favorites are full. Delete one first.",
+  unknown_favorite: "That favorite is no longer on Zenit.",
+  bad_name: "Zenit did not accept that name.",
+  name_taken: "You already have a favorite with that name.",
 };
+
+/** The sentence for an error code of the board, or undefined for one this app has no sentence for. */
+export const errorSentence = (code: string): string | undefined => own(BOARD_ERRORS, code);
 
 /** The WebSocket close statuses the board uses on purpose (docs/board/wifi-and-updates-v1.md#websocket). */
 export const CLOSE_MESSAGES: Record<number, string> = {

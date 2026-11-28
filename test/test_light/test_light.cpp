@@ -10,9 +10,11 @@
 #include <string>
 #include <vector>
 
+#include <favorites.h>
 #include <light_record.h>
 
 #include "app.h"
+#include "firmware.h"
 #include "output.h"
 #include "platform.h"
 #include "settings.h"
@@ -1101,9 +1103,363 @@ void test_a_blob_whose_size_does_not_match_its_version_is_damaged()
   TEST_ASSERT_TRUE(settings::current().breath_pattern == zenit::BreathPattern::FourSevenEight);
 }
 
+// ---- Favorites (docs/board/light-v1.md#favorites) ----
+
+namespace
+{
+bool name_ok(const std::string &name) { return zenit::valid_favorite_name(name.data(), name.size()); }
+
+// A light settings value with the given effect and every other field away from its default.
+LightSettings unusual(Effect effect)
+{
+  LightSettings s;
+  s.effect = effect;
+  s.brightness = 33;
+  s.color = Color::Blue;
+  s.colors.count = 2;
+  s.colors.color[0] = Color::Green;
+  s.colors.color[1] = Color::Red;
+  s.color_set = zenit::ColorSet::Sunset;
+  s.hold_seconds = 77;
+  s.period_seconds = 13;
+  s.breath_pattern = zenit::BreathPattern::Box;
+  s.floor = 44;
+  s.twinkle_strength = 9;
+  s.timer_minutes = 90;
+  return s;
+}
+} // namespace
+
+void test_favorite_names()
+{
+  TEST_ASSERT_TRUE(name_ok("A"));
+  TEST_ASSERT_TRUE(name_ok("Starry night"));
+  TEST_ASSERT_TRUE(name_ok("Citt\xC3\xA0 di notte"));
+  TEST_ASSERT_TRUE(name_ok("a  b"));
+  TEST_ASSERT_TRUE(name_ok(std::string(20, 'x')));
+  std::string emoji; // 20 four-byte characters: 80 bytes, the longest name
+  for (int i = 0; i < 20; i++)
+    emoji += "\xF0\x9F\x8C\x99";
+  TEST_ASSERT_TRUE(name_ok(emoji));
+  TEST_ASSERT_FALSE(name_ok(emoji + "x"));
+  TEST_ASSERT_FALSE(name_ok(std::string(21, 'x')));
+  TEST_ASSERT_FALSE(name_ok(""));
+  TEST_ASSERT_FALSE(name_ok(" a"));
+  TEST_ASSERT_FALSE(name_ok("a "));
+  TEST_ASSERT_FALSE(name_ok(" "));
+  TEST_ASSERT_FALSE(name_ok("a\tb"));
+  TEST_ASSERT_FALSE(name_ok("a\x7F"));
+  TEST_ASSERT_FALSE(name_ok("a\xC2\x85")); // U+0085
+  TEST_ASSERT_FALSE(name_ok("a\xE2\x80\x8B"
+                            "b")); // U+200B zero width space
+  TEST_ASSERT_FALSE(name_ok("a\xE2\x80\xAE"
+                            "b")); // U+202E right-to-left override
+  TEST_ASSERT_FALSE(name_ok("a\xE2\x81\xA6"
+                            "b")); // U+2066
+  TEST_ASSERT_FALSE(name_ok("\xEF\xBB\xBF"
+                            "a")); // U+FEFF
+  TEST_ASSERT_TRUE(name_ok("a\xE2\x80\xAF"
+                           "b"));                 // U+202F narrow no-break space is allowed
+  TEST_ASSERT_FALSE(name_ok("\xC0\xAF"));         // overlong
+  TEST_ASSERT_FALSE(name_ok("\xED\xA0\x80"));     // a surrogate
+  TEST_ASSERT_FALSE(name_ok("\xF4\x90\x80\x80")); // above U+10FFFF
+  TEST_ASSERT_FALSE(name_ok("\xE2\x82"));         // cut short
+  TEST_ASSERT_FALSE(name_ok(std::string("a\0b", 3)));
+  TEST_ASSERT_TRUE(zenit::same_favorite_name("Christmas", "cHRISTMAS"));
+  TEST_ASSERT_FALSE(zenit::same_favorite_name("Christmas", "Christmas 2"));
+  TEST_ASSERT_FALSE(zenit::same_favorite_name("\xC3\x80", "\xC3\xA0")); // only ASCII letters ignore case
+}
+
+void test_ready_made_favorites()
+{
+  const zenit::Favorites f = zenit::ready_made_favorites();
+  TEST_ASSERT_EQUAL(2, f.count);
+  TEST_ASSERT_EQUAL(zenit::NO_FAVORITE, f.start);
+  TEST_ASSERT_EQUAL(1, f.items[0].id);
+  TEST_ASSERT_EQUAL_STRING("Starry night", f.items[0].name);
+  TEST_ASSERT_TRUE(f.items[0].look.effect == Effect::ShootingStar);
+  TEST_ASSERT_TRUE(f.items[0].look.color == Color::White);
+  TEST_ASSERT_EQUAL(60, f.items[0].look.brightness);
+  TEST_ASSERT_EQUAL(2, f.items[1].id);
+  TEST_ASSERT_EQUAL_STRING("Christmas", f.items[1].name);
+  TEST_ASSERT_TRUE(f.items[1].look.effect == Effect::Christmas);
+  TEST_ASSERT_TRUE(f.items[1].look.color_set == zenit::ColorSet::Christmas);
+  TEST_ASSERT_EQUAL(30, f.items[1].look.hold_seconds);
+  TEST_ASSERT_EQUAL(3, f.next_id);
+}
+
+void test_favorite_operations()
+{
+  zenit::Favorites f = zenit::ready_made_favorites();
+  using R = zenit::FavoriteResult;
+  TEST_ASSERT_TRUE(zenit::add_favorite(f, "christmas", LightSettings()) == R::NameTaken);
+  TEST_ASSERT_TRUE(zenit::add_favorite(f, "", LightSettings()) == R::BadName);
+  TEST_ASSERT_TRUE(zenit::add_favorite(f, "Reading", unusual(Effect::Breathing)) == R::Ok);
+  TEST_ASSERT_EQUAL(3, f.items[2].id);
+  TEST_ASSERT_EQUAL(0, f.items[2].look.timer_minutes); // a look has no timer
+  for (const char *name : {"D", "E", "F"})
+    TEST_ASSERT_TRUE(zenit::add_favorite(f, name, LightSettings()) == R::Ok);
+  TEST_ASSERT_EQUAL(6, f.count);
+  TEST_ASSERT_TRUE(zenit::add_favorite(f, "G", LightSettings()) == R::Full);
+  // A taken name is reported before a full list: it is the more specific problem
+  TEST_ASSERT_TRUE(zenit::add_favorite(f, "d", LightSettings()) == R::NameTaken);
+  TEST_ASSERT_TRUE(zenit::set_start_favorite(f, 3) == R::Ok);
+  TEST_ASSERT_TRUE(zenit::set_start_favorite(f, 99) == R::Unknown);
+  TEST_ASSERT_EQUAL(3, f.start);
+  TEST_ASSERT_TRUE(zenit::replace_favorite(f, 3, unusual(Effect::Twinkle)) == R::Ok);
+  TEST_ASSERT_EQUAL_STRING("Reading", f.items[2].name);
+  TEST_ASSERT_TRUE(f.items[2].look.effect == Effect::Twinkle);
+  TEST_ASSERT_EQUAL(3, f.start);
+  TEST_ASSERT_TRUE(zenit::rename_favorite(f, 3, "reading") == R::Ok); // its own name, in other case
+  TEST_ASSERT_TRUE(zenit::rename_favorite(f, 3, "Starry Night") == R::NameTaken);
+  TEST_ASSERT_TRUE(zenit::rename_favorite(f, 3, "a\nb") == R::BadName);
+  TEST_ASSERT_TRUE(zenit::rename_favorite(f, 42, "Fine") == R::Unknown);
+  TEST_ASSERT_TRUE(zenit::delete_favorite(f, 3) == R::Ok);
+  TEST_ASSERT_EQUAL(5, f.count);
+  TEST_ASSERT_EQUAL(zenit::NO_FAVORITE, f.start); // the mark went with it
+  TEST_ASSERT_EQUAL_STRING("D", f.items[2].name); // the others keep their order
+  TEST_ASSERT_TRUE(zenit::delete_favorite(f, 3) == R::Unknown);
+  // Ids are not given again at once: the next save takes the next one
+  TEST_ASSERT_TRUE(zenit::add_favorite(f, "H", LightSettings()) == R::Ok);
+  TEST_ASSERT_EQUAL(7, f.items[5].id);
+  TEST_ASSERT_TRUE(zenit::set_start_favorite(f, zenit::NO_FAVORITE) == R::Ok);
+}
+
+void test_favorite_ids_wrap_and_skip_ids_in_use()
+{
+  zenit::Favorites f = zenit::ready_made_favorites(); // ids 1 and 2
+  f.next_id = 255;
+  TEST_ASSERT_TRUE(zenit::add_favorite(f, "A", LightSettings()) == zenit::FavoriteResult::Ok);
+  TEST_ASSERT_EQUAL(255, f.items[2].id);
+  TEST_ASSERT_EQUAL(1, f.next_id);
+  TEST_ASSERT_TRUE(zenit::add_favorite(f, "B", LightSettings()) == zenit::FavoriteResult::Ok);
+  TEST_ASSERT_EQUAL(3, f.items[3].id); // 1 and 2 are in use
+  f.next_id = 0;                       // a damaged counter starts at 1
+  TEST_ASSERT_TRUE(zenit::add_favorite(f, "C", LightSettings()) == zenit::FavoriteResult::Ok);
+  TEST_ASSERT_EQUAL(4, f.items[4].id);
+}
+
+void test_applying_a_look_sets_only_what_its_effect_reads()
+{
+  zenit::Favorite favorite;
+  favorite.look = unusual(Effect::Breathing);
+  LightSettings current;
+  current.timer_minutes = 15;
+  const LightSettings next = zenit::apply_favorite_look(current, favorite);
+  LightSettings expected = current;
+  expected.effect = Effect::Breathing;
+  expected.brightness = 33;
+  expected.color = Color::Blue;
+  expected.period_seconds = 13;
+  expected.floor = 44;
+  TEST_ASSERT_TRUE(next == expected);
+  favorite.look = unusual(Effect::ColorChange);
+  expected = current;
+  expected.effect = Effect::ColorChange;
+  expected.brightness = 33;
+  expected.colors = favorite.look.colors;
+  expected.hold_seconds = 77;
+  TEST_ASSERT_TRUE(zenit::apply_favorite_look(current, favorite) == expected);
+  favorite.look = unusual(Effect::GuidedBreathing);
+  const LightSettings guided = zenit::apply_favorite_look(current, favorite);
+  TEST_ASSERT_TRUE(guided.breath_pattern == zenit::BreathPattern::Box);
+  TEST_ASSERT_EQUAL(15, guided.timer_minutes);
+  TEST_ASSERT_EQUAL(30, guided.hold_seconds);
+}
+
+void test_favorites_record_round_trip()
+{
+  zenit::Favorites f = zenit::ready_made_favorites();
+  TEST_ASSERT_TRUE(zenit::add_favorite(f, "Citt\xC3\xA0", unusual(Effect::GuidedBreathing)) ==
+                   zenit::FavoriteResult::Ok);
+  f.start = 3;
+  uint8_t record[zenit::FAVORITES_RECORD_SIZE];
+  zenit::encode_favorites_record(f, record);
+  TEST_ASSERT_EQUAL(598, sizeof(record));
+  TEST_ASSERT_EQUAL(1, record[0]);
+  TEST_ASSERT_EQUAL(3, record[1]);
+  TEST_ASSERT_EQUAL(3, record[2]);
+  TEST_ASSERT_EQUAL(4, record[3]);
+  zenit::Favorites back;
+  TEST_ASSERT_TRUE(zenit::decode_favorites_record(record, sizeof(record), back));
+  TEST_ASSERT_TRUE(back == f);
+}
+
+void test_damaged_favorites_records()
+{
+  zenit::Favorites f = zenit::ready_made_favorites();
+  TEST_ASSERT_TRUE(zenit::add_favorite(f, "Third", LightSettings()) == zenit::FavoriteResult::Ok);
+  f.start = 3;
+  uint8_t record[zenit::FAVORITES_RECORD_SIZE];
+  zenit::encode_favorites_record(f, record);
+  zenit::Favorites back;
+  // Another size, another version or too many entries: the ready-made favorites
+  TEST_ASSERT_FALSE(zenit::decode_favorites_record(record, sizeof(record) - 1, back));
+  TEST_ASSERT_TRUE(back == zenit::ready_made_favorites());
+  record[0] = 2;
+  TEST_ASSERT_FALSE(zenit::decode_favorites_record(record, sizeof(record), back));
+  record[0] = 1;
+  record[1] = 7;
+  TEST_ASSERT_FALSE(zenit::decode_favorites_record(record, sizeof(record), back));
+  record[1] = 3;
+  // An entry with an effect this firmware does not know is left out, and the mark it carried with it
+  const size_t third = 4 + 2 * zenit::FAVORITE_ENTRY_SIZE;
+  record[third + 1 + zenit::MAX_FAVORITE_NAME_BYTES + 2] = zenit::EFFECT_COUNT;
+  TEST_ASSERT_TRUE(zenit::decode_favorites_record(record, sizeof(record), back));
+  TEST_ASSERT_EQUAL(2, back.count);
+  TEST_ASSERT_EQUAL(zenit::NO_FAVORITE, back.start);
+  // A repeated id, a bad name, a repeated name, a light record of another version: left out
+  zenit::encode_favorites_record(f, record);
+  record[third] = 1;
+  TEST_ASSERT_TRUE(zenit::decode_favorites_record(record, sizeof(record), back));
+  TEST_ASSERT_EQUAL(2, back.count);
+  zenit::encode_favorites_record(f, record);
+  record[third + 1] = ' ';
+  TEST_ASSERT_TRUE(zenit::decode_favorites_record(record, sizeof(record), back));
+  TEST_ASSERT_EQUAL(2, back.count);
+  zenit::encode_favorites_record(f, record);
+  std::memcpy(record + third + 1, "CHRISTMAS", 9);
+  TEST_ASSERT_TRUE(zenit::decode_favorites_record(record, sizeof(record), back));
+  TEST_ASSERT_EQUAL(2, back.count);
+  zenit::encode_favorites_record(f, record);
+  record[third + 1 + zenit::MAX_FAVORITE_NAME_BYTES] = 1;
+  TEST_ASSERT_TRUE(zenit::decode_favorites_record(record, sizeof(record), back));
+  TEST_ASSERT_EQUAL(2, back.count);
+  // A field out of range keeps its default and the entry loads
+  zenit::encode_favorites_record(f, record);
+  record[third + 1 + zenit::MAX_FAVORITE_NAME_BYTES + 1] = 0; // brightness 0
+  TEST_ASSERT_TRUE(zenit::decode_favorites_record(record, sizeof(record), back));
+  TEST_ASSERT_EQUAL(3, back.count);
+  TEST_ASSERT_EQUAL(60, back.items[2].look.brightness);
+  TEST_ASSERT_EQUAL(3, back.start);
+}
+
+void test_favorites_memory()
+{
+  settings::begin();
+  TEST_ASSERT_TRUE(settings::favorites() == zenit::ready_made_favorites());
+  TEST_ASSERT_TRUE(settings::sim_read_raw("favorites").empty()); // nothing written for the ready-made ones
+  zenit::Favorites next = settings::favorites();
+  TEST_ASSERT_TRUE(zenit::delete_favorite(next, 1) == zenit::FavoriteResult::Ok);
+  TEST_ASSERT_TRUE(zenit::delete_favorite(next, 2) == zenit::FavoriteResult::Ok);
+  TEST_ASSERT_TRUE(settings::commit_favorites(next) == settings::Commit::Ok);
+  TEST_ASSERT_EQUAL(zenit::FAVORITES_RECORD_SIZE, settings::sim_read_raw("favorites").size());
+  // Deleted ready-made favorites stay deleted at the next start
+  settings::sim_reset_current();
+  settings::begin();
+  TEST_ASSERT_EQUAL(0, settings::favorites().count);
+  const size_t writes = settings::sim_write_count();
+  TEST_ASSERT_TRUE(settings::commit_favorites(settings::favorites()) == settings::Commit::Ok);
+  TEST_ASSERT_EQUAL(writes, settings::sim_write_count()); // nothing written when nothing changes
+  // A failed write changes nothing
+  settings::sim_fail_key("favorites");
+  TEST_ASSERT_TRUE(settings::commit_favorites(zenit::ready_made_favorites()) == settings::Commit::Failed);
+  settings::sim_fail_key("");
+  TEST_ASSERT_EQUAL(0, settings::favorites().count);
+  // A damaged record: the ready-made favorites, and the next change writes over it
+  settings::sim_write_raw("favorites", std::vector<uint8_t>(10, 0));
+  settings::begin();
+  TEST_ASSERT_TRUE(settings::favorites() == zenit::ready_made_favorites());
+  // ... even a commit of the same favorites (a reset to defaults): the damaged record does not stay
+  TEST_ASSERT_TRUE(settings::commit_favorites(zenit::ready_made_favorites()) == settings::Commit::Ok);
+  TEST_ASSERT_EQUAL(zenit::FAVORITES_RECORD_SIZE, settings::sim_read_raw("favorites").size());
+  // A failed read: the ready-made favorites, no change saved until a restart, and the health check fails
+  settings::sim_fail_read_key("favorites");
+  settings::begin();
+  settings::sim_fail_read_key("");
+  TEST_ASSERT_FALSE(settings::read_ok());
+  TEST_ASSERT_TRUE(settings::favorites() == zenit::ready_made_favorites());
+  TEST_ASSERT_TRUE(settings::commit_favorites(next) == settings::Commit::Failed);
+}
+
+namespace
+{
+// Stores favorites with "Christmas" marked, as a board that keeps them, then restarts the board at time 0.
+void restart_with_start_favorite(bool trial)
+{
+  settings::begin();
+  zenit::Favorites f = settings::favorites();
+  TEST_ASSERT_TRUE(zenit::set_start_favorite(f, 2) == zenit::FavoriteResult::Ok);
+  TEST_ASSERT_TRUE(settings::commit_favorites(f) == settings::Commit::Ok);
+  firmware::sim_set_trial(trial);
+  output::begin();
+  settings::sim_reset_current();
+  settings::begin();
+  app::begin(0, 1);
+  firmware::sim_set_trial(false);
+}
+
+std::vector<uint8_t> stored_settings() { return settings::sim_read_raw("settings"); }
+} // namespace
+
+void test_power_up_applies_the_start_favorite()
+{
+  restart_with_start_favorite(false);
+  TEST_ASSERT_TRUE(settings::current().effect == Effect::Christmas);
+  TEST_ASSERT_EQUAL(zenit::LIGHT_RECORD_SIZE + zenit::net::BOARD_RECORD_SIZE, stored_settings().size());
+  TEST_ASSERT_EQUAL(5, stored_settings()[2]); // saved: christmas
+  TEST_ASSERT_TRUE(app::tick(1000).status.effect == Effect::Christmas);
+}
+
+void test_power_up_on_trial_applies_the_start_favorite_without_saving()
+{
+  restart_with_start_favorite(true);
+  TEST_ASSERT_TRUE(settings::current().effect == Effect::Christmas);
+  TEST_ASSERT_EQUAL(0, stored_settings()[2]); // the stored light is still static
+  TEST_ASSERT_TRUE(app::tick(1000).status.effect == Effect::Christmas);
+  // The next save that changes something writes the look with it
+  LightSettings next = settings::current();
+  next.timer_minutes = 30;
+  TEST_ASSERT_TRUE(app::change_settings(next, settings::board(), 2000) == settings::Commit::Ok);
+  TEST_ASSERT_EQUAL(5, stored_settings()[2]);
+}
+
+void test_turning_on_applies_the_start_favorite()
+{
+  restart_with_start_favorite(false);
+  LightSettings mine = settings::current();
+  mine.effect = Effect::Static;
+  mine.color = Color::Red;
+  mine.timer_minutes = 1;
+  TEST_ASSERT_TRUE(app::change_settings(mine, settings::board(), 1000) == settings::Commit::Ok);
+  // On while on changes nothing
+  TEST_ASSERT_TRUE(app::turn_on(2000) == settings::Commit::Ok);
+  TEST_ASSERT_TRUE(settings::current().effect == Effect::Static);
+  // The timer's fade-out: the light is still on, so it only comes back up
+  for (uint64_t now = 2000; now <= 70000; now += zenit::TICK_MS)
+    app::tick(now);
+  TEST_ASSERT_TRUE(app::turn_on(70000) == settings::Commit::Ok);
+  TEST_ASSERT_TRUE(settings::current().effect == Effect::Static);
+  // From off: the start favorite, saved, with the timer as set
+  app::set_light(false, 71000);
+  settings::sim_fail_writes(true);
+  TEST_ASSERT_TRUE(app::turn_on(72000) == settings::Commit::Failed);
+  TEST_ASSERT_FALSE(app::tick(72000).status.on); // nothing changed
+  TEST_ASSERT_TRUE(settings::current().effect == Effect::Static);
+  settings::sim_fail_writes(false);
+  TEST_ASSERT_TRUE(app::turn_on(73000) == settings::Commit::Ok);
+  TEST_ASSERT_TRUE(settings::current().effect == Effect::Christmas);
+  TEST_ASSERT_TRUE(settings::current().color == Color::Red); // not read by christmas: kept
+  TEST_ASSERT_EQUAL(1, settings::current().timer_minutes);
+  const zenit::LightFrame frame = app::tick(74100);
+  TEST_ASSERT_TRUE(frame.status.on);
+  TEST_ASSERT_TRUE(frame.status.timer);
+}
+
 int main()
 {
   UNITY_BEGIN();
+  RUN_TEST(test_favorite_names);
+  RUN_TEST(test_ready_made_favorites);
+  RUN_TEST(test_favorite_operations);
+  RUN_TEST(test_favorite_ids_wrap_and_skip_ids_in_use);
+  RUN_TEST(test_applying_a_look_sets_only_what_its_effect_reads);
+  RUN_TEST(test_favorites_record_round_trip);
+  RUN_TEST(test_damaged_favorites_records);
+  RUN_TEST(test_favorites_memory);
+  RUN_TEST(test_power_up_applies_the_start_favorite);
+  RUN_TEST(test_power_up_on_trial_applies_the_start_favorite_without_saving);
+  RUN_TEST(test_turning_on_applies_the_start_favorite);
   RUN_TEST(test_defaults_are_valid);
   RUN_TEST(test_limits);
   RUN_TEST(test_color_lists);

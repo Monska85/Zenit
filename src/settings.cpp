@@ -5,6 +5,7 @@
 #include "platform.h"
 #include "settings_store.h"
 
+#include <favorites.h>
 #include <light_record.h>
 
 #include <cstring>
@@ -26,6 +27,13 @@ bool update_read = true;
 // The size of the light record in the blob as stored, and whether a version 1 layout is kept (keep_old_layout).
 size_t stored_light_size = zenit::LIGHT_RECORD_SIZE;
 bool keep_layout = false;
+// The favorites (docs/board/light-v1.md#stored-favorites), their own record under their own key. A missing record is
+// the ready-made favorites, written only at the first change.
+zenit::Favorites favorite_values;
+bool favorites_read = true;
+// The stored favorites record is damaged: it is written over at the next commit, even of the same favorites.
+bool favorites_damaged = false;
+constexpr const char *FAVORITES_KEY = "favorites";
 // The light record and the board record (docs/board/light-v1.md#stored-settings,
 // docs/board/wifi-and-updates-v1.md#stored-settings) are stored together as one blob under one key, so a save of both
 // is one atomic write: it is all or nothing even when the power fails.
@@ -88,6 +96,21 @@ void begin()
       platform::log("the new token could not be saved");
   }
 
+  favorite_values = zenit::ready_made_favorites();
+  static uint8_t favorite_bytes[zenit::FAVORITES_RECORD_SIZE];
+  size_t favorite_size = 0;
+  const store::Read favorite_state = store::read(FAVORITES_KEY, favorite_bytes, sizeof(favorite_bytes), favorite_size);
+  favorites_read = favorite_state != store::Read::Failed;
+  favorites_damaged = false;
+  if (!favorites_read)
+    platform::log("the favorites could not be read: the ready-made ones show, nothing is saved until a restart");
+  else if (favorite_state == store::Read::Found &&
+           !zenit::decode_favorites_record(favorite_bytes, favorite_size, favorite_values))
+  {
+    favorites_damaged = true;
+    platform::log("the favorites record is damaged: the ready-made favorites show");
+  }
+
   update_values = zenit::update::UpdateRecord();
   uint8_t update_record_bytes[zenit::update::UPDATE_RECORD_SIZE];
   size_t update_size = 0;
@@ -106,7 +129,8 @@ const zenit::net::BoardSettings &board() { return board_values; }
 const zenit::update::UpdateRecord &update_record() { return update_values; }
 bool memory_ok() { return memory_open; }
 bool update_record_readable() { return update_readable; }
-bool read_ok() { return settings_read && update_read; }
+bool read_ok() { return settings_read && update_read && favorites_read; }
+const zenit::Favorites &favorites() { return favorite_values; }
 
 zenit::net::BoardSettings fresh_board_settings()
 {
@@ -143,6 +167,23 @@ Commit commit_both(const zenit::LightSettings &light, const zenit::net::BoardSet
   return Commit::Ok;
 }
 
+void use_unsaved(const zenit::LightSettings &light) { values = light; }
+
+Commit commit_favorites(const zenit::Favorites &next)
+{
+  if (!favorites_read)
+    return Commit::Failed;
+  if (next == favorite_values && !favorites_damaged)
+    return Commit::Ok;
+  static uint8_t record[zenit::FAVORITES_RECORD_SIZE];
+  zenit::encode_favorites_record(next, record);
+  if (!store::write(FAVORITES_KEY, record, sizeof(record)))
+    return Commit::Failed;
+  favorite_values = next;
+  favorites_damaged = false;
+  return Commit::Ok;
+}
+
 Commit commit_update(const zenit::update::UpdateRecord &next)
 {
   if (next == update_values && update_readable)
@@ -163,6 +204,9 @@ void sim_reset_current()
   board_values = zenit::net::BoardSettings();
   update_values = zenit::update::UpdateRecord();
   update_readable = true;
+  favorite_values = zenit::ready_made_favorites();
+  favorites_read = true;
+  favorites_damaged = false;
   settings_read = true;
   update_read = true;
 }

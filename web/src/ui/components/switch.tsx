@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 
 /**
  * A setting that is on or off, drawn as a switch: a real checkbox with the switch role, transparent over a track whose
@@ -14,7 +14,7 @@ export function SwitchField({
   disabled,
 }: {
   label: string;
-  hint?: string;
+  hint?: ReactNode;
   checked: boolean;
   onChange: (checked: boolean) => void;
   disabled?: boolean;

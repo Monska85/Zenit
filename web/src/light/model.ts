@@ -5,7 +5,8 @@
 
 import { own } from "../lib/own";
 import { boardSettingsProblem } from "../device/settings";
-import type { BoardInfo, Settings } from "../protocol/types";
+import { favoriteNameKey, MAX_FAVORITE_NAME, MAX_FAVORITES, REFUSED_IN_NAME } from "../protocol/schema";
+import type { BoardInfo, Favorite, Settings } from "../protocol/types";
 
 export type { Settings } from "../protocol/types";
 
@@ -239,4 +240,81 @@ export function customTimerLabel(minutes: number): string {
   return minutes !== 0 && !(TIMER_PRESETS as readonly number[]).includes(minutes)
     ? `Custom · ${formatTimer(minutes)}`
     : "Custom";
+}
+
+/** The most favorites and the longest name this board accepts, from `info.limits` (the protocol's numbers otherwise). */
+export function favoriteLimits(info: BoardInfo): { count: number; name: number } {
+  return { count: info.limits.favorites ?? MAX_FAVORITES, name: info.limits.favorite_name ?? MAX_FAVORITE_NAME };
+}
+
+/** The names of the settings an effect reads: the board's list, else this app's own, else none (an unknown effect). */
+function readSettings(effect: string, info: BoardInfo): readonly string[] {
+  const reported = info.effect_settings === undefined ? undefined : own(info.effect_settings, effect);
+  return reported ?? own(EFFECTS, effect)?.params ?? [];
+}
+
+const sameValue = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * Whether the light shows `favorite` (ignoring whether it is on): the same effect, the same brightness and the same value
+ * of every setting that effect reads. The timer is not part of a look. An effect with no list of settings is compared by
+ * effect and brightness only.
+ */
+export function favoriteMatches(favorite: Favorite, settings: Settings, info: BoardInfo): boolean {
+  if (favorite.effect !== settings.effect || favorite.brightness !== settings.brightness) return false;
+  const saved = favorite as unknown as Record<string, unknown>;
+  const now = settings as unknown as Record<string, unknown>;
+  return readSettings(favorite.effect, info).every((name) => {
+    const a = own(saved, name);
+    const b = own(now, name);
+    // A value one side does not have cannot differ
+    return a === undefined || b === undefined || sameValue(a, b);
+  });
+}
+
+const length = (text: string): number => [...text].length;
+const cut = (text: string, characters: number): string => [...text].slice(0, characters).join("").trimEnd();
+
+/**
+ * The name the save dialog starts with: the effect's name, then "Shooting star 2", "Shooting star 3" and so on while a
+ * favorite has it. Always a name the board accepts, within `max` characters.
+ */
+export function defaultFavoriteName(effectLabel: string, existing: readonly string[], max = MAX_FAVORITE_NAME): string {
+  const taken = new Set(existing.map(favoriteNameKey));
+  const clean = effectLabel.trim().normalize("NFC");
+  const base = clean !== "" && !REFUSED_IN_NAME.test(clean) ? cut(clean, max) : "My light";
+  for (let number = 1; ; number++) {
+    const suffix = number === 1 ? "" : ` ${number}`;
+    const name = `${cut(base, max - suffix.length)}${suffix}`;
+    if (!taken.has(favoriteNameKey(name))) return name;
+  }
+}
+
+/**
+ * Checks a name typed by a person. `name` is what to send (normalized, ends trimmed); `problem` is the sentence to show,
+ * or null when the board will take it. `exceptId` is the favorite being renamed: it may keep its own name.
+ */
+export function favoriteNameProblem(
+  typed: string,
+  favorites: readonly Favorite[],
+  exceptId: number | null = null,
+  max = MAX_FAVORITE_NAME,
+): { name: string; problem: string | null } {
+  const name = typed.normalize("NFC").trim();
+  const problem = (sentence: string | null): { name: string; problem: string | null } => ({ name, problem: sentence });
+  if (name === "") return problem("Give your favorite a name.");
+  if (REFUSED_IN_NAME.test(name))
+    return problem("That name has a character Zenit cannot keep. Try letters, numbers and spaces.");
+  if (length(name) > max) return problem(`Keep the name to ${max} characters or fewer.`);
+  const key = favoriteNameKey(name);
+  const other = favorites.find((item) => item.id !== exceptId && favoriteNameKey(item.name) === key);
+  if (other) return problem(`You already have a favorite called ${other.name}. Choose another name.`);
+  return problem(null);
+}
+
+/** The color a favorite's preview dot shows: its color, the first of its colors, or the first color of its palette. */
+export function favoritePreviewColor(favorite: Favorite): string | null {
+  if (favorite.color !== undefined) return favorite.color;
+  if (favorite.colors !== undefined && favorite.colors[0] !== undefined) return favorite.colors[0];
+  return favorite.color_set === undefined ? null : (own(COLOR_SET_COLORS, favorite.color_set)?.[0] ?? null);
 }

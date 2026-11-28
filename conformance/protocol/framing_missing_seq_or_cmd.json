@@ -214,7 +214,9 @@
           "free": 0
         },
         "limits": {
-          "line": 1024
+          "line": 1024,
+          "favorites": 6,
+          "favorite_name": 20
         }
       },
       "note": "the lowest seq"
@@ -312,7 +314,9 @@
           "free": 0
         },
         "limits": {
-          "line": 1024
+          "line": 1024,
+          "favorites": 6,
+          "favorite_name": 20
         }
       },
       "note": "the highest seq"

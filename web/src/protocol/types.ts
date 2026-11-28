@@ -19,6 +19,36 @@ export interface BoardInfo {
   power_limit_mw: number;
   memory: { free: number; largest: number };
   nvs: { used: number; free: number };
+  limits: BoardLimits;
+}
+
+/** What the board accepts; `favorites` and `favorite_name` come together and are missing on a board from before them. */
+export interface BoardLimits {
+  line: number;
+  favorites?: number;
+  favorite_name?: number;
+}
+
+/** A saved look: the effect, the brightness and the settings that effect reads (the others are missing). */
+export interface Favorite {
+  id: number;
+  name: string;
+  effect: string;
+  brightness: number;
+  color?: string;
+  colors?: string[];
+  color_set?: string;
+  hold_seconds?: number;
+  period_seconds?: number;
+  floor?: number;
+  twinkle_strength?: number;
+  breath_pattern?: string;
+}
+
+/** The reply of every favorites command that lists them: the favorites in the board's order, and the one Zenit turns on with. */
+export interface FavoriteList {
+  favorites: Favorite[];
+  start: number | null;
 }
 
 /** The light settings of `settings_get`, with the names of the protocol. */
@@ -122,6 +152,10 @@ export const plain = (value: JsonValue): unknown => {
 /** The object of a reply as plain JavaScript values (floats as numbers), once the schema has checked its types. */
 export const toInfo = (reply: JsonObject): BoardInfo => plain(reply) as BoardInfo;
 export const toSettings = (reply: JsonObject): Settings => plain(reply["settings"] as JsonValue) as Settings;
+export const toFavorites = (reply: JsonObject): FavoriteList => {
+  const value = plain(reply) as FavoriteList;
+  return { favorites: value.favorites, start: value.start };
+};
 export const toLight = (reply: JsonObject): LightStatus => plain(reply["light"] as JsonValue) as LightStatus;
 export const toStatus = (reply: JsonObject): BoardStatus => {
   const value = plain(reply) as Partial<BoardStatus>;

@@ -220,6 +220,56 @@ const LIGHT = shape({
   timer: anyOf(isNull, TIMER),
 });
 
+export const MAX_FAVORITES = 6;
+export const MAX_FAVORITE_NAME = 20;
+/** Control and invisible formatting characters, which a name may not hold. */
+// eslint-disable-next-line no-control-regex -- the control characters are the point
+export const REFUSED_IN_NAME = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/u;
+/** 1 to 20 characters (code points), none refused, no space at either end. */
+const favoriteName: Check = (value) => {
+  if (typeof value !== "string") return false;
+  const length = [...value].length;
+  return (
+    length >= 1 &&
+    length <= MAX_FAVORITE_NAME &&
+    !value.startsWith(" ") &&
+    !value.endsWith(" ") &&
+    !REFUSED_IN_NAME.test(value)
+  );
+};
+/** Two names are the same when equal with the ASCII letters compared without case. */
+export const favoriteNameKey = (name: string): string => name.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+
+// A favorite: its look is the effect, the brightness and the settings that effect reads, with their ranges
+const FAVORITE = shape(
+  { id: intIn(1, 255), name: favoriteName, effect: isText, brightness: intIn(1, 100) },
+  {
+    color: isText,
+    colors: distinctTexts(2, 4),
+    color_set: isText,
+    hold_seconds: intIn(5, 600),
+    period_seconds: intIn(4, 20),
+    floor: intIn(5, 80),
+    twinkle_strength: intIn(5, 50),
+    breath_pattern: isText,
+  },
+);
+// The list: at most 6, ids and names each once, a mark that names one of them
+const FAVORITES = and(shape({ favorites: arrayOf(FAVORITE), start: anyOf(intIn(1, 255), isNull) }), (reply) => {
+  const items = reply["favorites"] as { id: number; name: string }[];
+  return (
+    items.length <= MAX_FAVORITES &&
+    new Set(items.map((item) => item.id)).size === items.length &&
+    new Set(items.map((item) => favoriteNameKey(item.name))).size === items.length &&
+    (reply["start"] === null || items.some((item) => item.id === reply["start"]))
+  );
+});
+// The favorites limits come together, from the firmware with favorites
+const LIMITS = and(
+  shape({ line: isInt }, { favorites: intIn(1, 255), favorite_name: intIn(1, 255) }),
+  (limits) => Object.hasOwn(limits, "favorites") === Object.hasOwn(limits, "favorite_name"),
+);
+
 /** The known fields of a successful reply, by command. */
 export const REPLIES: Record<string, Check> = {
   info: shape(
@@ -234,7 +284,7 @@ export const REPLIES: Record<string, Check> = {
       power_limit_mw: isInt,
       memory: shape({ free: isInt, largest: isInt }),
       nvs: shape({ used: isInt, free: isInt }),
-      limits: shape({ line: isInt }),
+      limits: LIMITS,
     },
     { effect_settings: settingsByEffect, breath_patterns: arrayOf(isText) },
   ),
@@ -247,6 +297,12 @@ export const REPLIES: Record<string, Check> = {
   auth_challenge: shape({ nonce: matching(/^[0-9a-f]{32}$/) }),
   update_check: shape({ update: UPDATE }),
   update_install: shape({ update: UPDATE }),
+  favorites: FAVORITES,
+  favorite_save: FAVORITES,
+  favorite_rename: FAVORITES,
+  favorite_delete: FAVORITES,
+  favorite_start: FAVORITES,
+  favorite_apply: shape({ light: LIGHT, settings: SETTINGS }),
 };
 
 /** Whether a `seq` is one the protocol allows: a whole number from 0 to 4,294,967,295. */

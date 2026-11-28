@@ -7,6 +7,7 @@
 #pragma once
 
 #include <board_settings.h>
+#include <favorites.h>
 #include <light_settings.h>
 #include <update_record.h>
 
@@ -39,6 +40,15 @@ enum class Commit
   Ok,
   Failed // nothing changed
 };
+
+// The favorites: the stored ones, or the ready-made ones when none are stored (docs/board/light-v1.md#favorites).
+const zenit::Favorites &favorites();
+// Stores the favorites in their own record, unless they equal the current ones and the stored record is not damaged.
+// Fails after a failed read of that record, until a restart reads it.
+Commit commit_favorites(const zenit::Favorites &next);
+// Makes `light` the current light settings without writing them: the start favorite at a power-up on trial. The next
+// save that changes something writes them with it.
+void use_unsaved(const zenit::LightSettings &light);
 
 // Stores the light and board settings in one write, unless they equal the current ones. Both must be valid. A board
 // token that is empty is made first.

@@ -5,6 +5,7 @@
 
 #include <unity.h>
 
+#include <favorites_json.h>
 #include <frame.h>
 #include <line_reader.h>
 #include <proto_limits.h>
@@ -163,6 +164,52 @@ void test_record()
       bytes.push_back(b.as<uint8_t>());
     TEST_ASSERT_TRUE_MESSAGE(zenit::decode_light_record(bytes.data(), bytes.size()) == expected, label.c_str());
   }
+}
+
+void test_favorites_record()
+{
+  JsonDocument doc = load(LIGHT + "/favorites_record.json");
+  int index = 0;
+  for (JsonObjectConst c : doc["cases"].as<JsonArrayConst>())
+  {
+    const std::string label = "favorites record case " + std::to_string(index++);
+    std::vector<uint8_t> record(zenit::FAVORITES_RECORD_SIZE, 0);
+    for (size_t i = 0; i < 4; i++)
+      record[i] = c["header"][i].as<uint8_t>();
+    size_t at = 4;
+    for (JsonObjectConst entry : c["entries"].as<JsonArrayConst>())
+    {
+      record[at] = entry["id"].as<uint8_t>();
+      std::string name;
+      if (entry["name_hex"].is<const char *>())
+        TEST_ASSERT_TRUE_MESSAGE(zenit_test::from_hex(entry["name_hex"].as<std::string>(), name), label.c_str());
+      else
+        name = entry["name"].as<std::string>();
+      TEST_ASSERT_TRUE_MESSAGE(name.size() <= zenit::MAX_FAVORITE_NAME_BYTES, label.c_str());
+      std::copy(name.begin(), name.end(), record.begin() + at + 1);
+      TEST_ASSERT_EQUAL_size_t_MESSAGE(zenit::LIGHT_RECORD_SIZE, entry["look"].size(), label.c_str());
+      for (size_t i = 0; i < zenit::LIGHT_RECORD_SIZE; i++)
+        record[at + 1 + zenit::MAX_FAVORITE_NAME_BYTES + i] = entry["look"][i].as<uint8_t>();
+      at += zenit::FAVORITE_ENTRY_SIZE;
+    }
+    if (c["size"].is<size_t>())
+      record.resize(c["size"].as<size_t>(), 0);
+    zenit::Favorites read;
+    const bool readable = zenit::decode_favorites_record(record.data(), record.size(), read);
+    TEST_ASSERT_EQUAL_MESSAGE(c["damaged"] | false, !readable, (label + " damaged").c_str());
+    JsonDocument got;
+    zenit::proto::write_favorites(got.to<JsonObject>(), read);
+    TEST_ASSERT_TRUE_MESSAGE(got["favorites"] == c["favorites"], (label + " favorites").c_str());
+    TEST_ASSERT_TRUE_MESSAGE(got["start"] == c["start"], (label + " start").c_str());
+    TEST_ASSERT_EQUAL_UINT8_MESSAGE(c["next_id"].as<uint8_t>(), read.next_id, (label + " next id").c_str());
+    if (c["round_trip"] | false)
+    {
+      uint8_t again[zenit::FAVORITES_RECORD_SIZE];
+      zenit::encode_favorites_record(read, again);
+      TEST_ASSERT_EQUAL_UINT8_ARRAY_MESSAGE(record.data(), again, sizeof(again), (label + " round trip").c_str());
+    }
+  }
+  TEST_ASSERT_GREATER_THAN(0, index);
 }
 
 void test_sequences()
@@ -467,6 +514,7 @@ int main()
   RUN_TEST(test_curve);
   RUN_TEST(test_power);
   RUN_TEST(test_record);
+  RUN_TEST(test_favorites_record);
   RUN_TEST(test_sequences);
   RUN_TEST(test_protocol_cases);
   RUN_TEST(test_hash_cases);

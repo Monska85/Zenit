@@ -91,7 +91,9 @@
           "free": 0
         },
         "limits": {
-          "line": 1024
+          "line": 1024,
+          "favorites": 6,
+          "favorite_name": 20
         }
       },
       "note": "CR LF: the one carriage return is ignored"
@@ -226,7 +228,9 @@
           "free": 0
         },
         "limits": {
-          "line": 1024
+          "line": 1024,
+          "favorites": 6,
+          "favorite_name": 20
         }
       },
       "note": "a tab between tokens is whitespace"
@@ -321,7 +325,9 @@
           "free": 0
         },
         "limits": {
-          "line": 1024
+          "line": 1024,
+          "favorites": 6,
+          "favorite_name": 20
         }
       },
       "note": "so is a space"
@@ -434,7 +440,9 @@
           "free": 0
         },
         "limits": {
-          "line": 1024
+          "line": 1024,
+          "favorites": 6,
+          "favorite_name": 20
         }
       },
       "transport": "wifi",
