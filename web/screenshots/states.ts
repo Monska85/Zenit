@@ -16,6 +16,8 @@ export interface State {
   dark?: boolean;
   /** Reaches the state from a blank page and waits until it shows. */
   reach: (page: Page) => Promise<void>;
+  /** The browser's time zone, UTC (the simulator's) unless a state needs another. */
+  timezoneId?: string;
   /** What the screenshot hides: text that changes by the second. */
   mask?: (page: Page) => import("@playwright/test").Locator[];
 }
@@ -334,6 +336,29 @@ export const STATES: State[] = [
       await deviceOverWifi(page, networkBoard());
       await page.getByText("Advanced settings", { exact: true }).click();
       await expect(page.getByRole("region", { name: "Time", exact: true })).toBeVisible();
+    },
+  },
+  {
+    // A browser in another zone than the board's: the offer of its zone, first on the Device page
+    name: "device-time-offer",
+    dark: true,
+    timezoneId: "Asia/Kolkata",
+    reach: async (page) => {
+      await deviceOverWifi(page, networkBoard());
+      await expect(page.getByTestId("time-zone-offer")).toContainText("Zenit uses UTC time.");
+    },
+  },
+  {
+    // The search of the Time card with its suggestions open
+    name: "device-time-search",
+    dark: true,
+    reach: async (page) => {
+      await deviceOverWifi(page, networkBoard());
+      await page.getByText("Advanced settings", { exact: true }).click();
+      const search = page.getByRole("combobox", { name: "Find a time zone" });
+      await search.fill("ind");
+      await search.press("ArrowDown");
+      await expect(page.getByRole("listbox", { name: "Time zones" }).getByRole("option")).toHaveCount(8);
     },
   },
   {

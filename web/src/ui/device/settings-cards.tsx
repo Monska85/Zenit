@@ -8,9 +8,7 @@ import {
   formatMinute,
   hourOptions,
   ntpServerProblem,
-  TIME_ZONES,
   windowToSend,
-  zoneOfBrowser,
   timezoneProblem,
   UPDATE_MODE_HINTS,
   UPDATE_MODE_LABELS,
@@ -28,8 +26,9 @@ import { SwitchField } from "../components/switch";
 import { ValueForm } from "../components/value-form";
 import { ConfirmDialog } from "../components/confirm-dialog";
 import { useCommit } from "../light/use-commit";
-
-const CUSTOM = "custom";
+import { ZONE_TABLE } from "../../device/zones";
+import { cn } from "../../lib/utils";
+import { zoneText, ZoneSearch } from "./time-zone";
 
 /** How long the install window waits after the last change of a time before it sends both. */
 const WINDOW_SETTLE_MS = 1000;
@@ -196,64 +195,59 @@ export function UpdateSettingsCard() {
   );
 }
 
-/** The listed zone of this browser's own time zone, or null when the list has none or the browser does not say. */
-function deviceZone(): { value: string; city: string } | null {
-  try {
-    return zoneOfBrowser(Intl.DateTimeFormat().resolvedOptions().timeZone);
-  } catch {
-    return null;
-  }
-}
-
-/** The time zone and the clock of the board, which the install window and the dates depend on. */
-export function TimeCard() {
+/**
+ * The time zone and the clock of the board, which the install window and the dates depend on. `chosen` is the zone
+ * chosen on this page, which names the board's string while it is still its string.
+ */
+export function TimeCard({ chosen, onChoose }: { chosen: string | null; onChoose: (name: string) => void }) {
   const { board } = useBoard();
   const { pending, commit } = useCommit();
-  const [custom, setCustom] = useState(false);
   const settings = board.settings && { ...board.settings, ...pending };
-  if (!settings || settings.timezone === undefined || board.phase !== "connected") return null;
-  const zone = settings.timezone;
-  const listed = TIME_ZONES.some((entry) => entry.value === zone);
-  const customShown = custom || !listed;
-  const mine = deviceZone();
+  const zone = settings?.timezone;
+  const named = zone !== undefined && ZONE_TABLE.boardZone(zone, chosen, null) !== null;
+  // The raw field is open while the board holds a string no zone has, unless the person opened or closed it; choosing a
+  // zone by search gives the field back to that rule
+  const [rawChoice, setRawChoice] = useState<boolean | null>(null);
+  const raw = rawChoice ?? !named;
+  if (!settings || zone === undefined || board.phase !== "connected") return null;
   return (
     <Card aria-labelledby="time-title">
       <CardTitle id="time-title">Time</CardTitle>
       <div className="flex flex-col gap-5">
-        {mine !== null && mine.value !== zone && (
-          <div>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setCustom(false);
-                void commit({ timezone: mine.value });
-              }}
-            >
-              Use this device's time zone ({mine.city})
-            </Button>
-          </div>
-        )}
-        <SelectField
-          label="Time zone"
-          value={customShown ? CUSTOM : zone}
-          options={[...TIME_ZONES, { value: CUSTOM, label: "Another time zone..." }]}
-          onChange={(value) => {
-            if (value === CUSTOM) setCustom(true);
-            else {
-              setCustom(false);
-              void commit({ timezone: value });
-            }
+        <p className="text-base">
+          <span className="text-muted-foreground">Time zone: </span>
+          <span className={cn("font-medium break-words", !named && "font-mono")} data-testid="time-zone-current">
+            {zoneText(zone, chosen)}
+          </span>
+        </p>
+        <ZoneSearch
+          onChoose={(choice) => {
+            setRawChoice(null);
+            onChoose(choice.name);
+            void commit({ timezone: choice.posix });
           }}
         />
-        {customShown && (
-          <ValueForm
-            label="Time zone text"
-            hint="A POSIX time zone such as CET-1CEST,M3.5.0,M10.5.0/3."
-            value={zone}
-            validate={timezoneProblem}
-            onSubmit={(timezone) => void commit({ timezone })}
-          />
-        )}
+        <details
+          open={raw}
+          // The browser also fires toggle when the page sets `open`: only a change from what the page set is a choice
+          onToggle={(event) => {
+            if (event.currentTarget.open !== raw) setRawChoice(event.currentTarget.open);
+          }}
+          data-testid="time-zone-raw"
+        >
+          <summary className="flex min-h-11 cursor-pointer items-center text-base font-medium">
+            Type a POSIX time zone
+          </summary>
+          <div className="mt-2">
+            <ValueForm
+              label="Time zone text"
+              hint="For experts: a POSIX time zone such as CET-1CEST,M3.5.0,M10.5.0/3."
+              value={zone}
+              validate={timezoneProblem}
+              onSubmit={(timezone) => void commit({ timezone })}
+            />
+          </div>
+        </details>
         {settings.ntp_server !== undefined && (
           <ValueForm
             label="Time server"

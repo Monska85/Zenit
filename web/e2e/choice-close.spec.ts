@@ -27,7 +27,6 @@ const LISTS = [
   { label: "WiFi strength", value: "13", advanced: false },
   { label: "Look for updates", value: "3", advanced: true },
   { label: "Check the time", value: "24", advanced: true },
-  { label: "Time zone", value: "CET-1CEST,M3.5.0,M10.5.0/3", advanced: true },
 ];
 
 for (const list of LISTS) {
@@ -49,6 +48,21 @@ for (const list of LISTS) {
     await next.close();
   });
 }
+
+test("keeps a time zone chosen by search when the page closes at once", async ({ browser, servedSimulator }) => {
+  const page = await openServed(browser, servedSimulator, "#/device");
+  await openAdvanced(page);
+  const search = page.getByRole("combobox", { name: "Find a time zone" });
+  await search.fill("kolkata");
+  await search.press("ArrowDown");
+  await search.press("Enter");
+  await page.close();
+
+  const next = await openServed(browser, servedSimulator, "#/device");
+  await openAdvanced(next);
+  await expect(next.getByLabel("Time zone text")).toHaveValue("IST-5:30");
+  await next.close();
+});
 
 test("keeps an effect chosen on the Light page when the page closes at once", async ({ browser, servedSimulator }) => {
   const page = await openServed(browser, servedSimulator);

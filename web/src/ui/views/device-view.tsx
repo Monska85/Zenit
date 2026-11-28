@@ -11,6 +11,7 @@ import { Card, CardTitle } from "../components/card";
 import { FirmwareCard, publishedState, usePublishedFirmware, type Published } from "../device/firmware-card";
 import { MaintenanceCard } from "../device/maintenance-card";
 import { AccessCard, hasAdvancedSettings, TimeCard, UpdateSettingsCard } from "../device/settings-cards";
+import { TimeZoneOffer } from "../device/time-zone";
 import { WebAppCard } from "../device/web-app-card";
 import { WifiCard } from "../device/wifi-card";
 import type { Route } from "../route";
@@ -84,7 +85,17 @@ function BoardCard({ published }: { published: Published }) {
 }
 
 /** The settings most people never change, folded: how Zenit updates itself, and its clock. Open while the page is. */
-function Advanced({ open, onToggle }: { open: boolean; onToggle: (open: boolean) => void }) {
+function Advanced({
+  open,
+  onToggle,
+  chosen,
+  onChoose,
+}: {
+  open: boolean;
+  onToggle: (open: boolean) => void;
+  chosen: string | null;
+  onChoose: (name: string) => void;
+}) {
   const { board } = useBoard();
   if (board.phase !== "connected" || !hasAdvancedSettings(board.settings)) return null;
   return (
@@ -103,7 +114,7 @@ function Advanced({ open, onToggle }: { open: boolean; onToggle: (open: boolean)
       </summary>
       <div className="mt-4 flex flex-col gap-4">
         <UpdateSettingsCard />
-        <TimeCard />
+        <TimeCard chosen={chosen} onChoose={onChoose} />
       </div>
     </details>
   );
@@ -114,9 +125,12 @@ export function DeviceView({ go }: { go: (route: Route) => void }) {
   const served = board.served !== null;
   const published = usePublishedFirmware(!served);
   const [advanced, setAdvanced] = useState(false);
+  // The time zone chosen on this page, which names the board's POSIX string while it is still that zone's
+  const [zone, setZone] = useState<string | null>(null);
   return (
     <>
       <h1 className="text-2xl font-semibold">Device</h1>
+      <TimeZoneOffer chosen={zone} onChoose={setZone} />
       {board.info ? (
         <BoardCard published={published} />
       ) : (
@@ -130,7 +144,7 @@ export function DeviceView({ go }: { go: (route: Route) => void }) {
       <WifiCard />
       <FirmwareCard published={published} />
       <WebAppCard />
-      <Advanced open={advanced} onToggle={setAdvanced} />
+      <Advanced open={advanced} onToggle={setAdvanced} chosen={zone} onChoose={setZone} />
       <AccessCard />
       <MaintenanceCard published={published === "missing" ? null : published} go={go} />
     </>

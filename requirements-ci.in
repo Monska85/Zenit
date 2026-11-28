@@ -11,3 +11,6 @@ websockets==17.4
 
 # The certificate bundle: Espressif's generator (tools/crt_bundle.py) and the check of the GitHub Pages chain
 cryptography==50.0.2
+
+# The IANA time zone table of the web app (tools/tz_table.py makes web/src/device/zones.json from it)
+tzdata==2026.6

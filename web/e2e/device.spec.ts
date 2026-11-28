@@ -130,3 +130,61 @@ test("shows the outlines of the Device page while it loads", async ({ page }) =>
   await expect(placeholder).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Maintenance" })).toBeVisible();
 });
+
+// Zones the old list of twelve did not have: the simulator starts on UTC, as a new board does
+for (const { zone, city, posix, label } of [
+  { zone: "Asia/Kolkata", city: "Kolkata", posix: "IST-5:30", label: "Kolkata (India)" },
+  { zone: "America/Sao_Paulo", city: "Sao Paulo", posix: "<-03>3", label: "Sao Paulo (Brazil)" },
+]) {
+  test.describe(`a browser in ${zone}`, () => {
+    test.use({ timezoneId: zone });
+
+    test("is offered its own time zone first on the Device page, and the board keeps it", async ({
+      page,
+      simulator,
+    }) => {
+      await connectByAddress(page, simulator.url);
+      await page.getByRole("link", { name: "Device" }).click();
+      const offer = page.getByTestId("time-zone-offer");
+      await expect(page.locator("main h2").first()).toHaveText("Time zone");
+      await expect(offer).toContainText("Zenit uses UTC time.");
+      await expect(page.getByTestId("advanced")).not.toHaveAttribute("open");
+      await offer.getByRole("button", { name: `Use this device's time zone (${city})` }).click();
+      await expect(offer).toHaveCount(0);
+      await page.getByText("Advanced settings", { exact: true }).click();
+      await expect(page.getByTestId("time-zone-current")).toHaveText(label);
+      await expect(page.getByLabel("Time zone text")).toHaveValue(posix);
+      // A new page reads it from the board, and offers nothing
+      await page.reload();
+      await connectByAddress(page, simulator.url);
+      await page.getByRole("link", { name: "Device" }).click();
+      await expect(page.getByRole("region", { name: "Your Zenit" })).toBeVisible();
+      await expect(offer).toHaveCount(0);
+    });
+  });
+}
+
+test("chooses a time zone by search, and takes one typed by hand", async ({ page, simulator }) => {
+  await connectByAddress(page, simulator.url);
+  await page.getByRole("link", { name: "Device" }).click();
+  // Same zone as the browser (UTC): no offer
+  await expect(page.getByRole("region", { name: "Your Zenit" })).toBeVisible();
+  await expect(page.getByTestId("time-zone-offer")).toHaveCount(0);
+  await page.getByText("Advanced settings", { exact: true }).click();
+  const card = page.getByRole("region", { name: "Time", exact: true });
+  await expect(card.getByTestId("time-zone-current")).toHaveText("UTC");
+  const search = card.getByRole("combobox", { name: "Find a time zone" });
+  await search.fill("adelaide");
+  await search.press("ArrowDown");
+  await search.press("Enter");
+  await expect(card.getByTestId("time-zone-current")).toHaveText("Adelaide (Australia)");
+  await expect(card.getByLabel("Time zone text")).toHaveValue("ACST-9:30ACDT,M10.1.0,M4.1.0/3");
+  await card.getByText("Type a POSIX time zone").click();
+  await card.getByLabel("Time zone text").fill("<+0545>-5:45");
+  await card.getByRole("button", { name: "Set", exact: true }).first().click();
+  // The string of Kathmandu: the board's string is named by the table
+  await expect(card.getByTestId("time-zone-current")).toHaveText("Kathmandu (Nepal)");
+  await card.getByLabel("Time zone text").fill("ABC-3:21");
+  await card.getByRole("button", { name: "Set", exact: true }).first().click();
+  await expect(card.getByTestId("time-zone-current")).toHaveText("ABC-3:21");
+});
