@@ -42,15 +42,20 @@
   },
   "wifi": {
     "title": "WiFi",
-    "theNetwork": "the network",
-    "namedNetwork": "\"{{ssid}}\"",
     "states": {
       "not_configured": "Not set up. Zenit is not on a WiFi network.",
-      "connecting": "Connecting to {{name}}...",
-      "connected": "Connected to {{name}}.",
-      "not_found": "Zenit cannot see {{name}}. It keeps trying.",
-      "wrong_password": "{{name}} refused the password. Zenit keeps trying.",
-      "no_address": "Zenit joined {{name}} but got no address. It keeps trying."
+      "connecting": "Connecting to \"{{name}}\"...",
+      "connected": "Connected to \"{{name}}\".",
+      "not_found": "Zenit cannot see \"{{name}}\". It keeps trying.",
+      "wrong_password": "\"{{name}}\" refused the password. Zenit keeps trying.",
+      "no_address": "Zenit joined \"{{name}}\" but got no address. It keeps trying."
+    },
+    "statesUnnamed": {
+      "connecting": "Connecting to the network...",
+      "connected": "Connected to the network.",
+      "not_found": "Zenit cannot see the network. It keeps trying.",
+      "wrong_password": "The network refused the password. Zenit keeps trying.",
+      "no_address": "Zenit joined the network but got no address. It keeps trying."
     },
     "unknownState": "Zenit reports a WiFi state this app does not know.",
     "signals": {
@@ -101,8 +106,16 @@
     "scanning": "Looking for WiFi networks, up to 15 seconds...",
     "noNetworks": "Zenit sees no networks. Type the name of yours below.",
     "networks": "Networks Zenit sees",
-    "networkSecure": "{{signal}} signal, password",
-    "networkOpen": "{{signal}} signal, open",
+    "networkSecure": {
+      "strong": "strong signal, password",
+      "fair": "fair signal, password",
+      "weak": "weak signal, password"
+    },
+    "networkOpen": {
+      "strong": "strong signal, open",
+      "fair": "fair signal, open",
+      "weak": "weak signal, open"
+    },
     "networkName": "Network name",
     "password": "Password",
     "hidePassword": "Hide password",
@@ -145,9 +158,9 @@
     "progress": {
       "checking": "Looking for an update...",
       "downloading": "Downloading the update...",
-      "downloadingPercent": "Downloading the update: {{progress}} %",
+      "downloadingPercent": "Downloading the update: {{progress}}%",
       "downloadingApp": "Downloading the new app...",
-      "downloadingAppPercent": "Downloading the new app: {{progress}} %",
+      "downloadingAppPercent": "Downloading the new app: {{progress}}%",
       "verifying": "Checking the download...",
       "restarting": "Restarting to start the new version...",
       "unknown": "Zenit is busy with the update ({{state}})."
@@ -246,7 +259,7 @@
   },
   "time": {
     "title": "Time",
-    "zone": "Time zone: ",
+    "zone": "Time zone: {{zone}}",
     "rawSummary": "Type a POSIX time zone",
     "rawLabel": "Time zone text",
     "rawHint": "For experts: a POSIX time zone such as CET-1CEST,M3.5.0,M10.5.0/3.",
@@ -266,7 +279,7 @@
       "hint": "Type a city or a country, then choose. Zenit changes at once.",
       "list": "Time zones",
       "none": "No time zone matches. Try a nearby city or the country.",
-      "found_one": "{{count}} time zones found.",
+      "found_one": "{{count}} time zone found.",
       "found_other": "{{count}} time zones found."
     }
   },

@@ -26,13 +26,11 @@ import { EditDialog, FavoriteSheet, FullDialog, SaveDialog, type Note, type Shee
 
 /** The words of a tile for assistive technology: its name, then what is true of it. */
 export function tileName(favorite: Favorite, onNow: boolean, turnsOn: boolean): string {
-  return [
-    favorite.name,
-    onNow ? i18n.t("favorites:tile.onNowName") : null,
-    turnsOn ? i18n.t("favorites:tile.turnsOnName") : null,
-  ]
-    .filter(Boolean)
-    .join(i18n.t("favorites:tile.separator"));
+  const name = favorite.name;
+  if (onNow && turnsOn) return i18n.t("favorites:tile.nameOnNowTurnsOn", { name });
+  if (onNow) return i18n.t("favorites:tile.nameOnNow", { name });
+  if (turnsOn) return i18n.t("favorites:tile.nameTurnsOn", { name });
+  return name;
 }
 
 function Tile({

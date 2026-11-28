@@ -6,10 +6,13 @@
   "hero": {
     "title": "Light now",
     "off": "Off",
-    "on": "On",
-    "separator": " · ",
-    "fadesOut": "fades out in {{time}}",
-    "reduced": "Light reduced to {{value}} % to stay cool.",
+    "line": "{{color}} · {{effect}}",
+    "lineTimer": "{{color}} · {{effect}} · fades out in {{time}}",
+    "lineSoon": "{{color}} · {{effect}} · fades out in less than a minute",
+    "onLine": "On · {{effect}}",
+    "onLineTimer": "On · {{effect}} · fades out in {{time}}",
+    "onLineSoon": "On · {{effect}} · fades out in less than a minute",
+    "reduced": "Light reduced to {{value}}% to stay cool.",
     "brightness": "Brightness",
     "usb": "Connected by USB. The light gets no power from USB: plug in the panel power socket and use WiFi to see it."
   },
@@ -92,7 +95,6 @@
     "colorsAtLeast": "Keep at least {{min}} colors.",
     "colorsAtMost": "Pick at most {{max}} colors.",
     "palette": "Palette",
-    "paletteSeparator": ", ",
     "pattern": "Breathing pattern",
     "hold": "Time on each color",
     "period": "Length of a breath",
@@ -111,11 +113,10 @@
     "wholeMinutes": "Choose a whole number of minutes from 1 to {{max}}.",
     "fadesOut": "Fades out in {{time}}.",
     "fadesOutSoon": "Fades out in less than a minute.",
-    "ended": "The timer ended. The light stays off until you turn it on.",
-    "lessThanMinute": "less than a minute"
+    "ended": "The timer ended. The light stays off until you turn it on."
   },
   "units": {
-    "percent": "{{value}} %",
+    "percent": "{{value}}%",
     "seconds": "{{seconds}} s",
     "minutes": "{{minutes}} min",
     "hours": "{{hours}} h",

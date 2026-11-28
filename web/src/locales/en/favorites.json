@@ -8,9 +8,9 @@
   "tile": {
     "onNow": "On now",
     "turnsOn": "Turns on with this",
-    "onNowName": "on now",
-    "turnsOnName": "turns on with this",
-    "separator": ", "
+    "nameOnNow": "{{name}}, on now",
+    "nameTurnsOn": "{{name}}, turns on with this",
+    "nameOnNowTurnsOn": "{{name}}, on now, turns on with this"
   },
   "done": {
     "applied": "{{name}} is on.",

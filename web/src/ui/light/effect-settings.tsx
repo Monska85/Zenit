@@ -4,7 +4,7 @@ import { own } from "../../lib/own";
 import { Check } from "lucide-react";
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { message, translate, type Message } from "../../i18n";
+import { formatList, message, translate, type Message } from "../../i18n";
 import {
   COLOR_SET_COLORS,
   COLOR_SWATCHES,
@@ -141,7 +141,7 @@ function PaletteChoice({ info, settings, commit }: { info: BoardInfo; settings: 
       options={info.color_sets.map((set) => ({
         value: set,
         label: colorSetLabel(set),
-        hint: own(COLOR_SET_COLORS, set)?.map(colorLabel).join(t("settings.paletteSeparator")),
+        hint: formatList((own(COLOR_SET_COLORS, set) ?? []).map(colorLabel)) || undefined,
       }))}
     />
   );

@@ -9,8 +9,9 @@ import { STATES, THEMES, WIDTHS } from "./states.ts";
 
 for (const state of STATES) {
   test.describe(() => {
-    test.use({ timezoneId: state.timezoneId ?? "UTC" });
+    test.use({ timezoneId: state.timezoneId ?? "UTC", locale: state.locale ?? "en-GB" });
     for (const size of WIDTHS) {
+      if (state.phoneOnly && size.name !== "phone") continue;
       for (const theme of THEMES) {
         if (theme === "dark" && !state.dark) continue;
         test(`${state.name} at ${size.width} px, ${theme} theme`, async ({ page }) => {

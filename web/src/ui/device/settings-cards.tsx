@@ -22,6 +22,7 @@ import { useBoard, useSession } from "../board-context";
 import { Banner } from "../components/banner";
 import { Button } from "../components/button";
 import { Card, CardTitle } from "../components/card";
+import { Sentence, slot } from "../components/sentence";
 import { ChoiceGroup } from "../components/choice";
 import { SelectField } from "../components/select";
 import { SwitchField } from "../components/switch";
@@ -220,10 +221,16 @@ export function TimeCard({ chosen, onChoose }: { chosen: string | null; onChoose
       <CardTitle id="time-title">{t("time.title")}</CardTitle>
       <div className="flex flex-col gap-5">
         <p className="text-base">
-          <span className="text-muted-foreground">{t("time.zone")}</span>
-          <span className={cn("font-medium break-words", !named && "font-mono")} data-testid="time-zone-current">
-            {zoneText(zone, chosen)}
-          </span>
+          <Sentence
+            text={t("time.zone", { zone: slot("zone") })}
+            parts={{
+              zone: (
+                <span className={cn("font-medium break-words", !named && "font-mono")} data-testid="time-zone-current">
+                  {zoneText(zone, chosen)}
+                </span>
+              ),
+            }}
+          />
         </p>
         <ZoneSearch
           onChoose={(choice) => {

@@ -10,14 +10,14 @@ The user is a family member with no technical background, holding a phone or sit
 
 - **Browsers.** Chrome and Edge on desktop, and Chrome on Android, for USB (Web Serial), which also sets up the WiFi. Any current browser for a WebSocket connection, and so for the page a Zenit serves itself. A browser without Web Serial shows the USB option disabled, with the reason in one sentence.
 - **Screens.** From 360 px wide to desktop, one-handed on a phone, light and dark theme from the system, with a choice in the header menu.
-- **Language.** English is the source language and the default. Every user-visible string is in the catalogs of `web/src/locales/`, and other languages follow them ([Languages](#languages), [ADR 0007](../adr/0007-translations.md)).
+- **Language.** English is the source language and the default; Italian is the first translation. Every user-visible string is in the catalogs of `web/src/locales/`, and other languages follow them ([Languages](#languages), [ADR 0007](../adr/0007-translations.md)).
 - **Offline.** The app is a static site and needs no server of its own; once loaded it needs only the board. The board serves the same app on its own address, so a phone on the home network needs nothing from the internet.
 
 ## Views
 
 A header with the name and a status pill; two pages, **Light** and **Device**, in a tab bar fixed to the bottom of the screen on a phone (below 640 px, where the thumb is) and under the header on a wider screen; and a footer link to **Privacy** on every page. The address fragment holds the view (`#/light`, `#/device`, `#/privacy`, `#/connect`), so the back button works.
 
-**Status pill.** A compact button with a dot and a few words: "WiFi" or "USB" and the board's name when it reports one (`zenit-a1b2`: the name of the board that served the page, or `status.wifi.hostname`) while connected, "Connecting...", "Log in needed", "Restarting..." or "Reconnecting..." while a lost connection is opened again by itself, and "Not connected" otherwise. The dot repeats what the words say. For a WebSocket the address is the pill's tooltip and a row of the Device page. The pill opens a small panel: the connection in words ("Connected over WiFi to zenit-a1b2."), the theme choice (Match my device, Light, Dark) and a Disconnect button while a board is connected, waits for a token or is lost (never on a page served by a Zenit, which has no other place to connect to). Escape, a click outside or moving the focus away closes the panel. The theme choice is there in every state, with or without a board.
+**Status pill.** A compact button with a dot and a few words: "WiFi" or "USB" and the board's name when it reports one (`zenit-a1b2`: the name of the board that served the page, or `status.wifi.hostname`) while connected, "Connecting...", "Log in needed", "Restarting..." or "Reconnecting..." while a lost connection is opened again by itself, and "Not connected" otherwise. The dot repeats what the words say. For a WebSocket the address is the pill's tooltip and a row of the Device page. The pill opens a small panel: the connection in words ("Connected over WiFi to zenit-a1b2."), the theme choice (Match my device, Light, Dark), the language choice (Match my device, then each language named in its own language: English, Italiano) and a Disconnect button while a board is connected, waits for a token or is lost (never on a page served by a Zenit, which has no other place to connect to). Escape, a click outside or moving the focus away closes the panel. The theme and language choices are there in every state, with or without a board. A language choice takes effect at once, with no reload: the connection and what is on screen stay.
 
 **A lost connection** has one message, a banner above the view (the Light, Device and Privacy pages; not the Connect screen, where a board is being chosen): "Connection lost.", the reason (for example "Zenit did not answer. Check the cable or the address."), "These are the last values Zenit reported." and a Reconnect button inside it. The view keeps the last values, greyed and disabled. While the connection is opened again by itself the banner says "Zenit is restarting. It connects again by itself in a few seconds." or "Connecting to Zenit again..." instead, with no button. When the connection comes back, a short confirmation "Connected again." shows at the bottom of the screen for 4 seconds.
 
@@ -46,7 +46,7 @@ The one screen a user lives in, top to bottom. On a phone the favorites start on
 
 1. **Now.** One card with the power button, one line saying what the light does now, and the brightness:
    - **Power.** A large round toggle button, on or off, with no word under it: its look and its pressed state say it. It sends `light` and is not saved, as in the protocol. Lit, it is filled with the brand color (its icon in the brand's foreground), so on and off never look alike whatever the light's color, and it glows softly in the color the light shows now (`light.color` of `status`: warm white, red, ...); the glow breathes only when the system allows motion. A color the app has no swatch for glows in the brand color. Off, it is a muted grey button with no glow.
-   - **Now line.** From `status`: the color's name and the effect's name, and while a timer runs the time left in minutes ("Warm white · Steady · fades out in 12 min"; "less than a minute" in the last minute, so it never counts seconds), or "Off". Under it, when the power limit reduces the light: "Light reduced to 80 % to stay cool."
+   - **Now line.** From `status`: the color's name and the effect's name, and while a timer runs the time left in minutes ("Warm white · Steady · fades out in 12 min"; "less than a minute" in the last minute, so it never counts seconds), or "Off". Under it, when the power limit reduces the light: "Light reduced to 80% to stay cool."
    - **Brightness.** A slider from 1 to 100 with its value. It sends `settings_set {brightness}` when released (or when a key press ends), never while moving.
    - When the connection is USB, a note at the bottom of the card: "Connected by USB. The light gets no power from USB: plug in the panel power socket and use WiFi to see it." (the user must not have both).
 2. **Favorites.** A card right under the first card, drawn only when `info.limits.favorites` is present (a board from before favorites shows no card and nothing about them). It holds looks saved on the board, each brought back with one tap. See [Favorites](#favorites).
@@ -79,10 +79,10 @@ Setting controls:
 | `breath_pattern`   | option buttons                | Breathing pattern     | 4-7-8 ("In 4 s, hold 7 s, out 8 s."), Box ("In, hold, out, hold: 4 s each.") | `info.breath_patterns` |
 | `hold_seconds`     | slider                        | Time on each color    | `30 s`, `2 min`, `1 min 30 s` | 5 to 600            |
 | `period_seconds`   | slider                        | Length of a breath    | `8 s`                         | 4 to 20             |
-| `floor`            | slider                        | Dimmest level         | `20 %`                        | 5 to 80             |
-| `twinkle_strength` | slider                        | Twinkle strength      | `20 %`                        | 5 to 50             |
+| `floor`            | slider                        | Dimmest level         | `20%`                         | 5 to 80             |
+| `twinkle_strength` | slider                        | Twinkle strength      | `20%`                         | 5 to 50             |
 | `timer_minutes`    | choices and a number field    | Sleep timer           | `Off`, `30 min`, `2 h`        | 0, or 1 to 360      |
-| `brightness`       | slider                        | Brightness            | `60 %`                        | 1 to 100            |
+| `brightness`       | slider                        | Brightness            | `60%`                         | 1 to 100            |
 
 The limits are constants in `web/src/light/model.ts`, equal to the protocol's. A reply whose setting is out of its limit is not a valid reply (see [Replies](#replies)).
 
@@ -246,7 +246,7 @@ Over a WebSocket connection the card shows the state and says that changing the 
 The lower part of the **Firmware** card shows `status.update`, while connected, and is left out for a board that does not report it:
 
 - **What it found.** A sentence for the last result, in plain words for every `last_result` of [WiFi and updates](../board/wifi-and-updates-v1.md#modes-and-checks): `never` "Zenit has not looked for an update yet.", `up_to_date` "Your Zenit has the latest firmware.", `available` "Version 1.2.0 is available.", `skipped` "A newer version exists, but it did not work on this Zenit before, so Zenit does not install it by itself.", `installed` "The new version was installed. Zenit is restarting.", `no_network`, `no_time`, `unreachable`, `tls_error`, `bad_manifest`, `bad_download`, `flash_error`, each in a sentence of its own, and `not_published` "The project site has no firmware published yet, so there is nothing to install." A result the app does not know is named, not hidden. "Last checked" shows `last_check` in the reader's local time. With updates off the card says so and what to do; with the mode on and `update_firmware` false it says "Firmware updates are turned off in Advanced settings, so Zenit does not look for new firmware."
-- **What it is doing.** While `state` is not `idle`: "Looking for an update...", "Downloading the update: 42 %" with a progress bar, "Checking the download...", "Restarting to start the new version...". The poll of once a second follows it. A screen reader hears the state ("Downloading the update..."), not every percent: the number is in the progress bar.
+- **What it is doing.** While `state` is not `idle`: "Looking for an update...", "Downloading the update: 42%" with a progress bar, "Checking the download...", "Restarting to start the new version...". The poll of once a second follows it. A screen reader hears the state ("Downloading the update..."), not every percent: the number is in the progress bar.
 - **Notes.** A firmware on trial ("This firmware is on trial. It confirms itself in a moment, and until then Zenit does not install another one."), a version that was rolled back ("Version 1.1.0 did not work on this Zenit, so Zenit went back to the version it had before."), and the version set aside.
 - **Check now** sends `update_check`; it is off while updates are off (the mode, or both `update_firmware` and `update_web` false), while the board is busy or while it is not on WiFi (a sentence says it needs WiFi).
 - **Install** shows for a version that is `available` (not while on trial, busy, off WiFi or with `update_firmware` false), and asks first: "Zenit downloads the new firmware and then restarts. The light goes dark for a moment and fades in again. Keep Zenit powered until it is back, which takes a minute or so." It sends `update_install` with `target` `firmware`.
@@ -254,7 +254,7 @@ The lower part of the **Firmware** card shows `status.update`, while connected, 
 
 The errors `updates_off`, `no_network`, `nothing_to_install` and `busy` have their own sentences (see [Errors](#errors)).
 
-While the board downloads the web app (`target` `web`) the progress says "Downloading the new app: 42 %". With the firmware's updates off and the app's on, **Check now** still works: the board then looks for a new app only.
+While the board downloads the web app (`target` `web`) the progress says "Downloading the new app: 42%". With the firmware's updates off and the app's on, **Check now** still works: the board then looks for a new app only.
 
 ## The app on Zenit
 
@@ -365,12 +365,12 @@ The board takes a POSIX TZ string; the app offers the IANA zones. `web/src/devic
 - **Frames.** A static site cannot send `frame-ancestors`, so a page that finds itself inside another page's frame shows only "The Zenit app works only in its own browser tab, not inside another page." and a link that opens it in its own tab: no connection, no probe, no controls.
 - Settings, the board's details and the address of the board stay in the browser and travel only to the board.
 - The browser's time zone is read inside the page only to offer it on the Device page and to name the board's zone; it is not stored, and it reaches the board only when the user presses "Use this device's time zone". The time zone search runs in the page.
-- The browser's local storage holds two values: the theme choice and the last board address. Nothing else is stored. The WiFi password goes from the form to the board over the USB cable and is wiped from the frame buffers after it is written, and the form is emptied. The access token lives in the page's memory until the page is closed; it is never stored, put in an address or sent over the network (the board sees only HMACs of it).
+- The browser's local storage holds three values: the theme choice, the language choice and the last board address. Nothing else is stored, and none of them leaves the browser. The WiFi password goes from the form to the board over the USB cable and is wiped from the frame buffers after it is written, and the form is emptied. The access token lives in the page's memory until the page is closed; it is never stored, put in an address or sent over the network (the board sees only HMACs of it).
 - Installing firmware downloads the firmware file from the same site and writes it to the board over USB. Updating over WiFi is done by the board itself, which reads the project's site and downloads from it; the page only asks the board to start.
 
 ## Accessibility
 
-- Every control has an accessible name; sliders have labels and announce their value as text (`60 %`); the power button is a toggle button with `aria-pressed`.
+- Every control has an accessible name; sliders have labels and announce their value as text (`60%`); the power button is a toggle button with `aria-pressed`.
 - Every control works with the keyboard; the focus is always visible.
 - State is never carried by color alone: the selected effect has a mark and a text state; colors have names. A favorite that is on now or turns on has the outline, an icon and words.
 - The Favorites card is a region labelled "Favorites". A tile is a button named by its name and its state: "Starry night, on now, turns on with this". It is not `aria-pressed`, since pressing it again does not undo it. The save dialog, the full dialog, the list and a favorite's sheet are modal dialogs built on the native `dialog` element (`aria-modal`, labelled by their title); the delete question is the alert dialog. Their focus rules are in [Favorites](#favorites).
@@ -379,7 +379,7 @@ The board takes a POSIX TZ string; the app offers the IANA zones. `web/src/devic
 - In Colors, a box that cannot change (the last two picked, or a fifth) is marked `aria-disabled`, and pressing it says why: "Keep at least 2 colors." or "Pick at most 4 colors."
 - `prefers-reduced-motion` turns the transitions off and stops every animation: the power button's glow, the effect previews and the favorites' dots, the reconnection icon, the switches' thumbs and the Device page's loading outlines are still.
 - On/off settings are switches: a real checkbox with the `switch` role over a drawn track, toggled by the whole row; the track has at least 3:1 contrast with the card in both themes. The Advanced settings and "Details for technicians" folds are `details` elements, opened by the keyboard like a button.
-- The status pill is a button that shows and hides its panel (`aria-expanded`), named "Connection: WiFi · zenit-a1b2" and so on; the theme choice is a group of radio buttons. The bottom tab bar's tabs are at least 56 px high and mark the current page (`aria-current`).
+- The status pill is a button that shows and hides its panel (`aria-expanded`), named "Connection: WiFi · zenit-a1b2" and so on; the theme and language choices are groups of radio buttons, and each language's name carries its own `lang`. The bottom tab bar's tabs are at least 56 px high and mark the current page (`aria-current`).
 
 ## Wording
 
@@ -387,12 +387,14 @@ Plain, short and warm. "Zenit" for the projector, "light" for what it shines, "d
 
 ## Languages
 
-- **Catalogs.** The app's text is in `web/src/locales/<language>/<namespace>.json`, one file per namespace (`common`, `connect`, `light`, `favorites`, `device`, `errors`, `privacy`), English in `en/`. Keys are typed: the build fails on a key the English catalogs do not have. A sentence is one key with `{{placeholder}}` values and plural keys where it counts something; no translation holds markup, and a sentence around a link is split around the link's text.
+- **Catalogs.** The app's text is in `web/src/locales/<language>/<namespace>.json`, one file per namespace (`common`, `connect`, `light`, `favorites`, `device`, `errors`, `privacy`), English in `en/`. Keys are typed: the build fails on a key the English catalogs do not have. A sentence is one key with `{{placeholder}}` values and plural keys where it counts something; no translation holds markup. A sentence is never glued from pieces: a link or a styled name inside it is a placeholder that the code fills with the element, a sentence that changes with a state has one key per case, and a list of names is joined by `Intl.ListFormat` in the active language.
 - **Loading.** English is part of the first JavaScript the page loads. Another language is its own file of the same site, loaded only when that language is chosen; nothing comes from another site.
-- **Order.** The browser's languages in order by their primary subtag (`it-CH` is Italian), then English; while English is the only catalog, the app is always in English. A language the person chooses in the app, saved in the browser, comes first once there is a second language to choose (ADR 0007 decision 5). A missing key shows its English text.
+- **Languages.** English and Italian.
+- **Order.** The language chosen in the status panel, saved in the browser's local storage (`zenit.language`, never sent anywhere); with "Match my device", the browser's languages in order by their primary subtag (`it-CH` is Italian), followed as they change; then English. A missing key shows its English text.
+- **The page.** `<html lang>` is the active language. The page is drawn once the language's catalogs are loaded, so it never shows English first; a catalog that cannot load leaves English.
 - **Dates** use the browser's own variant of the active language when it has one (`en-GB` keeps its day-first dates), else the active language.
 - **Not translated.** Names the board reports, protocol identifiers, the raw POSIX time zone string, the city names of the time zone table and log output. An effect, palette, color or pattern with no catalog entry shows the board's id in words.
-- **Numbers and times.** Numbers with a fraction or grouping use the active language's separators; times of day stay `HH:MM` on a 24-hour clock.
+- **Numbers and times.** Numbers with a fraction or grouping use the active language's separators; a percentage has no space before `%` ("45%"); times of day stay `HH:MM` on a 24-hour clock.
 - **Checks.** A test compares every language folder with English: the same files and keys, every plural form of the language, the same placeholders per key, no empty text and no markup.
 
 ## Publishing

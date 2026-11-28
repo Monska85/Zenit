@@ -102,7 +102,7 @@ test("asks before it installs, says the board restarts, and shows the progress",
   mock.board.update = { ...mock.board.update, state: "downloading", progress: 40 };
   const bar = page.getByRole("progressbar", { name: "Download progress" });
   await expect(bar).toHaveAttribute("aria-valuenow", "40", { timeout: 5000 });
-  await expect(page.getByTestId("update-progress")).toContainText("Downloading the update: 40 %");
+  await expect(page.getByTestId("update-progress")).toContainText("Downloading the update: 40%");
   mock.board.update = { ...mock.board.update, state: "verifying", progress: null };
   await expect(page.getByTestId("update-progress")).toContainText("Checking the download...", { timeout: 5000 });
 });

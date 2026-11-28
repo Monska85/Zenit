@@ -268,7 +268,7 @@ test("shows the power limit note when the light is reduced", async ({ page }) =>
   await page.goto("/");
   await page.getByLabel("Address of your Zenit").fill(MOCK_URL);
   await page.getByRole("button", { name: "Connect", exact: true }).click();
-  await expect(page.getByText("Light reduced to 80 % to stay cool.")).toBeVisible();
+  await expect(page.getByText("Light reduced to 80% to stay cool.")).toBeVisible();
 });
 
 test("says the timer ended, and the light stays off", async ({ page }) => {

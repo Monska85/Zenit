@@ -11,6 +11,7 @@
   "status": {
     "label": "Connection: {{text}}",
     "labelWithName": "Connection: {{text}} · {{name}}",
+    "pill": "{{text}} · {{name}}",
     "connecting": "Connecting...",
     "login": "Log in needed",
     "usb": "USB",
@@ -18,10 +19,10 @@
     "restarting": "Restarting...",
     "reconnecting": "Reconnecting...",
     "notConnected": "Not connected",
-    "connectedUsb": "Connected by USB",
-    "connectedWifi": "Connected over WiFi",
-    "to": "to",
-    "end": ".",
+    "connectedUsb": "Connected by USB.",
+    "connectedUsbTo": "Connected by USB to {{name}}.",
+    "connectedWifi": "Connected over WiFi.",
+    "connectedWifiTo": "Connected over WiFi to {{name}}.",
     "disconnect": "Disconnect"
   },
   "theme": {
@@ -29,6 +30,10 @@
     "system": "Match my device",
     "light": "Light",
     "dark": "Dark"
+  },
+  "language": {
+    "legend": "Language",
+    "system": "Match my device"
   },
   "lost": {
     "restarting": "Zenit is restarting. It connects again by itself in a few seconds.",

@@ -1,15 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import { ChevronDown, Monitor, Moon, Sun, Unplug } from "lucide-react";
+import { ChevronDown, Languages, Monitor, Moon, Sun, Unplug } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { boardName, type BoardState } from "../../board/session";
-import { i18n } from "../../i18n";
+import { i18n, LANGUAGES, languageName } from "../../i18n";
+import { chooseLanguage, currentLanguage } from "../../lib/language";
 import { chooseTheme, currentTheme } from "../../lib/theme";
 import type { ThemeChoice } from "../../lib/storage";
 import { cn } from "../../lib/utils";
 import { useBoard } from "../board-context";
 import { Button } from "../components/button";
+import { Sentence, slot } from "../components/sentence";
 import type { Route } from "../route";
 
 const THEMES = [
@@ -54,6 +56,7 @@ export function StatusMenu({ go }: { go: (route: Route) => void }) {
   const { board, session } = useBoard();
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>(currentTheme);
+  const [language, setLanguage] = useState<string | null>(currentLanguage);
   const panelId = useId();
   const root = useRef<HTMLDivElement>(null);
   const pill = useRef<HTMLButtonElement>(null);
@@ -104,12 +107,13 @@ export function StatusMenu({ go }: { go: (route: Route) => void }) {
       >
         <span aria-hidden className={cn("size-2.5 shrink-0 rounded-full", DOTS[dot])} />
         <span className="truncate" data-testid="connection">
-          {text}
-          {name !== null && (
-            <>
-              {" · "}
-              <span data-testid="hostname">{name}</span>
-            </>
+          {name === null ? (
+            text
+          ) : (
+            <Sentence
+              text={t("status.pill", { text, name: slot("name") })}
+              parts={{ name: <span data-testid="hostname">{name}</span> }}
+            />
           )}
         </span>
         <ChevronDown aria-hidden className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")} />
@@ -121,14 +125,16 @@ export function StatusMenu({ go }: { go: (route: Route) => void }) {
       >
         {board.phase === "connected" && (
           <p className="mb-3 text-base">
-            {t(board.kind === "usb" ? "status.connectedUsb" : "status.connectedWifi")}
-            {name !== null && (
-              <>
-                {` ${t("status.to")} `}
-                <span className="font-medium whitespace-nowrap">{name}</span>
-              </>
+            {name === null ? (
+              t(board.kind === "usb" ? "status.connectedUsb" : "status.connectedWifi")
+            ) : (
+              <Sentence
+                text={t(board.kind === "usb" ? "status.connectedUsbTo" : "status.connectedWifiTo", {
+                  name: slot("name"),
+                })}
+                parts={{ name: <span className="font-medium whitespace-nowrap">{name}</span> }}
+              />
             )}
-            {t("status.end")}
           </p>
         )}
         <fieldset>
@@ -151,6 +157,35 @@ export function StatusMenu({ go }: { go: (route: Route) => void }) {
               />
               <Icon aria-hidden className="size-5" />
               {t(label)}
+            </label>
+          ))}
+        </fieldset>
+        <fieldset className="mt-3">
+          <legend className="mb-1 text-sm font-medium text-muted-foreground">{t("language.legend")}</legend>
+          {[null, ...LANGUAGES].map((choice) => (
+            <label
+              key={choice ?? "system"}
+              // Each language is named in its own language, and read out in it
+              lang={choice ?? undefined}
+              className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 hover:bg-muted"
+            >
+              <input
+                type="radio"
+                name="language"
+                value={choice ?? "system"}
+                checked={language === choice}
+                onChange={() => {
+                  setLanguage(choice);
+                  void chooseLanguage(choice);
+                }}
+                className="size-4 accent-[var(--primary)]"
+              />
+              {choice === null ? (
+                <Monitor aria-hidden className="size-5" />
+              ) : (
+                <Languages aria-hidden className="size-5" />
+              )}
+              {choice === null ? t("language.system") : languageName(choice)}
             </label>
           ))}
         </fieldset>

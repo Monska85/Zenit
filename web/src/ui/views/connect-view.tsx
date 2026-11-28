@@ -18,6 +18,7 @@ import { useBoard, useSession } from "../board-context";
 import { Banner } from "../components/banner";
 import { Button } from "../components/button";
 import { Card, CardTitle } from "../components/card";
+import { Sentence, slot } from "../components/sentence";
 import type { Route } from "../route";
 
 /** The USB choice: a button that opens the browser's port chooser, behind a warning about the panel power. */
@@ -253,11 +254,16 @@ export function ConnectView({ go }: { go: (route: Route) => void }) {
         </>
       )}
       <p className="text-base text-muted-foreground">
-        {t("install.question")}{" "}
-        <a className="font-medium text-primary underline" href="#/device">
-          {t("install.link")}
-        </a>
-        {t("install.end")}
+        <Sentence
+          text={t("install.text", { link: slot("link") })}
+          parts={{
+            link: (
+              <a className="font-medium text-primary underline" href="#/device">
+                {t("install.link")}
+              </a>
+            ),
+          }}
+        />
       </p>
     </>
   );

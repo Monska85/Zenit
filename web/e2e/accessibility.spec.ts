@@ -41,10 +41,10 @@ test("every control has an accessible name and a focus ring", async ({ page, sim
 
 test("sliders announce their value as text", async ({ page, simulator }) => {
   await connectByAddress(page, simulator.url);
-  await expect(page.getByRole("slider", { name: "Brightness" })).toHaveAttribute("aria-valuetext", "60 %");
+  await expect(page.getByRole("slider", { name: "Brightness" })).toHaveAttribute("aria-valuetext", "60%");
   await page.getByRole("radio", { name: "Breathing", exact: true }).check({ force: true });
   await expect(page.getByRole("slider", { name: "Length of a breath" })).toHaveAttribute("aria-valuetext", "8 s");
-  await expect(page.getByRole("slider", { name: "Dimmest level" })).toHaveAttribute("aria-valuetext", "20 %");
+  await expect(page.getByRole("slider", { name: "Dimmest level" })).toHaveAttribute("aria-valuetext", "20%");
 });
 
 test("the pages have one heading of level 1 each, and the navigation marks the current page", async ({

@@ -30,9 +30,12 @@ describe("catalogs", () => {
       expect(files(language)).toEqual(files("en"));
     });
 
-    it.each(files("en"))("%s has every key, plural form and placeholder of English, and no empty text", (file) => {
-      expect(catalogProblems(read("en", file), read(language, file), language)).toEqual([]);
-    });
+    it.each(files("en"))(
+      "%s has every key, plural form and placeholder of English, and no empty or punctuation-only text",
+      (file) => {
+        expect(catalogProblems(read("en", file), read(language, file), language)).toEqual([]);
+      },
+    );
   });
 });
 
@@ -63,7 +66,7 @@ describe("catalogProblems", () => {
     expect(catalogProblems(english, english, "en")).toEqual([]);
   });
 
-  it("names a missing key, an extra key, an empty text, markup and a value that is not a text", () => {
+  it("names a missing key, an extra key, an empty text, markup, punctuation alone and a value that is not a text", () => {
     const broken = {
       saved: " ",
       group: { hint: "<b>Try</b> {{value}} %." },
@@ -75,13 +78,14 @@ describe("catalogProblems", () => {
       left_many: "{{name}}: ne restano {{count}}",
       left_other: "{{name}}: ne restano {{count}}",
       list: ["a"],
+      title: " · ",
     };
     expect(catalogProblems(english, broken, "it")).toEqual([
       "list: not a text",
       "saved: empty",
       "group.hint: markup",
       "extra: not in English",
-      "title: missing",
+      "title: punctuation only",
       "saved: placeholders  instead of name",
     ]);
   });

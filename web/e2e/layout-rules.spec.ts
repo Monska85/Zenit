@@ -53,3 +53,13 @@ test("a slider track under 44 px is reported", async ({ page: browser }) => {
   );
   expect((await layoutProblems(browser)).map((problem) => problem.rule)).toContain("a slider is shorter than 44 px");
 });
+
+test("a text cut by its box is reported, and a text that fits is let through", async ({ page: browser }) => {
+  await browser.setContent(
+    page(`<p style="width:80px;overflow:hidden;white-space:nowrap">A sentence much longer than its box</p>
+    <p style="width:80px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">Another long sentence here</p>
+    <p style="width:200px;overflow:hidden;white-space:nowrap">Fits</p>`),
+  );
+  const cut = (await layoutProblems(browser)).filter((problem) => problem.rule === "a text is cut");
+  expect(cut).toHaveLength(2);
+});

@@ -1,0 +1,347 @@
+{
+  "view": {
+    "title": "Dispositivo",
+    "loading": "Caricamento della pagina Dispositivo...",
+    "connectFirst": "Connettiti per vedere il tuo Zenit.",
+    "connect": "Connetti"
+  },
+  "board": {
+    "title": "Il tuo Zenit",
+    "name": "Nome",
+    "connection": "Connessione",
+    "usbCable": "Cavo USB",
+    "firmware": "Firmware",
+    "firmwareWithSummary": "{{version}} · {{summary}}",
+    "summary": {
+      "updating": "Aggiornamento in corso",
+      "available": "Aggiornamento disponibile",
+      "up_to_date": "Aggiornato",
+      "skipped": "Aggiornamento escluso",
+      "update_available": "Aggiornamento disponibile",
+      "newer": "Più recente della versione pubblicata"
+    }
+  },
+  "details": {
+    "title": "Dettagli tecnici",
+    "hardware": "Hardware",
+    "powerLimit": "Limite di potenza della luce",
+    "watts": "{{value}} W",
+    "colors": "Colori",
+    "effects": "Effetti",
+    "palettes": "Palette",
+    "protocol": "Protocollo",
+    "freeMemory": "Memoria libera",
+    "bytes": "{{value}} byte",
+    "settingsMemory": "Memoria delle impostazioni",
+    "usedFree": "{{used}} usati, {{free}} liberi",
+    "notReported": "Non disponibile"
+  },
+  "advanced": {
+    "title": "Impostazioni avanzate",
+    "subtitle": "Aggiornamenti e ora"
+  },
+  "wifi": {
+    "title": "WiFi",
+    "states": {
+      "not_configured": "Non configurato. Zenit non è su una rete WiFi.",
+      "connecting": "Zenit si sta connettendo alla rete \"{{name}}\"...",
+      "connected": "Zenit è connesso alla rete \"{{name}}\".",
+      "not_found": "Zenit non trova la rete \"{{name}}\". Continua a cercare.",
+      "wrong_password": "La rete \"{{name}}\" ha rifiutato la password. Zenit continua a riprovare.",
+      "no_address": "Zenit è entrato nella rete \"{{name}}\", ma non ha ricevuto un indirizzo. Continua a riprovare."
+    },
+    "statesUnnamed": {
+      "connecting": "Zenit si sta connettendo alla rete WiFi...",
+      "connected": "Zenit è connesso alla rete WiFi.",
+      "not_found": "Zenit non trova la rete WiFi. Continua a cercare.",
+      "wrong_password": "La rete WiFi ha rifiutato la password. Zenit continua a riprovare.",
+      "no_address": "Zenit è entrato nella rete WiFi, ma non ha ricevuto un indirizzo. Continua a riprovare."
+    },
+    "unknownState": "Zenit segnala uno stato WiFi che l'app non conosce.",
+    "signals": {
+      "strong": "forte",
+      "fair": "discreto",
+      "weak": "debole"
+    },
+    "address": "Indirizzo",
+    "number": "Numero",
+    "signal": "Segnale",
+    "setUp": "Configura il WiFi",
+    "ownAddress": "Quando Zenit è connesso al tuo WiFi, puoi controllarlo dal suo indirizzo, {{address}}. Con una versione aggiornata di Chrome o Edge, questa pagina può connettersi anche usando quel nome.",
+    "phoneAccessHint": "Se un telefono Android non riesce ad aprirlo, consenti a Chrome di trovare dispositivi sulla tua rete: Impostazioni, App, Chrome, Autorizzazioni, Dispositivi nelle vicinanze.",
+    "usbNote": "Per cambiare rete WiFi o farla dimenticare a Zenit, usa il cavo USB.",
+    "forget": {
+      "button": "Dimentica questa rete",
+      "title": "Dimenticare questa rete WiFi?",
+      "confirm": "Dimentica la rete",
+      "text": "Zenit lascia la rete e spegne il WiFi. Puoi configurarlo di nuovo con il cavo USB."
+    },
+    "power": {
+      "label": "Potenza del WiFi",
+      "hint": "L'impostazione automatica va bene per quasi tutte le case. Riduci la potenza solo se Zenit perde spesso la connessione.",
+      "auto": "Automatica",
+      "dbm": "{{value}} dBm",
+      "lowest": "{{value}} dBm (minima)",
+      "highest": "{{value}} dBm (massima)"
+    }
+  },
+  "improv": {
+    "errors": {
+      "scanFailed": "Zenit non è riuscito a cercare le reti. Riprova.",
+      "unable_to_connect": "Zenit non è riuscito a connettersi a questa rete. Controlla il nome e la password, poi riprova.",
+      "invalid_rpc": "Zenit non accetta questo nome o questa password.",
+      "unknown_rpc": "Il firmware di questo Zenit non può farlo. Aggiorna il firmware.",
+      "timeout": "Zenit non risponde. Riprova.",
+      "busy": "Zenit sta ancora lavorando alla richiesta precedente. Aspetta un momento.",
+      "link": "La connessione USB non ha funzionato. Controlla il cavo."
+    },
+    "problems": {
+      "noName": "Scegli o scrivi il nome della tua rete WiFi.",
+      "nameLength": "Il nome della rete WiFi deve avere da 1 a 32 caratteri.",
+      "nameCharacters": "Zenit non può usare un nome di rete con caratteri di controllo o non validi.",
+      "passwordUnusable": "Questa password non può essere usata.",
+      "passwordLength": "La password del WiFi deve avere da 8 a 63 caratteri. Lasciala vuota per una rete senza password."
+    },
+    "scan": "Cerca le reti",
+    "scanning": "Ricerca delle reti WiFi, fino a 15 secondi...",
+    "noNetworks": "Zenit non trova reti. Scrivi qui sotto il nome della tua.",
+    "networks": "Reti trovate da Zenit",
+    "networkSecure": {
+      "strong": "Segnale forte, con password",
+      "fair": "Segnale discreto, con password",
+      "weak": "Segnale debole, con password"
+    },
+    "networkOpen": {
+      "strong": "Segnale forte, senza password",
+      "fair": "Segnale discreto, senza password",
+      "weak": "Segnale debole, senza password"
+    },
+    "networkName": "Nome della rete",
+    "password": "Password",
+    "hidePassword": "Nascondi la password",
+    "showPassword": "Mostra la password",
+    "passwordHint": "Lasciala vuota se la rete non ha una password.",
+    "connect": "Connetti Zenit a questa rete",
+    "connecting": "Connessione in corso, fino a 30 secondi. Lascia collegato il cavo USB.",
+    "connectedAs": "Connesso come {{hostname}}.local. Apri {{address}} sul telefono o sul computer per controllare Zenit via WiFi.",
+    "connected": "Connesso. Zenit è sul tuo WiFi."
+  },
+  "firmware": {
+    "title": "Firmware",
+    "running": "Sul tuo Zenit",
+    "latestPublished": "Ultima versione pubblicata",
+    "checking": "Controllo in corso...",
+    "notAvailable": "Non disponibile",
+    "state": {
+      "up_to_date": "Il tuo Zenit è aggiornato.",
+      "update_available": "È disponibile un aggiornamento.",
+      "newer": "Il tuo Zenit ha una versione più recente di quella pubblicata.",
+      "unknown": "Non è possibile confrontare le versioni."
+    },
+    "publishedMissing": "Impossibile leggere la versione pubblicata del firmware. Può succedere quando l'app gira sul tuo computer o non sei connesso a internet.",
+    "results": {
+      "never": "Zenit non ha ancora cercato aggiornamenti.",
+      "up_to_date": "Zenit ha l'ultima versione del firmware.",
+      "available": "È disponibile una nuova versione.",
+      "skipped": "C'è una versione più recente, ma in passato non ha funzionato su questo Zenit. Zenit non la installa da solo.",
+      "installed": "La nuova versione è stata installata. Zenit si sta riavviando.",
+      "no_network": "Zenit non è connesso al WiFi e non ha potuto cercare aggiornamenti.",
+      "no_time": "Zenit non conosce ancora l'ora e non ha potuto cercare aggiornamenti. Riprova tra un minuto.",
+      "unreachable": "Zenit non riesce a raggiungere il sito degli aggiornamenti. Controlla la connessione a internet.",
+      "not_published": "Sul sito del progetto non è ancora pubblicato un firmware. Non c'è nulla da installare.",
+      "tls_error": "Zenit non riconosce il certificato di sicurezza del sito degli aggiornamenti e non ha scaricato nulla.",
+      "bad_manifest": "Le informazioni sull'aggiornamento nel sito non sono valide. Zenit non ha scaricato nulla.",
+      "bad_download": "Il file scaricato è danneggiato. Zenit non l'ha installato e non è cambiato nulla.",
+      "flash_error": "Zenit non è riuscito a scrivere il nuovo firmware. Non è cambiato nulla."
+    },
+    "unknownResult": "L'ultimo controllo ha dato un risultato che l'app non conosce ({{result}}).",
+    "progress": {
+      "checking": "Ricerca aggiornamenti...",
+      "downloading": "Download dell'aggiornamento...",
+      "downloadingPercent": "Download dell'aggiornamento: {{progress}}%",
+      "downloadingApp": "Download della nuova app...",
+      "downloadingAppPercent": "Download della nuova app: {{progress}}%",
+      "verifying": "Controllo del file scaricato...",
+      "restarting": "Riavvio con la nuova versione...",
+      "unknown": "Zenit è occupato con l'aggiornamento ({{state}})."
+    },
+    "updatesOff": "Gli aggiornamenti sono disattivati. Zenit non cerca nuove versioni del firmware. Puoi attivarli nelle Impostazioni avanzate.",
+    "firmwareUpdatesOff": "Gli aggiornamenti del firmware sono disattivati nelle Impostazioni avanzate. Zenit non cerca nuove versioni.",
+    "newerSince": "Questo sito ha una versione più recente di quella trovata da Zenit nell'ultimo controllo.",
+    "versionAvailable": "È disponibile la versione {{version}}.",
+    "lastChecked": "Ultimo controllo: {{time}}.",
+    "downloadProgress": "Avanzamento del download",
+    "trial": "Questo firmware è in prova. Tra poco Zenit conferma che funziona. Fino ad allora non ne installa altri.",
+    "rolledBack": "La versione {{version}} non ha funzionato su questo Zenit, che è tornato alla versione precedente.",
+    "skipped": "La versione {{version}} è stata esclusa e non viene installata da sola.",
+    "needsWifi": "Zenit ha bisogno del WiFi per cercare e installare aggiornamenti.",
+    "checkNow": "Controlla ora",
+    "installButton": "Installa {{version}}",
+    "installAnywayButton": "Installa comunque {{version}}",
+    "install": {
+      "title": "Installare la versione {{version}}?",
+      "titleAnyway": "Installare comunque la versione {{version}}?",
+      "confirm": "Installa",
+      "confirmAnyway": "Installa comunque",
+      "warning": "Questa versione non ha funzionato su questo Zenit, che è tornato alla precedente. Potrebbe succedere ancora. In quel caso Zenit torna di nuovo alla versione precedente da solo.",
+      "text": "Zenit scarica il nuovo firmware e si riavvia. La luce si spegne per un momento, poi torna ad accendersi piano. Lascia Zenit alimentato finché non è di nuovo pronto: ci vuole circa un minuto."
+    }
+  },
+  "webApp": {
+    "title": "App su Zenit",
+    "states": {
+      "ok": "Zenit ha l'app pronta per i telefoni e i computer sul tuo WiFi.",
+      "installing": "Zenit sta installando una nuova versione dell'app.",
+      "missing": "Zenit non ha una copia dell'app. La installerà da solo appena possibile.",
+      "incompatible": "L'app su Zenit non è adatta al suo firmware. Zenit ne installerà una adatta da solo."
+    },
+    "unknownState": "L'app su Zenit è in uno stato che questa pagina non conosce ({{state}}).",
+    "results": {
+      "never": "Zenit non ha ancora cercato nuove versioni dell'app.",
+      "up_to_date": "Zenit ha l'ultima versione dell'app.",
+      "available": "È disponibile una nuova versione dell'app.",
+      "installed": "La nuova versione dell'app è stata installata. Le pagine aperte all'indirizzo di Zenit la caricano da sole.",
+      "incompatible": "C'è una versione più recente dell'app, ma richiede un firmware più recente. Zenit tiene quella che ha.",
+      "no_network": "Zenit non è connesso al WiFi e non ha potuto cercare una nuova versione dell'app.",
+      "no_time": "Zenit non conosce ancora l'ora e non ha potuto cercare una nuova versione dell'app. Riprova tra un minuto.",
+      "unreachable": "Zenit non riesce a raggiungere il sito degli aggiornamenti. Controlla la connessione a internet.",
+      "not_published": "Sul sito del progetto non è ancora pubblicata un'app. Non c'è nulla da installare.",
+      "tls_error": "Zenit non riconosce il certificato di sicurezza del sito degli aggiornamenti e non ha scaricato nulla.",
+      "bad_manifest": "Le informazioni sull'aggiornamento dell'app nel sito non sono valide. Zenit non ha scaricato nulla.",
+      "bad_download": "Il file dell'app scaricato è danneggiato. Zenit non l'ha conservato.",
+      "flash_error": "Zenit non è riuscito a scrivere la nuova versione dell'app."
+    },
+    "unknownResult": "L'ultimo controllo ha dato un risultato che l'app non conosce ({{result}}).",
+    "availableVersion": "È disponibile la versione {{version}} dell'app.",
+    "retrySoon": "Zenit riprova tra meno di un minuto.",
+    "retryIn_one": "Zenit riprova tra circa un minuto.",
+    "retryIn_many": "Zenit riprova tra circa {{count}} minuti.",
+    "retryIn_other": "Zenit riprova tra circa {{count}} minuti.",
+    "version": "Versione {{version}}.",
+    "updatesOff": "Zenit non cerca nuove versioni dell'app. Puoi attivare questa opzione nelle Impostazioni avanzate.",
+    "installButton": "Installa app {{version}}",
+    "install": {
+      "title": "Installare la versione {{version}} dell'app?",
+      "confirm": "Installa",
+      "text": "Zenit scarica la nuova app e lascia la luce com'è. Non si riavvia. Al termine, le pagine aperte all'indirizzo di Zenit la caricano di nuovo da sole."
+    }
+  },
+  "settings": {
+    "title": "Impostazioni degli aggiornamenti",
+    "modeLegend": "Quando esce una nuova versione",
+    "modes": {
+      "off": "Disattivati",
+      "notify": "Solo avvisi",
+      "automatic": "Installazione automatica"
+    },
+    "modeHints": {
+      "off": "Zenit non cerca nuove versioni del firmware.",
+      "notify": "Zenit cerca nuove versioni del firmware e ti avvisa. Scegli tu quando installarle.",
+      "automatic": "Zenit installa il nuovo firmware da solo, negli orari indicati qui sotto."
+    },
+    "newChoice": "{{value}} (nuovo su questo Zenit)",
+    "updateFirmware": "Aggiorna il firmware",
+    "updateFirmwareHint": "Disattiva questa opzione per tenere il firmware attuale, qualunque sia la scelta qui sopra.",
+    "updateWeb": "Aggiorna l'app su Zenit",
+    "updateWebHint": "Disattiva questa opzione per tenere l'app attuale su Zenit, qualunque sia la scelta qui sopra.",
+    "checkHours": "Cerca aggiornamenti",
+    "every_one": "Ogni ora",
+    "every_many": "Ogni {{count}} ore",
+    "every_other": "Ogni {{count}} ore",
+    "window": {
+      "legend": "Orario di installazione",
+      "from": "Dalle",
+      "until": "Alle",
+      "anyTime": "A qualsiasi ora.",
+      "range": "Dalle {{from}} alle {{to}}.",
+      "pastMidnight": "Dalle {{from}} alle {{to}} (oltre la mezzanotte).",
+      "summary": "{{window}} Zenit installa automaticamente il nuovo firmware solo in questa fascia oraria. Se i due orari coincidono, può installarlo a qualsiasi ora.",
+      "problem": "Scegli due orari validi, per esempio 03:00."
+    }
+  },
+  "time": {
+    "title": "Ora",
+    "zone": "Fuso orario: {{zone}}",
+    "rawSummary": "Inserisci un fuso orario POSIX",
+    "rawLabel": "Testo del fuso orario",
+    "rawHint": "Per esperti: un fuso orario POSIX come CET-1CEST,M3.5.0,M10.5.0/3.",
+    "timezoneProblem": "Usa da 1 a {{max}} lettere, numeri o simboli, senza spazi.",
+    "server": "Server dell'ora",
+    "serverHint": "È il server da cui Zenit prende l'ora. Quello predefinito va bene quasi sempre.",
+    "ntpServerProblem": "Usa da 1 a {{max}} lettere, numeri, punti o trattini, per esempio pool.ntp.org.",
+    "syncHours": "Controlla l'ora",
+    "offer": {
+      "title": "Fuso orario",
+      "posix": "Zenit usa il fuso orario {{posix}}.",
+      "named": "Zenit usa l'ora di {{zone}}.",
+      "useMine": "Usa il fuso orario di questo dispositivo ({{city}})"
+    },
+    "search": {
+      "label": "Cerca un fuso orario",
+      "hint": "Scrivi una città o un paese, poi scegli. Zenit cambia subito.",
+      "list": "Fusi orari",
+      "none": "Nessun fuso orario trovato. Prova una città vicina o il paese.",
+      "found_one": "{{count}} fuso orario trovato.",
+      "found_many": "{{count}} fusi orari trovati.",
+      "found_other": "{{count}} fusi orari trovati."
+    }
+  },
+  "access": {
+    "title": "Accesso via WiFi",
+    "login": "Accesso con token",
+    "loginHint": "Senza questa opzione, chiunque sia sul tuo WiFi può controllare Zenit.",
+    "loginOn": "I telefoni e i computer sul tuo WiFi inseriscono il token una volta, quando si connettono. Il token non passa sulla rete.",
+    "usbNote": "Il token si vede solo con il cavo USB. Serve il cavo USB anche per crearne uno nuovo.",
+    "token": "Token",
+    "hideToken": "Nascondi il token",
+    "showToken": "Mostra il token",
+    "copyToken": "Copia il token",
+    "copied": "Copiato.",
+    "newToken": {
+      "button": "Crea un nuovo token",
+      "title": "Creare un nuovo token?",
+      "confirm": "Crea un nuovo token",
+      "text": "Il vecchio token smette di funzionare. Ogni telefono e computer che usa Zenit via WiFi deve accedere di nuovo con quello nuovo."
+    },
+    "turnOn": {
+      "title": "Attivare la richiesta del token?",
+      "confirm": "Attiva",
+      "text": "Zenit chiude questa connessione e poi chiede il token. Lo trovi nella pagina Dispositivo quando Zenit è connesso con il cavo USB, oppure con lo strumento da riga di comando via USB.",
+      "warning": "Assicurati di avere il token prima di continuare."
+    }
+  },
+  "maintenance": {
+    "title": "Manutenzione",
+    "reset": {
+      "title": "Ripristina le impostazioni iniziali",
+      "text": "Riporta tutte le impostazioni a quelle iniziali di Zenit.",
+      "button": "Ripristina le impostazioni iniziali",
+      "dialogTitle": "Ripristinare le impostazioni iniziali?",
+      "confirm": "Ripristina",
+      "dialogText": "Tutte le impostazioni tornano a quelle iniziali. La luce torna all'aspetto iniziale. Zenit dimentica anche la rete WiFi e crea un nuovo token.",
+      "needsUsb": "Per ripristinare serve un cavo USB. Connettiti via USB."
+    },
+    "servedNote": "Per installare il firmware via USB serve una pagina su internet: il browser lo permette solo lì. Apri la pagina del progetto su un computer con Chrome o Edge e collega Zenit con il cavo USB. Da qui puoi aggiornarlo via WiFi."
+  },
+  "install": {
+    "title": "Installa o aggiorna il firmware",
+    "keepPlugged": "Lascia collegato il cavo USB finché l'installazione non è finita.",
+    "loading": "Caricamento del programma di installazione...",
+    "done": "Fine",
+    "version": "Installa la versione {{version}} tramite cavo USB.",
+    "latest": "Installa l'ultima versione del firmware tramite cavo USB.",
+    "settingsKept": "Le tue impostazioni restano, a meno che tu non scelga di cancellare tutto.",
+    "button": "Installa o aggiorna il firmware",
+    "dialog": {
+      "title": "Prima di collegare il cavo",
+      "confirm": "Continua",
+      "unplugged": "L'alimentatore della luce è staccato dalla presa",
+      "warning": "Stacca dalla presa l'alimentatore della luce prima di collegare il cavo USB. Non collegare mai insieme il cavo USB e l'alimentatore della luce.",
+      "text": "Le tue impostazioni restano. Il programma di installazione permette anche di cancellare tutto: scegli questa opzione solo se Zenit non funziona bene.",
+      "stuck": "La porta USB è ancora occupata. Scollega il cavo USB, ricollegalo e ricarica questa pagina."
+    },
+    "start": "Avvia l'installazione",
+    "unsupported": "Questo browser non può installare il firmware. Usa Chrome o Edge su un computer.",
+    "notAllowed": "Il browser non permette di avviare l'installazione da qui."
+  }
+}

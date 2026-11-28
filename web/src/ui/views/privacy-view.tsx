@@ -2,6 +2,7 @@
 
 import { useTranslation } from "react-i18next";
 import { Card, CardTitle } from "../components/card";
+import { Sentence, slot } from "../components/sentence";
 
 const link = "inline-flex min-h-11 items-center font-medium text-primary underline";
 
@@ -34,13 +35,21 @@ export function PrivacyView() {
             </a>
           </li>
           <li>
-            <a className={link} href="./LICENSE.txt">
-              {t("about.license")}
-            </a>
-            {` ${t("about.and")} `}
-            <a className={link} href="./LICENSE-EXCEPTION.txt">
-              {t("about.permission")}
-            </a>
+            <Sentence
+              text={t("about.licenseLine", { license: slot("license"), permission: slot("permission") })}
+              parts={{
+                license: (
+                  <a className={link} href="./LICENSE.txt">
+                    {t("about.license")}
+                  </a>
+                ),
+                permission: (
+                  <a className={link} href="./LICENSE-EXCEPTION.txt">
+                    {t("about.permission")}
+                  </a>
+                ),
+              }}
+            />
           </li>
           <li>
             <a className={link} href="./THIRD_PARTY_NOTICES.txt">

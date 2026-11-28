@@ -36,6 +36,18 @@ export async function layoutProblems(page: Page): Promise<Problem[]> {
         problems.push({ rule: "an element reaches outside the window", element: describe(element) });
       }
     }
+    // Text cut by its box: clipped or ended with an ellipsis (a longer language must still fit its control)
+    for (const element of document.body.querySelectorAll<HTMLElement>("*")) {
+      if (!visible(element) || element.closest(".sr-only")) continue;
+      const style = getComputedStyle(element);
+      if (style.overflowX === "visible" && style.textOverflow !== "ellipsis") continue;
+      if (style.overflowX === "auto" || style.overflowX === "scroll") continue;
+      const ownText = [...element.childNodes].some(
+        (node) => node.nodeType === Node.TEXT_NODE && (node.textContent ?? "").trim() !== "",
+      );
+      if (ownText && element.scrollWidth > element.clientWidth + 1)
+        problems.push({ rule: "a text is cut", element: describe(element) });
+    }
     const targets = document.querySelectorAll<HTMLElement>(
       "button, a[href], input:not(.sr-only), select, textarea, label:has(input), summary",
     );

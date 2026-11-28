@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import { useTranslation } from "react-i18next";
-import { formatPercent, LIMITS, liveLine } from "../../light/model";
+import { formatPercent, LIMITS, liveLine, liveValues } from "../../light/model";
 import type { LightStatus } from "../../protocol/types";
 import { Banner } from "../components/banner";
 import { Card } from "../components/card";
+import { Sentence, slot } from "../components/sentence";
 import { PowerButton } from "./power-button";
 import { SettingSlider } from "./setting-slider";
 
@@ -42,17 +43,13 @@ export function HeroCard({
             {line === null ? (
               t("hero.off")
             ) : (
-              <>
-                <span data-testid="live-color">{line.color}</span>
-                {t("hero.separator")}
-                <span data-testid="live-effect">{line.effect}</span>
-                {line.timer !== null && (
-                  <>
-                    {t("hero.separator")}
-                    <span className="font-normal text-muted-foreground">{line.timer}</span>
-                  </>
-                )}
-              </>
+              <Sentence
+                text={t(line.key, liveValues(line, slot("color"), slot("effect")))}
+                parts={{
+                  color: <span data-testid="live-color">{line.color}</span>,
+                  effect: <span data-testid="live-effect">{line.effect}</span>,
+                }}
+              />
             )}
           </p>
           {reduced && (

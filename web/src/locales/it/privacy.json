@@ -1,0 +1,22 @@
+{
+  "title": "Privacy",
+  "data": {
+    "title": "I tuoi dati restano con te",
+    "nothingSent": "Questa app non invia nulla a server su internet. Non raccoglie statistiche, non ti traccia e non mostra pubblicità.",
+    "ownFiles": "L'app carica solo i propri file e i dati del tuo Zenit. Non usa font, programmi o immagini da altri siti.",
+    "localOnly": "Si connette solo a uno Zenit sulla tua rete o a questo computer: rifiuta gli indirizzi su internet.",
+    "settings": "Le tue impostazioni e i dati del tuo Zenit passano solo tra questa pagina e Zenit.",
+    "stored": "Il browser conserva tre cose su questo dispositivo: il tema che hai scelto, la lingua e l'ultimo indirizzo a cui ti sei connesso.",
+    "secrets": "La password del WiFi passa da questa pagina a Zenit solo tramite il cavo USB. La pagina non la conserva. Il token di accesso, se lo usi, resta nella memoria della pagina finché non la chiudi.",
+    "firmware": "Per installare il firmware, questa pagina scarica il file dallo stesso sito e lo scrive su Zenit tramite il cavo USB."
+  },
+  "about": {
+    "title": "Informazioni sull'app",
+    "version": "Versione {{version}}",
+    "source": "Codice sorgente",
+    "license": "Licenza",
+    "permission": "permesso aggiuntivo",
+    "licenseLine": "{{license}} e {{permission}}",
+    "notices": "Licenze dei componenti esterni"
+  }
+}

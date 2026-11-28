@@ -27,9 +27,8 @@
     "unsupported": "This browser cannot use a USB cable. Open the app in Chrome or Edge."
   },
   "install": {
-    "question": "New Zenit with no firmware yet?",
-    "link": "Install the firmware",
-    "end": "."
+    "text": "New Zenit with no firmware yet? {{link}}.",
+    "link": "Install the firmware"
   },
   "login": {
     "title": "Log in to your Zenit",

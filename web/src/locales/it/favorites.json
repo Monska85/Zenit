@@ -1,0 +1,61 @@
+{
+  "card": {
+    "title": "Preferiti",
+    "empty": "Salva la luce che ti piace e ritrovala con un tocco.",
+    "save": "Salva questa luce",
+    "edit": "Modifica"
+  },
+  "tile": {
+    "onNow": "In uso",
+    "turnsOn": "All'accensione",
+    "nameOnNow": "{{name}}, in uso",
+    "nameTurnsOn": "{{name}}, all'accensione",
+    "nameOnNowTurnsOn": "{{name}}, in uso, all'accensione"
+  },
+  "done": {
+    "applied": "{{name}} è attivo.",
+    "saved": "Preferito {{name}} salvato.",
+    "updated": "Preferito {{name}} aggiornato.",
+    "renamed": "Il preferito ora si chiama {{name}}.",
+    "startOn": "Zenit si accende con {{name}}.",
+    "startOff": "Zenit si accende con l'ultima luce usata.",
+    "deleted": "Preferito {{name}} eliminato."
+  },
+  "buttons": {
+    "cancel": "Annulla",
+    "save": "Salva",
+    "replace": "Sostituisci",
+    "rename": "Rinomina",
+    "delete": "Elimina",
+    "done": "Fine"
+  },
+  "name": {
+    "label": "Nome",
+    "default": "La mia luce",
+    "hint": "Fino a {{max}} caratteri.",
+    "empty": "Dai un nome al preferito.",
+    "badCharacter": "Zenit non può salvare uno dei caratteri di questo nome. Prova con lettere, numeri e spazi.",
+    "tooLong": "Usa al massimo {{max}} caratteri.",
+    "taken": "Hai già un preferito chiamato {{name}}. Scegli un altro nome."
+  },
+  "save": {
+    "title": "Salva questa luce"
+  },
+  "full": {
+    "title": "Hai raggiunto il limite dei preferiti",
+    "body": "Zenit può tenere fino a {{max}} preferiti. Scegline uno da sostituire con questa luce, oppure eliminane uno da Modifica.",
+    "legend": "Preferito da sostituire"
+  },
+  "edit": {
+    "title": "Modifica i preferiti"
+  },
+  "sheet": {
+    "useNow": "Usa la luce attuale",
+    "useNowHint": "{{name}} mostrerà la luce che vedi adesso.",
+    "start": "Usa all'accensione",
+    "startHint": "Zenit mostra {{name}} quando riceve corrente e quando accendi la luce.",
+    "startHolder": "Ora Zenit si accende usando {{name}}. Se scegli questo, verrà sostituito.",
+    "deleteTitle": "Eliminare {{name}}?",
+    "deleteQuestion": "Puoi salvare un nuovo preferito quando vuoi."
+  }
+}

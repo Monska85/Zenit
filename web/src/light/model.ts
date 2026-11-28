@@ -174,7 +174,7 @@ export function settingsProblem(settings: Settings, info: BoardInfo): string | n
   return boardSettingsProblem(settings);
 }
 
-/** "12 %": a percentage setting. */
+/** "12%": a percentage setting. */
 export const formatPercent = (value: number): string => i18n.t("light:units.percent", { value });
 
 /** "45 s": a whole number of seconds. */
@@ -212,31 +212,51 @@ export function formatTimer(minutes: number): string {
   return minutes === 0 ? i18n.t("light:timer.off") : formatMinutes(minutes);
 }
 
-/** The time left of a running timer in words that never count seconds: "12 min", "1 h 5 min", "less than a minute". */
-export const timeLeft = (seconds: number): string =>
-  seconds < 60 ? i18n.t("light:timer.lessThanMinute") : formatSeconds(seconds);
+/** The hero's sentence for each case: with the light's color or only "On", and with or without a running timer. */
+type LiveKey =
+  "hero.line" | "hero.lineSoon" | "hero.lineTimer" | "hero.onLine" | "hero.onLineSoon" | "hero.onLineTimer";
+const LIVE_KEYS: Record<"color" | "on", Record<"none" | "soon" | "time", LiveKey>> = {
+  color: { none: "hero.line", soon: "hero.lineSoon", time: "hero.lineTimer" },
+  on: { none: "hero.onLine", soon: "hero.onLineSoon", time: "hero.onLineTimer" },
+};
 
-/** What the light does now in one line: "Warm white · Steady · fades out in 12 min", or "Off". */
+/** What the light does now, as one sentence and its values; null when the light is off. */
+export interface LiveLine {
+  key: LiveKey;
+  /** The color's name; null for an effect with no single color, whose sentence says "On". */
+  color: string | null;
+  effect: string;
+  /** The time left of a running timer of a minute or more: "12 min", "1 h 5 min". */
+  time: string | null;
+}
+
+/** What the light does now: "Warm white · Steady · fades out in 12 min" as a key and its values, or null when off. */
 export function liveLine(light: {
   on: boolean;
   color: string | null;
   effect: string;
   timer: { remaining: number } | null;
-}): {
-  color: string;
-  effect: string;
-  timer: string | null;
-} | null {
+}): LiveLine | null {
   if (!light.on) return null;
+  const remaining = light.timer?.remaining ?? 0;
+  const timer = remaining <= 0 ? "none" : remaining < 60 ? "soon" : "time";
   return {
-    color: light.color === null ? i18n.t("light:hero.on") : colorLabel(light.color),
+    key: LIVE_KEYS[light.color === null ? "on" : "color"][timer],
+    color: light.color === null ? null : colorLabel(light.color),
     effect: effectInfo(light.effect).label,
-    timer:
-      light.timer !== null && light.timer.remaining > 0
-        ? i18n.t("light:hero.fadesOut", { time: timeLeft(light.timer.remaining) })
-        : null,
+    time: timer === "time" ? formatSeconds(remaining) : null,
   };
 }
+
+/**
+ * The values of a live line's sentence. The hero gives slots for the color and the effect, to put its own elements
+ * there; plain text takes the names.
+ */
+export const liveValues = (line: LiveLine, color = line.color ?? "", effect = line.effect) => ({
+  color,
+  effect,
+  time: line.time ?? "",
+});
 
 /** The label of the timer's Custom choice: with the stored value when it is a custom one. */
 export function customTimerLabel(minutes: number): string {
