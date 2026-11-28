@@ -31,7 +31,7 @@ test.beforeEach(async ({ page, simulator }) => {
   await connectByAddress(page, simulator.url);
 });
 
-test("shows the default light: on, 60 %, steady, no timer", async ({ page }) => {
+test("shows the default light: on, 60%, steady, no timer", async ({ page }) => {
   await expect(page.getByTestId("power-button")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("slider", { name: "Brightness" })).toHaveAttribute("aria-valuenow", "60");
   await expect(page.getByRole("radio", { name: "Steady" })).toBeChecked();
@@ -188,7 +188,7 @@ test("offers every palette the board lists", async ({ page }) => {
   for (const name of ["Christmas", "Ice", "Aurora", "Sunset", "All colors"])
     await expect(palette.getByRole("radio", { name: new RegExp("^" + name) })).toHaveCount(1);
   await palette.getByRole("radio", { name: /^All colors/ }).check({ force: true });
-  await expect(palette.getByText("Red, Green, Blue, Warm white")).toBeVisible();
+  await expect(palette.getByText("Red, Green, Blue, and Warm white")).toBeVisible();
 });
 
 test("shows a hint on Fall asleep while there is no timer", async ({ page }) => {

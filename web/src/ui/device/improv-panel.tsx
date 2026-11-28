@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { message, translate, type Message } from "../../i18n";
 import { ImprovClient, ImprovError, type ImprovNetwork } from "../../protocol/improv-client";
-import { boardAddress, describeSignal, passwordProblem, phoneAccessHint, ssidProblem } from "../../wifi/model";
+import { boardAddress, passwordProblem, phoneAccessHint, signalLevel, ssidProblem } from "../../wifi/model";
 import { useSession } from "../board-context";
 import { Banner } from "../components/banner";
 import { Button } from "../components/button";
@@ -128,8 +128,8 @@ export function ImprovPanel() {
                   <span className="min-w-0 break-words">{network.ssid}</span>
                   <span className="shrink-0 text-sm text-muted-foreground">
                     {network.secure
-                      ? t("improv.networkSecure", { signal: describeSignal(network.rssi) })
-                      : t("improv.networkOpen", { signal: describeSignal(network.rssi) })}
+                      ? t(`improv.networkSecure.${signalLevel(network.rssi)}`)
+                      : t(`improv.networkOpen.${signalLevel(network.rssi)}`)}
                   </span>
                 </button>
               </li>

@@ -26,9 +26,29 @@ export default defineConfig({
   },
   plugins: [react(), tailwindcss(), cspOnlyInBuilds(), ...thirdPartyNotices(repository), licenseFiles()],
   // The manifest tells the web image build which files only the installer uses (tools/web_image.py)
-  build: { outDir: "dist", sourcemap: false, manifest: true },
+  build: {
+    outDir: "dist",
+    sourcemap: false,
+    manifest: true,
+    rolldownOptions: {
+      output: {
+        // Each language other than English is one chunk of its own, loaded when it is chosen (docs/adr/0007-translations.md)
+        codeSplitting: {
+          groups: [
+            {
+              test: /[\\/]src[\\/]locales[\\/]/,
+              name: (id) => {
+                const language = /[\\/]locales[\\/]([^\\/]+)[\\/][^\\/]+\.json$/.exec(id)?.[1];
+                return language === undefined || language === "en" ? null : `locale-${language}`;
+              },
+            },
+          ],
+        },
+      },
+    },
+  },
   test: {
-    include: ["test/**/*.test.ts"],
+    include: ["test/**/*.test.ts", "test/**/*.test.tsx"],
     environment: "node",
   },
 });

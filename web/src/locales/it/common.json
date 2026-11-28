@@ -1,0 +1,60 @@
+{
+  "tabs": {
+    "label": "Pagine",
+    "light": "Luce",
+    "device": "Dispositivo"
+  },
+  "footer": {
+    "privacy": "Privacy"
+  },
+  "connectedAgain": "Di nuovo connesso.",
+  "status": {
+    "label": "Connessione: {{text}}",
+    "labelWithName": "Connessione: {{text}} · {{name}}",
+    "pill": "{{text}} · {{name}}",
+    "connecting": "Connessione in corso...",
+    "login": "Serve il token",
+    "usb": "USB",
+    "wifi": "WiFi",
+    "restarting": "Riavvio in corso...",
+    "reconnecting": "Riconnessione in corso...",
+    "notConnected": "Non connesso",
+    "connectedUsb": "Connesso via USB.",
+    "connectedUsbTo": "Connesso via USB a {{name}}.",
+    "connectedWifi": "Connesso via WiFi.",
+    "connectedWifiTo": "Connesso via WiFi a {{name}}.",
+    "disconnect": "Disconnetti"
+  },
+  "theme": {
+    "legend": "Tema",
+    "system": "Come sul dispositivo",
+    "light": "Chiaro",
+    "dark": "Scuro"
+  },
+  "language": {
+    "legend": "Lingua",
+    "system": "Come sul dispositivo"
+  },
+  "lost": {
+    "restarting": "Zenit si sta riavviando. Si riconnette da solo tra pochi secondi.",
+    "reconnecting": "Riconnessione a Zenit...",
+    "title": "Connessione persa.",
+    "noAnswer": "Zenit non risponde.",
+    "lastValues": "Questi sono gli ultimi valori inviati da Zenit.",
+    "reconnect": "Riconnetti"
+  },
+  "buttons": {
+    "cancel": "Annulla",
+    "set": "Imposta",
+    "closeMessage": "Chiudi il messaggio"
+  },
+  "failure": {
+    "title": "Qualcosa non ha funzionato",
+    "text": "Questa pagina non riesce a mostrare i dati inviati da Zenit. Ricaricala per ricominciare.",
+    "reload": "Ricarica"
+  },
+  "framed": {
+    "text": "L'app Zenit funziona solo nella sua scheda del browser, non dentro un'altra pagina.",
+    "open": "Apri l'app Zenit in una nuova scheda"
+  }
+}

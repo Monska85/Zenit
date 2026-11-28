@@ -48,26 +48,31 @@ export function passwordProblem(password: string): Message | null {
 
 /** The sentence for the state of the board's WiFi. */
 export function describeWifiState(state: string, ssid: string | null): string {
-  const name = ssid === null ? i18n.t("device:wifi.theNetwork") : i18n.t("device:wifi.namedNetwork", { ssid });
   switch (state) {
     case "not_configured":
+      return i18n.t("device:wifi.states.not_configured");
     case "connecting":
     case "connected":
     case "not_found":
     case "wrong_password":
     case "no_address":
-      return i18n.t(`device:wifi.states.${state}`, { name });
+      return ssid === null
+        ? i18n.t(`device:wifi.statesUnnamed.${state}`)
+        : i18n.t(`device:wifi.states.${state}`, { name: ssid });
     default:
       return i18n.t("device:wifi.unknownState");
   }
 }
 
-/** The signal in words, from dBm. */
-export function describeSignal(rssi: number): string {
-  if (rssi >= -60) return i18n.t("device:wifi.signals.strong");
-  if (rssi >= -75) return i18n.t("device:wifi.signals.fair");
-  return i18n.t("device:wifi.signals.weak");
+/** How strong a signal is, from dBm. */
+export function signalLevel(rssi: number): "strong" | "fair" | "weak" {
+  if (rssi >= -60) return "strong";
+  if (rssi >= -75) return "fair";
+  return "weak";
 }
+
+/** The signal in words, from dBm. */
+export const describeSignal = (rssi: number): string => i18n.t(`device:wifi.signals.${signalLevel(rssi)}`);
 
 /** The address to open on a phone or computer once the board is on WiFi. */
 export const boardAddress = (hostname: string): string => `http://${hostname}.local/`;

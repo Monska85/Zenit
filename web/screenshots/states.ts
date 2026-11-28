@@ -9,6 +9,7 @@ import { installFakeSerial, scriptImprov } from "../e2e/fake-serial.ts";
 import { packet, rpcCommandOf } from "../e2e/improv-frames.ts";
 import { MOCK_URL, MOCK_USB_URL, mockBoard, type Mock } from "../e2e/mock-board.ts";
 import { FakeBoard } from "../test/helpers.ts";
+import { textsOf } from "../e2e/catalog.ts";
 
 export interface State {
   name: string;
@@ -18,6 +19,10 @@ export interface State {
   reach: (page: Page) => Promise<void>;
   /** The browser's time zone, UTC (the simulator's) unless a state needs another. */
   timezoneId?: string;
+  /** The browser's language, English (en-GB) unless the state shows the app in another language. */
+  locale?: string;
+  /** Drawn in the reference images at the phone width only (the layout checks always cover both widths). */
+  phoneOnly?: boolean;
   /** What the screenshot hides: text that changes by the second. */
   mask?: (page: Page) => import("@playwright/test").Locator[];
 }
@@ -599,7 +604,112 @@ export const STATES: State[] = [
       }, SCREENSHOT_VERSION_LABEL);
     },
   },
+  ...italianStates(),
 ];
+
+/**
+ * The main views in Italian, for a browser whose language is Italian, drawn at the phone width in both themes. Italian
+ * is longer than English: the layout checks show that no text overflows or is cut at 360 px.
+ */
+function italianStates(): State[] {
+  const it = textsOf("it");
+  const connected = async (page: Page, fake: FakeBoard = networkBoard()): Promise<Mock> => {
+    const mock = await mockBoard(page, fake);
+    await page.goto("/");
+    await page.getByLabel(it("connect:address.label")).fill(MOCK_URL);
+    await page.getByRole("button", { name: it("connect:connect"), exact: true }).click();
+    await expect(page.getByTestId("live-state")).toBeVisible();
+    return mock;
+  };
+  const device = async (page: Page): Promise<void> => {
+    await connected(page);
+    await page.getByRole("link", { name: it("common:tabs.device") }).click();
+    await expect(page.getByTestId("update-result")).toBeVisible();
+  };
+  const states: Array<Omit<State, "locale" | "phoneOnly" | "dark">> = [
+    {
+      name: "it-connect",
+      reach: async (page) => {
+        await page.goto("/");
+        await expect(page.getByRole("heading", { name: it("connect:title") })).toBeVisible();
+      },
+    },
+    {
+      name: "it-light",
+      reach: async (page) => void (await connected(page)),
+      mask: timerLine,
+    },
+    {
+      name: "it-menu",
+      reach: async (page) => {
+        await connected(page);
+        await page.getByTestId("connection").click();
+        await expect(page.getByRole("group", { name: it("common:language.legend") })).toBeVisible();
+      },
+      mask: timerLine,
+    },
+    {
+      name: "it-favorites-sheet",
+      reach: async (page) => {
+        await connected(page);
+        await page.getByRole("button", { name: it("favorites:card.edit"), exact: true }).click();
+        await page
+          .getByRole("dialog", { name: it("favorites:edit.title") })
+          .getByRole("button", { name: "Starry night", exact: true })
+          .click();
+        await expect(page.getByRole("dialog", { name: "Starry night" })).toBeVisible();
+      },
+    },
+    {
+      name: "it-error",
+      reach: async (page) => {
+        const mock = await connected(page);
+        mock.board.errors.set("settings_set", "bad_request");
+        // The board refuses, so the choice goes back at once: a click in the page, not a check that waits for the change
+        await page
+          .getByRole("radio", { name: it("light:effects.twinkle.label"), exact: true })
+          .evaluate((radio: HTMLInputElement) => radio.click());
+        await expect(page.getByTestId("bottom-message")).toHaveText(it("errors:board.bad_request"));
+      },
+      mask: timerLine,
+    },
+    {
+      name: "it-connection-lost",
+      reach: async (page) => {
+        const mock = await connected(page);
+        mock.drop();
+        await expect(page.getByTestId("connection-lost")).toBeVisible({ timeout: 10_000 });
+      },
+      mask: timerLine,
+    },
+    {
+      name: "it-device",
+      reach: device,
+    },
+    {
+      name: "it-device-advanced",
+      reach: async (page) => {
+        await device(page);
+        await page.getByText(it("device:advanced.title"), { exact: true }).click();
+        await expect(page.getByRole("region", { name: it("device:time.title"), exact: true })).toBeVisible();
+      },
+    },
+    {
+      name: "it-privacy",
+      reach: async (page) => {
+        await page.goto("/#/privacy");
+        await expect(page.getByRole("heading", { name: it("privacy:title"), level: 1 })).toBeVisible();
+        await page.getByTestId("app-version").evaluate(
+          (element, label) => {
+            element.textContent = label;
+          },
+          it("privacy:about.version", { version: "X.Y.Z" }),
+        );
+      },
+    },
+  ];
+  return states.map((state) => ({ ...state, locale: "it-IT", phoneOnly: true, dark: true }));
+}
 
 export const WIDTHS = [
   { name: "phone", width: 360, height: 740 },

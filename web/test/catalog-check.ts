@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // The checks every language's catalogs must pass against English (docs/adr/0007-translations.md): the same keys, every
-// plural form the language has, the same placeholders, no empty text and no markup. Kept apart from the test that runs
-// them on the real catalogs so they can be tested on fixtures of their own.
+// plural form the language has, the same placeholders, no empty text, no punctuation alone and no markup. Kept apart
+// from the test that runs them on the real catalogs so they can be tested on fixtures of their own.
 
 export type Catalog = Record<string, unknown>;
 
@@ -42,6 +42,8 @@ export function catalogProblems(english: Catalog, other: Catalog, language: stri
 
   for (const [key, text] of target) {
     if (text.trim() === "") problems.push(`${key}: empty`);
+    // A separator or a lone period is a piece of a glued sentence: every sentence is one text
+    else if (/^[\s\p{P}\p{S}]+$/u.test(text)) problems.push(`${key}: punctuation only`);
     if (MARKUP.test(text)) problems.push(`${key}: markup`);
     const base = baseOf(key, plurals);
     if (base === null) {

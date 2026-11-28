@@ -109,6 +109,21 @@ export function dateLocale(browser: readonly string[]): string {
   return browser.find((tag) => primary(tag) === i18n.language) ?? i18n.language;
 }
 
+/** A language's name in that language ("English", "Italiano"), for the language choice. */
+export function languageName(language: string): string {
+  try {
+    const name = new Intl.DisplayNames([language], { type: "language" }).of(language);
+    if (name && name !== language) return name.charAt(0).toLocaleUpperCase(language) + name.slice(1);
+  } catch {
+    // An old browser without Intl.DisplayNames
+  }
+  return language;
+}
+
+/** A list in the active language's words: "Red, Green, and Blue" in English, "Rosso, Verde e Blu" in Italian. */
+export const formatList = (items: readonly string[]): string =>
+  new Intl.ListFormat(i18n.language, { type: "conjunction" }).format(items);
+
 /** A number in the active language's digits and separators. */
 export const formatNumber = (value: number, options?: Intl.NumberFormatOptions): string =>
   new Intl.NumberFormat(i18n.language, options).format(value);

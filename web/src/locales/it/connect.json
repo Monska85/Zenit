@@ -1,0 +1,43 @@
+{
+  "title": "Connettiti al tuo Zenit",
+  "looking": "Ricerca del tuo Zenit...",
+  "waiting": "In attesa di Zenit...",
+  "connect": "Connetti",
+  "served": {
+    "title": "Il tuo Zenit",
+    "text": "Questa pagina arriva dal tuo Zenit e si connette da sola.",
+    "noInstall": "Per installare il firmware su un nuovo Zenit, usa il cavo USB dalla pagina del progetto. La pagina di Zenit non può farlo."
+  },
+  "last": {
+    "text": "L'ultimo Zenit che hai usato.",
+    "connectTo": "Connetti a {{address}}"
+  },
+  "address": {
+    "title": "Con un indirizzo",
+    "titleAnother": "Con un altro indirizzo",
+    "label": "Indirizzo del tuo Zenit",
+    "placeholder": "zenit-1a2b.local",
+    "hint": "Per esempio zenit-1a2b.local o 192.168.1.20.",
+    "asksFirst": "La prima volta Chrome chiede il permesso di trovare dispositivi sulla tua rete locale: consenti l'accesso."
+  },
+  "usb": {
+    "title": "Con un cavo USB",
+    "warning": "Stacca dalla presa l'alimentatore della luce prima di collegare il cavo USB. Non usarli mai insieme.",
+    "connect": "Connetti via USB",
+    "unsupported": "Questo browser non può usare il cavo USB. Apri l'app con Chrome o Edge."
+  },
+  "install": {
+    "text": "Hai un nuovo Zenit senza firmware? {{link}}.",
+    "link": "Installa il firmware"
+  },
+  "login": {
+    "title": "Accedi al tuo Zenit",
+    "cardTitle": "Accesso a questo Zenit",
+    "text": "Questo Zenit chiede un token per controllarlo via WiFi. Il token ha 16 lettere e numeri. Lo trovi nella pagina Dispositivo quando Zenit è connesso con il cavo USB, oppure con lo strumento da riga di comando via USB.",
+    "token": "Token",
+    "tokenHint": "Zenit non invia mai il token via WiFi. Questa pagina lo conserva solo finché non la chiudi.",
+    "idle": "Zenit ha chiuso la connessione dopo 10 secondi di attesa. Scrivi il token e premi Accedi: la pagina si riconnette da sola.",
+    "submit": "Accedi",
+    "another": "Usa un altro Zenit"
+  }
+}

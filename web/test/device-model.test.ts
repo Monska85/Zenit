@@ -201,7 +201,7 @@ describe("the WiFi rules", () => {
     ])
       expect(describeWifiState(state, "HomeNet")).toMatch(/\.$/);
     expect(describeWifiState("connected", "HomeNet")).toBe('Connected to "HomeNet".');
-    expect(describeWifiState("wrong_password", null)).toContain("the network");
+    expect(describeWifiState("wrong_password", null)).toBe("The network refused the password. Zenit keeps trying.");
   });
 
   it("describes the signal and the address", () => {
@@ -252,7 +252,7 @@ describe("the update sentences", () => {
   it("describes what the board is doing", () => {
     expect(describeUpdateState(update())).toBeNull();
     expect(describeUpdateState(update({ state: "checking" }))).toContain("Looking");
-    expect(describeUpdateState(update({ state: "downloading", progress: 42 }))).toBe("Downloading the update: 42 %");
+    expect(describeUpdateState(update({ state: "downloading", progress: 42 }))).toBe("Downloading the update: 42%");
     expect(describeUpdateState(update({ state: "downloading", progress: null }))).toBe("Downloading the update...");
     expect(describeUpdateState(update({ state: "verifying" }))).toContain("Checking");
     expect(describeUpdateState(update({ state: "restarting" }))).toContain("Restarting");
@@ -354,7 +354,7 @@ describe("the sentences of the app on Zenit", () => {
 
   it("names what is downloading", () => {
     expect(describeUpdateState(update({ state: "downloading", progress: 5, target: "web" }))).toBe(
-      "Downloading the new app: 5 %",
+      "Downloading the new app: 5%",
     );
   });
 

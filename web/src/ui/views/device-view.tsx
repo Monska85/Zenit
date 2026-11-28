@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { boardName } from "../../board/session";
 import { firmwareSummary } from "../../device/update";
-import { formatNumber } from "../../i18n";
+import { formatList, formatNumber } from "../../i18n";
 import { colorLabel, colorSetLabel, effectInfo } from "../../light/model";
 import { useBoard } from "../board-context";
 import { Banner } from "../components/banner";
@@ -71,9 +71,9 @@ function BoardCard({ published }: { published: Published }) {
             rows={[
               [t("details.hardware"), info.board],
               [t("details.powerLimit"), watts(info.power_limit_mw)],
-              [t("details.colors"), info.colors.map(colorLabel).join(", ")],
-              [t("details.effects"), info.effects.map((effect) => effectInfo(effect).label).join(", ")],
-              [t("details.palettes"), info.color_sets.map(colorSetLabel).join(", ")],
+              [t("details.colors"), formatList(info.colors.map(colorLabel))],
+              [t("details.effects"), formatList(info.effects.map((effect) => effectInfo(effect).label))],
+              [t("details.palettes"), formatList(info.color_sets.map(colorSetLabel))],
               [t("details.protocol"), String(info.protocol)],
               [
                 t("details.freeMemory"),

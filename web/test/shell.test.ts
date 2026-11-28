@@ -2,7 +2,8 @@
 
 import { describe, expect, it } from "vitest";
 import { BoardSession, boardName, type BoardState } from "../src/board/session";
-import { customTimerLabel, liveLine } from "../src/light/model";
+import { i18n } from "../src/i18n";
+import { customTimerLabel, liveLine, liveValues } from "../src/light/model";
 import { pillState } from "../src/ui/shell/status-menu";
 import { screenOf } from "../src/ui/route";
 import { backAgainStep, type BackAgain } from "../src/ui/shell/use-back-again";
@@ -12,33 +13,36 @@ const state = (patch: Partial<BoardState>): BoardState => ({ ...base, ...patch }
 
 describe("liveLine", () => {
   const light = { on: true, color: "white", effect: "static", timer: null };
+  const text = (patch: Partial<Parameters<typeof liveLine>[0]>) => {
+    const line = liveLine({ ...light, ...patch });
+    return line === null ? null : i18n.t(`light:${line.key}`, liveValues(line));
+  };
 
   it("says nothing more than Off while the light is off", () => {
     expect(liveLine({ ...light, on: false })).toBeNull();
   });
 
   it("names the color and the effect", () => {
-    expect(liveLine(light)).toEqual({ color: "Warm white", effect: "Steady", timer: null });
-    expect(liveLine({ ...light, color: "red", effect: "twinkle" })).toEqual({
-      color: "Red",
-      effect: "Twinkle",
-      timer: null,
-    });
+    expect(liveLine(light)).toEqual({ key: "hero.line", color: "Warm white", effect: "Steady", time: null });
+    expect(text({})).toBe("Warm white · Steady");
+    expect(text({ color: "red", effect: "twinkle" })).toBe("Red · Twinkle");
   });
 
   it("says when the timer fades it out, without counting seconds", () => {
-    expect(liveLine({ ...light, timer: { remaining: 12 * 60 + 40 } })?.timer).toBe("fades out in 12 min");
-    expect(liveLine({ ...light, timer: { remaining: 65 * 60 } })?.timer).toBe("fades out in 1 h 5 min");
-    expect(liveLine({ ...light, timer: { remaining: 59 } })?.timer).toBe("fades out in less than a minute");
-    expect(liveLine({ ...light, timer: { remaining: 60 } })?.timer).toBe("fades out in 1 min");
+    expect(text({ timer: { remaining: 12 * 60 + 40 } })).toBe("Warm white · Steady · fades out in 12 min");
+    expect(text({ timer: { remaining: 65 * 60 } })).toBe("Warm white · Steady · fades out in 1 h 5 min");
+    expect(text({ timer: { remaining: 59 } })).toBe("Warm white · Steady · fades out in less than a minute");
+    expect(text({ timer: { remaining: 60 } })).toBe("Warm white · Steady · fades out in 1 min");
   });
 
   it("leaves out a timer that ended", () => {
-    expect(liveLine({ ...light, timer: { remaining: 0 } })?.timer).toBeNull();
+    expect(text({ timer: { remaining: 0 } })).toBe("Warm white · Steady");
   });
 
   it("says On when no color is lit yet, and words an unknown effect", () => {
-    expect(liveLine({ ...light, color: null })?.color).toBe("On");
+    expect(text({ color: null })).toBe("On · Steady");
+    expect(text({ color: null, timer: { remaining: 30 } })).toBe("On · Steady · fades out in less than a minute");
+    expect(text({ color: null, timer: { remaining: 120 } })).toBe("On · Steady · fades out in 2 min");
     expect(liveLine({ ...light, effect: "aurora_glow" })?.effect).toBe("Aurora glow");
   });
 });

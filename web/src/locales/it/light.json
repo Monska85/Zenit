@@ -1,0 +1,126 @@
+{
+  "view": {
+    "legend": "Luce",
+    "effectTitle": "Effetto"
+  },
+  "hero": {
+    "title": "Luce attuale",
+    "off": "Spenta",
+    "line": "{{color}} · {{effect}}",
+    "lineTimer": "{{color}} · {{effect}} · si spegne tra {{time}}",
+    "lineSoon": "{{color}} · {{effect}} · si spegne tra meno di un minuto",
+    "onLine": "Accesa · {{effect}}",
+    "onLineTimer": "Accesa · {{effect}} · si spegne tra {{time}}",
+    "onLineSoon": "Accesa · {{effect}} · si spegne tra meno di un minuto",
+    "reduced": "Luce ridotta al {{value}}% per non scaldarsi troppo.",
+    "brightness": "Luminosità",
+    "usb": "Connesso via USB. Il cavo USB non alimenta la luce: collega l'alimentatore della luce e usa il WiFi per vederla."
+  },
+  "power": {
+    "label": "Luce"
+  },
+  "picker": {
+    "legend": "Effetto"
+  },
+  "effects": {
+    "static": {
+      "label": "Luce fissa",
+      "description": "Un solo colore, sempre uguale."
+    },
+    "color_change": {
+      "label": "Cambio colore",
+      "description": "Passa lentamente tra i colori che scegli."
+    },
+    "breathing": {
+      "label": "Respiro",
+      "description": "Si illumina e si attenua lentamente."
+    },
+    "twinkle": {
+      "label": "Scintillio",
+      "description": "Brilla piano, come una stella."
+    },
+    "fall_asleep": {
+      "label": "Buonanotte",
+      "description": "Si attenua piano mentre scorre il timer."
+    },
+    "christmas": {
+      "label": "Natale",
+      "description": "Passa lentamente tra i colori di una palette."
+    },
+    "shooting_star": {
+      "label": "Stella cadente",
+      "description": "Un cielo tranquillo, con un lampo ogni tanto."
+    },
+    "guided_breathing": {
+      "label": "Respira con la luce",
+      "description": "Inspira mentre la luce cresce, espira mentre cala."
+    },
+    "jingle": {
+      "label": "Jingle Bells",
+      "description": "Segue il ritmo di Jingle Bells."
+    },
+    "hop": {
+      "label": "Salti di colore",
+      "description": "Salta da un colore all'altro."
+    }
+  },
+  "colors": {
+    "white": "Bianco caldo",
+    "red": "Rosso",
+    "green": "Verde",
+    "blue": "Blu"
+  },
+  "palettes": {
+    "christmas": "Natale",
+    "ice": "Ghiaccio",
+    "aurora": "Aurora",
+    "sunset": "Tramonto",
+    "all": "Tutti i colori"
+  },
+  "patterns": {
+    "4-7-8": {
+      "label": "4-7-8",
+      "hint": "Inspira 4 s, trattieni 7 s, espira 8 s."
+    },
+    "box": {
+      "label": "Quadrato",
+      "hint": "Inspira, trattieni, espira, trattieni: 4 s ciascuno."
+    }
+  },
+  "settings": {
+    "color": "Colore",
+    "colors": "Colori",
+    "colorsHint": "Scegline da {{min}} a {{max}}. Appaiono nell'ordine in cui li scegli.",
+    "colorNumbered": "{{color}}, numero {{number}}",
+    "colorsAtLeast": "Tieni almeno {{min}} colori.",
+    "colorsAtMost": "Scegli al massimo {{max}} colori.",
+    "palette": "Palette",
+    "pattern": "Ritmo del respiro",
+    "hold": "Tempo per ogni colore",
+    "period": "Durata di un respiro",
+    "floor": "Luce minima",
+    "twinkle": "Intensità dello scintillio",
+    "fallAsleep": "Questo effetto attenua la luce mentre il timer è attivo. Imposta il timer qui sotto.",
+    "newerEffect": "Questo Zenit ha un effetto più recente. Aggiorna l'app per regolarlo."
+  },
+  "timer": {
+    "title": "Timer di spegnimento",
+    "off": "Spento",
+    "custom": "Altro",
+    "customWith": "Altro · {{time}}",
+    "minutesLabel": "Minuti (da 1 a {{max}})",
+    "set": "Imposta",
+    "wholeMinutes": "Scegli un numero intero di minuti da 1 a {{max}}.",
+    "fadesOut": "Si spegne tra {{time}}.",
+    "fadesOutSoon": "Si spegne tra meno di un minuto.",
+    "ended": "Il timer è finito. La luce resta spenta finché non la riaccendi."
+  },
+  "units": {
+    "percent": "{{value}}%",
+    "seconds": "{{seconds}} s",
+    "minutes": "{{minutes}} min",
+    "hours": "{{hours}} h",
+    "minutesSeconds": "{{minutes}} min {{seconds}} s",
+    "hoursMinutes": "{{hours}} h {{minutes}} min"
+  }
+}
